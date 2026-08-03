@@ -153,7 +153,15 @@ function createActivityBar() {
     h('div', { class: 'activity-bar__separator' }),
     ...renderGroup(planningModules),
     h('div', { class: 'activity-bar__separator' }),
-    ...renderGroup(analysisModules)
+    ...renderGroup(analysisModules),
+    // Spacer pushes toggle to bottom
+    h('div', { style: { flex: '1' } }),
+    h('div', {
+      class: 'activity-bar__item',
+      title: 'Toggle Sidebar (Ctrl+B)',
+      onclick: toggleSidebar,
+      id: 'activity-bar-sidebar-toggle',
+    }, '☰')
   );
   
   return bar;
@@ -176,10 +184,27 @@ function createSidebar() {
   return h('aside', { class: 'sidebar', id: 'sidebar' },
     h('div', { class: 'sidebar__header' },
       h('span', { class: 'sidebar__title', id: 'sidebar-title' }, 'Strategic Board'),
-      h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Add New', onclick: handleAddNew }, '+')
+      h('div', { style: { display: 'flex', gap: '4px' } },
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Add New', onclick: handleAddNew }, '+'),
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Collapse Sidebar', id: 'sidebar-toggle', onclick: toggleSidebar }, '◀'),
+      )
     ),
     h('div', { class: 'sidebar__content', id: 'sidebar-content' })
   );
+}
+
+function toggleSidebar() {
+  const layout = document.querySelector('.app-layout');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  if (!layout) return;
+  
+  const isCollapsed = layout.classList.toggle('app-layout--sidebar-collapsed');
+  appStore.setState({ sidebarCollapsed: isCollapsed });
+  
+  if (toggleBtn) {
+    toggleBtn.textContent = isCollapsed ? '▶' : '◀';
+    toggleBtn.title = isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
+  }
 }
 
 function updateSidebar() {
@@ -308,6 +333,12 @@ function setupKeyboardShortcuts() {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       appStore.setState({ commandPaletteOpen: !appStore.getState().commandPaletteOpen });
+    }
+    
+    // Toggle sidebar
+    if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+      e.preventDefault();
+      toggleSidebar();
     }
     
     // Escape
