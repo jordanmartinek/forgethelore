@@ -83,6 +83,13 @@ async function init() {
     // Update object count in status bar
     updateObjectCount();
     
+    // Register service worker for PWA install (desktop icon)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(() => {
+        console.log('[LoreForge] Service worker registered — app installable');
+      }).catch(e => console.warn('[LoreForge] SW registration failed:', e));
+    }
+    
     console.log('[LoreForge] ✨ LoreForge Planner ready');
     
   } catch (error) {
