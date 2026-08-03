@@ -1,22 +1,25 @@
 {
+  "framework": null,
   "buildCommand": "",
+  "installCommand": "",
   "outputDirectory": ".",
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ],
-  "headers": [
     {
-      "source": "/(.*)\\.js",
-      "headers": [
-        { "key": "Content-Type", "value": "application/javascript" }
-      ]
+      "src": "/(.*\\.js)",
+      "headers": { "Content-Type": "application/javascript; charset=utf-8" },
+      "continue": true
     },
     {
-      "source": "/(.*)\\.css",
-      "headers": [
-        { "key": "Content-Type", "value": "text/css" }
-      ]
-    }
+      "src": "/(.*\\.css)",
+      "headers": { "Content-Type": "text/css; charset=utf-8" },
+      "continue": true
+    },
+    {
+      "src": "/(.*\\.json)",
+      "headers": { "Content-Type": "application/json; charset=utf-8" },
+      "continue": true
+    },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

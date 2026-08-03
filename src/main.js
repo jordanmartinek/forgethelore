@@ -85,9 +85,10 @@ async function init() {
     
     // Register service worker for PWA install (desktop icon)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then(() => {
-        console.log('[LoreForge] Service worker registered — app installable');
-      }).catch(e => console.warn('[LoreForge] SW registration failed:', e));
+      navigator.serviceWorker.register('/sw.js').catch(e => {
+        // SW may fail on some hosts — non-critical
+        console.warn('[LoreForge] SW registration skipped:', e.message);
+      });
     }
     
     console.log('[LoreForge] ✨ LoreForge Planner ready');
