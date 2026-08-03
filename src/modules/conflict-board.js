@@ -56,6 +56,19 @@ const FACTION_ICONS = ['🦅', '🤖', '🐛', '🌟', '⚔️', '🛡️', '�
 let selectedPiece = null;
 let dragState = null;
 let boardSize = 'md';
+let activeView = 'macro'; // 'macro' or 'micro'
+let activeSceneId = null;
+
+// ─── Scene Data (Micro Board) ────────────────────────────────────────────────
+
+const scenes = [
+  { id: 'sc1', title: 'The Conduit Discovery', order: 1, location: 'The Breach', summary: 'Dominion scouts discover the largest Void Conduit. AXIOM Prime detects the signal simultaneously.', participants: ['p1', 'p4', 'p2'], conflictType: 'competition', outcome: 'Dominion claims territory first', powerShift: { f1: +10, f2: -5 }, status: 'completed' },
+  { id: 'sc2', title: 'Senate Betrayal', order: 2, location: 'Citadel Prime', summary: 'Senator Vex maneuvers to discredit Captain Sera\'s colonial petition, cutting off diplomatic options.', participants: ['p3', 'p7'], conflictType: 'manipulation', outcome: 'Sera loses political credibility', powerShift: { f1: +5, f4: -15 }, status: 'completed' },
+  { id: 'sc3', title: 'Unit-7 Infiltration', order: 3, location: 'Dominion Networks', summary: 'Unit-7 Vanguard breaches Dominion military databases. Dr. Voss receives leaked research data.', participants: ['p5', 'p2', 'p8'], conflictType: 'opposition', outcome: 'Partial success — detected but data extracted', powerShift: { f2: +10, f1: -5, f4: +5 }, status: 'completed' },
+  { id: 'sc4', title: 'Swarm Assault on Obsidian', order: 4, location: 'Obsidian', summary: 'The Overmind launches a full bio-assault on Obsidian, overwhelming the mining colony in hours.', participants: ['p6', 'p2'], conflictType: 'opposition', outcome: 'Swarm victory — planet falls', powerShift: { f3: +20, f1: -10 }, status: 'completed' },
+  { id: 'sc5', title: 'The Alliance Proposal', order: 5, location: 'Nexus Hub', summary: 'Captain Sera proposes a colonial-Machinae alliance against both Dominion and Swarm threats.', participants: ['p7', 'p4', 'p8'], conflictType: 'alliance', outcome: 'Pending — AXIOM deliberating', powerShift: {}, status: 'active' },
+  { id: 'sc6', title: 'Void Weapon Test', order: 6, location: 'Classified', summary: 'The Dominion secretly tests a Void-powered weapon on an asteroid. The energy signature is detected galaxy-wide.', participants: ['p1', 'p2'], conflictType: 'escalation', outcome: 'Unknown', powerShift: {}, status: 'planned' },
+];
 
 
 // ─── Modal System ────────────────────────────────────────────────────────────
@@ -341,6 +354,14 @@ function getPieceSymbol(type) {
 // ─── Render: Main Export ─────────────────────────────────────────────────────
 
 export function renderConflictBoard(container) {
+  if (activeView === 'macro') {
+    renderMacroBoard(container);
+  } else {
+    renderMicroBoard(container);
+  }
+}
+
+function renderMacroBoard(container) {
   const board = h('div', { class: 'conflict-board' },
     renderToolbar(),
     renderFactionsPanel(),
@@ -358,12 +379,12 @@ function renderToolbar() {
   return h('div', { class: 'conflict-board__toolbar' },
     h('div', { class: 'conflict-board__toolbar-left' },
       h('div', { class: 'board-tabs' },
-        h('button', { class: 'board-tab board-tab--active' }, 'Global Board'),
-        h('button', { class: 'board-tab' }, '+ New Board'),
+        h('button', { class: `board-tab ${activeView === 'macro' ? 'board-tab--active' : ''}`, onclick: () => switchView('macro') }, '🌐 Macro (Story)'),
+        h('button', { class: `board-tab ${activeView === 'micro' ? 'board-tab--active' : ''}`, onclick: () => switchView('micro') }, '🎬 Micro (Scenes)'),
       )
     ),
     h('div', { class: 'conflict-board__toolbar-center' },
-      ...strategicLayers.map((layer, i) =>
+      ...(activeView === 'macro' ? strategicLayers.map((layer, i) =>
         h('button', {
           class: `conflict-board__layer-btn ${i === 0 ? 'conflict-board__layer-btn--active' : ''}`,
           onclick: (e) => {
@@ -371,14 +392,27 @@ function renderToolbar() {
             e.target.classList.add('conflict-board__layer-btn--active');
           }
         }, layer)
-      )
+      ) : [
+        h('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `${scenes.length} scenes • ${scenes.filter(s => s.status === 'completed').length} completed`),
+      ])
     ),
     h('div', { class: 'conflict-board__toolbar-left' },
-      h('button', { class: 'btn btn--sm btn--ghost', onclick: toggleHeatmap }, '🔥 Heatmap'),
-      h('button', { class: 'btn btn--sm btn--ghost' }, '🧠 Simulate'),
-      h('button', { class: 'btn btn--sm btn--primary', onclick: openAddPieceModal }, '+ Piece'),
+      ...(activeView === 'macro' ? [
+        h('button', { class: 'btn btn--sm btn--ghost', onclick: toggleHeatmap }, '🔥 Heatmap'),
+        h('button', { class: 'btn btn--sm btn--ghost' }, '🧠 Simulate'),
+        h('button', { class: 'btn btn--sm btn--primary', onclick: openAddPieceModal }, '+ Piece'),
+      ] : [
+        h('button', { class: 'btn btn--sm btn--primary', onclick: openAddSceneModal }, '+ Add Scene'),
+      ])
     )
   );
+}
+
+function switchView(view) {
+  activeView = view;
+  activeSceneId = null;
+  selectedPiece = null;
+  rerenderBoard();
 }
 
 
@@ -729,6 +763,349 @@ function updateBoardSidebar() {
       h('span', { class: 'sidebar-item__icon', style: { color: faction.color } }, getPieceSymbol(piece.type)),
       h('span', { class: 'sidebar-item__label' }, piece.name),
       h('span', { class: `sidebar-item__count momentum-${piece.momentum}` }, piece.momentum === 'rising' ? '▲' : piece.momentum === 'falling' ? '▼' : '■'),
+    ));
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── MICRO BOARD (Scene-Level Conflict) ──────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function renderMicroBoard(container) {
+  const board = h('div', { class: 'conflict-board' },
+    renderToolbar(),
+    renderSceneList(),
+    renderSceneCanvas(),
+    renderSceneIntel(),
+    renderSceneTimeline()
+  );
+  container.appendChild(board);
+  updateMicroSidebar();
+}
+
+// ─── Scene List (Left Panel) ─────────────────────────────────────────────────
+
+function renderSceneList() {
+  const panel = h('div', { class: 'conflict-board__factions' },
+    h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' } },
+      h('div', { class: 'intel-section__title' }, 'SCENES'),
+      h('button', { class: 'btn btn--sm btn--ghost', onclick: openAddSceneModal, title: 'Add Scene' }, '+'),
+    ),
+    ...scenes.map((scene, idx) =>
+      h('div', {
+        class: `faction-card ${activeSceneId === scene.id ? 'faction-card--selected' : ''}`,
+        onclick: () => { activeSceneId = scene.id; rerenderBoard(); },
+        style: { borderLeftWidth: '3px', borderLeftColor: getConflictColor(scene.conflictType) },
+      },
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' } },
+          h('span', { style: { fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' } }, `SCENE ${scene.order}`),
+          h('span', { class: `tag tag--${scene.status === 'completed' ? 'success' : scene.status === 'active' ? 'warning' : 'accent'}`, style: { fontSize: '9px' } }, scene.status),
+        ),
+        h('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' } }, scene.title),
+        h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' } }, `📍 ${scene.location}`),
+        h('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap' } },
+          ...scene.participants.map(pid => {
+            const p = pieces.find(pp => pp.id === pid);
+            const f = p ? factions.find(ff => ff.id === p.faction) : null;
+            return p ? h('span', { style: { fontSize: '10px', padding: '1px 5px', borderRadius: '8px', background: f ? f.color : '#666', color: 'white' } }, p.name.split(' ')[0]) : null;
+          }).filter(Boolean)
+        ),
+        h('div', { style: { marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' } },
+          h('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: getConflictColor(scene.conflictType) } }),
+          h('span', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, scene.conflictType),
+        ),
+      )
+    ),
+    h('div', { style: { marginTop: '12px' } },
+      h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddSceneModal }, '+ Add Scene'),
+    ),
+  );
+  return panel;
+}
+
+// ─── Scene Canvas (Center) ───────────────────────────────────────────────────
+
+function renderSceneCanvas() {
+  const canvas = h('div', { class: 'conflict-board__canvas', style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' } });
+
+  if (!activeSceneId) {
+    canvas.appendChild(h('div', { style: { textAlign: 'center', color: 'var(--text-muted)' } },
+      h('div', { style: { fontSize: '48px', marginBottom: '16px', opacity: '0.5' } }, '🎬'),
+      h('div', { style: { fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' } }, 'Select a Scene'),
+      h('div', { style: { fontSize: '13px', maxWidth: '300px' } }, 'Click a scene from the left panel to view its conflict breakdown, participants, and power shifts.'),
+    ));
+    return canvas;
+  }
+
+  const scene = scenes.find(s => s.id === activeSceneId);
+  if (!scene) return canvas;
+
+  // Scene detail view - mini chessboard showing only participants
+  const miniBoard = h('div', { style: { width: '400px', background: 'var(--surface-1)', borderRadius: '12px', padding: '20px', border: '1px solid var(--border-default)' } },
+    // Scene header
+    h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' } },
+      h('div', {},
+        h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' } }, `Scene ${scene.order}`),
+        h('div', { style: { fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' } }, scene.title),
+      ),
+      h('span', { class: `tag tag--${scene.status === 'completed' ? 'success' : scene.status === 'active' ? 'warning' : 'accent'}` }, scene.status),
+    ),
+    h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.6' } }, scene.summary),
+
+    // Participants as pieces
+    h('div', { style: { marginBottom: '16px' } },
+      h('div', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' } }, 'Participants'),
+      h('div', { style: { display: 'flex', gap: '12px', flexWrap: 'wrap' } },
+        ...scene.participants.map(pid => {
+          const p = pieces.find(pp => pp.id === pid);
+          const f = p ? factions.find(ff => ff.id === p.faction) : null;
+          if (!p || !f) return null;
+          return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid var(--border-subtle)' } },
+            h('div', { style: { width: '28px', height: '28px', borderRadius: '50%', background: f.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: 'white' } }, getPieceSymbol(p.type)),
+            h('div', {},
+              h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' } }, p.name),
+              h('div', { style: { fontSize: '10px', color: f.color } }, f.name),
+            ),
+          );
+        }).filter(Boolean)
+      ),
+    ),
+
+    // Conflict visualization
+    h('div', { style: { padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', border: `1px solid ${getConflictColor(scene.conflictType)}40`, marginBottom: '16px' } },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
+        h('div', { style: { width: '12px', height: '12px', borderRadius: '50%', background: getConflictColor(scene.conflictType) } }),
+        h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', textTransform: 'uppercase' } }, `Conflict Type: ${scene.conflictType}`),
+      ),
+      scene.outcome ? h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `Outcome: ${scene.outcome}`) : null,
+    ),
+
+    // Power shifts
+    Object.keys(scene.powerShift).length > 0 ? h('div', {},
+      h('div', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' } }, 'Power Shift'),
+      ...Object.entries(scene.powerShift).map(([fid, shift]) => {
+        const f = factions.find(ff => ff.id === fid);
+        if (!f) return null;
+        return h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' } },
+          h('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `${f.icon} ${f.name}`),
+          h('span', { style: { fontSize: '12px', fontWeight: '700', color: shift > 0 ? 'var(--success)' : 'var(--danger)' } }, `${shift > 0 ? '+' : ''}${shift}%`),
+        );
+      }).filter(Boolean)
+    ) : null,
+  );
+
+  canvas.appendChild(miniBoard);
+  return canvas;
+}
+
+// ─── Scene Intel (Right Panel) ───────────────────────────────────────────────
+
+function renderSceneIntel() {
+  const panel = h('div', { class: 'conflict-board__intel' });
+
+  if (!activeSceneId) {
+    panel.append(
+      h('div', { class: 'intel-section' },
+        h('div', { class: 'intel-section__title' }, '📊 SCENE OVERVIEW'),
+        h('div', { class: 'intel-card' }, h('div', { class: 'intel-card__label' }, 'Total Scenes'), h('div', { class: 'intel-card__value' }, String(scenes.length))),
+        h('div', { class: 'intel-card' }, h('div', { class: 'intel-card__label' }, 'Completed'), h('div', { class: 'intel-card__value' }, String(scenes.filter(s => s.status === 'completed').length))),
+        h('div', { class: 'intel-card' }, h('div', { class: 'intel-card__label' }, 'Active'), h('div', { class: 'intel-card__value' }, String(scenes.filter(s => s.status === 'active').length))),
+        h('div', { class: 'intel-card' }, h('div', { class: 'intel-card__label' }, 'Planned'), h('div', { class: 'intel-card__value' }, String(scenes.filter(s => s.status === 'planned').length))),
+      ),
+      h('div', { class: 'intel-section' },
+        h('div', { class: 'intel-section__title' }, '⚡ CUMULATIVE POWER SHIFTS'),
+        ...factions.map(f => {
+          const totalShift = scenes.reduce((sum, s) => sum + (s.powerShift[f.id] || 0), 0);
+          return h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' } },
+            h('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `${f.icon} ${f.name}`),
+            h('span', { style: { fontSize: '13px', fontWeight: '700', color: totalShift > 0 ? 'var(--success)' : totalShift < 0 ? 'var(--danger)' : 'var(--text-muted)' } }, `${totalShift > 0 ? '+' : ''}${totalShift}%`),
+          );
+        })
+      ),
+      h('div', { class: 'intel-section' },
+        h('div', { class: 'intel-section__title' }, '🧠 AI SCENE ANALYSIS'),
+        h('div', { class: 'ai-suggestion' }, '⚠️ The Dominion has gained net +10% power. If the next scene doesn\'t introduce opposition, faction balance becomes one-sided.'),
+        h('div', { class: 'ai-suggestion' }, '💡 Captain Sera\'s alliance proposal (Scene 5) could rebalance power. Resolving it before the Void Weapon test creates stronger narrative tension.'),
+        h('div', { class: 'ai-suggestion' }, '🔄 No scene has focused on Personal conflict. Consider a character-driven scene to break up political/military progression.'),
+      ),
+    );
+  } else {
+    const scene = scenes.find(s => s.id === activeSceneId);
+    if (scene) {
+      panel.append(
+        h('div', { class: 'intel-section' },
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } },
+            h('div', { class: 'intel-section__title' }, 'SCENE DETAILS'),
+            h('button', { class: 'btn btn--ghost btn--sm', style: { color: 'var(--danger)' }, onclick: () => removeScene(scene) }, '🗑️ Delete'),
+          ),
+        ),
+        h('div', { class: 'intel-card', style: { marginBottom: '8px' } }, h('div', { class: 'intel-card__label' }, 'Location'), h('div', { class: 'intel-card__value' }, scene.location)),
+        h('div', { class: 'intel-card', style: { marginBottom: '8px' } }, h('div', { class: 'intel-card__label' }, 'Conflict Type'), h('div', { class: 'intel-card__value', style: { color: getConflictColor(scene.conflictType) } }, scene.conflictType)),
+        scene.outcome ? h('div', { class: 'intel-card', style: { marginBottom: '8px' } }, h('div', { class: 'intel-card__label' }, 'Outcome'), h('div', { class: 'intel-card__value' }, scene.outcome)) : null,
+        h('div', { class: 'intel-section', style: { marginTop: '16px' } },
+          h('div', { class: 'intel-section__title' }, '🧠 WHAT CHANGED'),
+          h('div', { class: 'ai-suggestion' }, getSceneAnalysis(scene)),
+        ),
+        h('div', { class: 'intel-section' },
+          h('div', { class: 'intel-section__title' }, '➡️ WHAT COMES NEXT'),
+          h('div', { class: 'ai-suggestion' }, getNextSceneSuggestion(scene)),
+        ),
+      );
+    }
+  }
+
+  return panel;
+}
+
+// ─── Scene Timeline (Bottom) ─────────────────────────────────────────────────
+
+function renderSceneTimeline() {
+  return h('div', { class: 'conflict-board__timeline', style: { gap: '8px', overflowX: 'auto' } },
+    h('span', { style: { fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', marginRight: '8px' } }, 'Scene Flow:'),
+    ...scenes.map((scene, i) =>
+      h('div', {
+        style: {
+          display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
+          padding: '4px 10px', borderRadius: '12px', whiteSpace: 'nowrap',
+          background: activeSceneId === scene.id ? 'var(--accent-primary)' : scene.status === 'completed' ? 'var(--surface-3)' : 'var(--surface-2)',
+          color: activeSceneId === scene.id ? 'white' : scene.status === 'completed' ? 'var(--text-secondary)' : 'var(--text-muted)',
+          border: `1px solid ${activeSceneId === scene.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+          fontSize: '11px', fontWeight: '500',
+        },
+        onclick: () => { activeSceneId = scene.id; rerenderBoard(); },
+      },
+        h('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: getConflictColor(scene.conflictType) } }),
+        `${i + 1}. ${scene.title}`,
+      )
+    ),
+  );
+}
+
+// ─── Scene Helpers ───────────────────────────────────────────────────────────
+
+function getConflictColor(type) {
+  const colors = { opposition: '#ef4444', alliance: '#3b82f6', manipulation: '#eab308', competition: '#f97316', escalation: '#a855f7', support: '#22c55e', hidden: '#6b7280' };
+  return colors[type] || '#6366f1';
+}
+
+function getSceneAnalysis(scene) {
+  const analyses = {
+    'sc1': 'The Dominion gained territorial advantage but AXIOM Prime now knows the Conduit exists. This creates a race dynamic.',
+    'sc2': 'Senator Vex successfully isolated Captain Sera politically. The Free Colonies lost their only diplomatic path.',
+    'sc3': 'A double-edged outcome: Machinae gained intel but the Dominion now knows they were breached. Expect retaliation.',
+    'sc4': 'Catastrophic loss for the Dominion. The Swarm proved it can overwhelm even defended positions. Military doctrine must change.',
+    'sc5': 'This alliance, if formed, would create the first real counter to Dominion supremacy. High stakes.',
+    'sc6': 'If successful, this changes the entire strategic calculus. No faction can oppose a Void weapon directly.',
+  };
+  return analyses[scene.id] || 'Analyzing scene impact on the strategic landscape...';
+}
+
+function getNextSceneSuggestion(scene) {
+  const suggestions = {
+    'sc1': 'Logical follow-up: AXIOM Prime dispatches Unit-7 to gather intelligence on Dominion Conduit operations.',
+    'sc2': 'Captain Sera needs a win. Consider a scene where she achieves something outside political channels — perhaps a military or personal victory.',
+    'sc3': 'The Dominion will respond to the breach. Fleet Admiral Koss should be tasked with hunting Unit-7.',
+    'sc4': 'The galaxy reacts to Obsidian\'s fall. Political scenes showing faction responses would build tension.',
+    'sc5': 'Aurelian should learn of this proposal and attempt to sabotage it — perhaps through Senator Vex.',
+    'sc6': 'The weapon test detection forces every faction to respond. This should trigger multiple simultaneous scenes.',
+  };
+  return suggestions[scene.id] || 'Consider what each participant would logically do next based on this outcome.';
+}
+
+function removeScene(scene) {
+  if (!confirm(`Delete scene "${scene.title}"?`)) return;
+  const idx = scenes.findIndex(s => s.id === scene.id);
+  if (idx !== -1) scenes.splice(idx, 1);
+  // Re-number
+  scenes.forEach((s, i) => s.order = i + 1);
+  activeSceneId = null;
+  rerenderBoard();
+  triggerSave();
+}
+
+function openAddSceneModal() {
+  const state = { title: '', location: '', summary: '', conflictType: 'opposition', participants: [], status: 'planned' };
+
+  const participantCheckboxes = h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', maxHeight: '120px', overflowY: 'auto' } },
+    ...pieces.map(p => {
+      const f = factions.find(ff => ff.id === p.faction);
+      return h('label', { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer', padding: '3px 6px', borderRadius: '4px', background: 'var(--surface-2)' } },
+        h('input', { type: 'checkbox', onchange: (e) => {
+          if (e.target.checked) { state.participants.push(p.id); }
+          else { state.participants = state.participants.filter(id => id !== p.id); }
+        }}),
+        h('span', { style: { color: f ? f.color : '#666' } }, getPieceSymbol(p.type)),
+        p.name,
+      );
+    })
+  );
+
+  const content = h('div', {},
+    createFormField('Scene Title', h('input', { class: 'input', placeholder: 'e.g. The Conduit Discovery', oninput: (e) => state.title = e.target.value })),
+    createFormField('Location', h('input', { class: 'input', placeholder: 'Where does this scene take place?', oninput: (e) => state.location = e.target.value })),
+    createFormField('Summary', h('textarea', { class: 'input', placeholder: 'What happens in this scene?', style: { minHeight: '60px' }, oninput: (e) => state.summary = e.target.value })),
+    createFormField('Conflict Type', h('select', { class: 'input', onchange: (e) => state.conflictType = e.target.value },
+      ...['opposition', 'alliance', 'manipulation', 'competition', 'escalation', 'support', 'hidden'].map(t => h('option', { value: t }, t.charAt(0).toUpperCase() + t.slice(1)))
+    )),
+    createFormField('Status', h('select', { class: 'input', onchange: (e) => state.status = e.target.value },
+      h('option', { value: 'planned' }, 'Planned'),
+      h('option', { value: 'active' }, 'Active'),
+      h('option', { value: 'completed' }, 'Completed'),
+    )),
+    createFormField('Participants', participantCheckboxes),
+  );
+
+  showModal('Add New Scene', content, () => {
+    if (!state.title.trim()) return;
+    scenes.push({
+      id: generateId(),
+      title: state.title,
+      order: scenes.length + 1,
+      location: state.location,
+      summary: state.summary,
+      participants: [...state.participants],
+      conflictType: state.conflictType,
+      outcome: '',
+      powerShift: {},
+      status: state.status,
+    });
+    activeSceneId = scenes[scenes.length - 1].id;
+    rerenderBoard();
+    triggerSave();
+  });
+}
+
+// ─── Micro Sidebar ───────────────────────────────────────────────────────────
+
+function updateMicroSidebar() {
+  const sidebar = document.getElementById('sidebar-content');
+  if (!sidebar) return;
+  sidebar.innerHTML = '';
+
+  sidebar.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' } }, 'Scene Progression'));
+
+  scenes.forEach(scene => {
+    sidebar.appendChild(h('div', {
+      class: `sidebar-item ${activeSceneId === scene.id ? 'sidebar-item--active' : ''}`,
+      onclick: () => { activeSceneId = scene.id; rerenderBoard(); },
+    },
+      h('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: getConflictColor(scene.conflictType), flexShrink: '0' } }),
+      h('span', { class: 'sidebar-item__label' }, `${scene.order}. ${scene.title}`),
+      h('span', { class: `sidebar-item__count` }, scene.status === 'completed' ? '✓' : scene.status === 'active' ? '●' : '○'),
+    ));
+  });
+
+  sidebar.appendChild(h('div', { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }));
+  sidebar.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' } }, 'Conflict Types Used'));
+
+  const typeCounts = {};
+  scenes.forEach(s => { typeCounts[s.conflictType] = (typeCounts[s.conflictType] || 0) + 1; });
+  Object.entries(typeCounts).forEach(([type, count]) => {
+    sidebar.appendChild(h('div', { class: 'sidebar-item' },
+      h('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: getConflictColor(type), flexShrink: '0' } }),
+      h('span', { class: 'sidebar-item__label' }, type),
+      h('span', { class: 'sidebar-item__count' }, String(count)),
     ));
   });
 }
