@@ -36,7 +36,7 @@ function renderSpeciesList() {
       h('span', { class: `tag tag--${sp.status === 'dominant' || sp.status === 'growing' ? 'success' : sp.status === 'expanding' ? 'warning' : 'accent'}`, style: { fontSize: '9px' } }, sp.status),
     ));
   });
-  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' } }, '+ New Species')));
+  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddSpeciesModal }, '+ New Species')));
   return list;
 }
 
@@ -67,4 +67,31 @@ function col(title, open, content) { return h('div', { class: `collapsible ${ope
 function updateSpeciesSidebar() {
   const sb = document.getElementById('sidebar-content'); if (!sb) return; sb.innerHTML = '';
   species.forEach(sp => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '🧬'), h('span', { class: 'sidebar-item__label' }, sp.name), h('span', { class: 'sidebar-item__count' }, sp.type))));
+}
+
+
+function openAddSpeciesModal() {
+  const state = { name: '', type: 'Organic', origin: '', description: '' };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', placeholder: 'Species name', oninput: (e) => state.name = e.target.value })),
+    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Organic', 'Synthetic', 'Bio-Collective', 'Hybrid', 'Energy', 'Other'].map(t => h('option', { value: t }, t)))),
+    ff('Origin', h('input', { class: 'input', placeholder: 'Where did they come from?', oninput: (e) => state.origin = e.target.value })),
+    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this species...', oninput: (e) => state.description = e.target.value })),
+  );
+  modal3('Add New Species', content, () => {
+    if (!state.name.trim()) return;
+    species.push({ id: `sp${Date.now()}`, name: state.name, type: state.type, origin: state.origin, population: 'Unknown', lifespan: 'Unknown', intelligence: 'Unknown', status: 'active', traits: [], weaknesses: [], description: state.description, color: '#6366f1' });
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
+function modal3(title, content, onSave) {
+  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
+      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
+  document.body.appendChild(overlay);
 }

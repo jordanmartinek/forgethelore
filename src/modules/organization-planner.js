@@ -36,7 +36,7 @@ function renderOrgList() {
       h('span', { class: 'tag tag--accent', style: { fontSize: '9px' } }, org.status),
     ));
   });
-  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' } }, '+ New Organization')));
+  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddOrgModal }, '+ New Organization')));
   return list;
 }
 
@@ -63,4 +63,32 @@ function col(title, open, content) { return h('div', { class: `collapsible ${ope
 function updateOrgSidebar() {
   const sb = document.getElementById('sidebar-content'); if (!sb) return; sb.innerHTML = '';
   organizations.forEach(org => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '🏢'), h('span', { class: 'sidebar-item__label' }, org.name))));
+}
+
+
+function openAddOrgModal() {
+  const state = { name: '', type: 'Organization', faction: '', leader: '', description: '' };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', placeholder: 'Organization name', oninput: (e) => state.name = e.target.value })),
+    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Intelligence Agency', 'Research Organization', 'Secret Society', 'Trade Guild', 'Military Order', 'Criminal Syndicate', 'Religious Order', 'Corporation', 'Other'].map(t => h('option', { value: t }, t)))),
+    ff('Faction', h('input', { class: 'input', placeholder: 'Affiliated faction', oninput: (e) => state.faction = e.target.value })),
+    ff('Leader', h('input', { class: 'input', placeholder: 'Leader name', oninput: (e) => state.leader = e.target.value })),
+    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this organization...', oninput: (e) => state.description = e.target.value })),
+  );
+  modal2('Add New Organization', content, () => {
+    if (!state.name.trim()) return;
+    organizations.push({ id: `org${Date.now()}`, name: state.name, type: state.type, faction: state.faction, leader: state.leader, members: 'Unknown', purpose: '', secrecy: 50, influence: 30, status: 'active', color: '#6366f1', description: state.description });
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
+function modal2(title, content, onSave) {
+  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
+      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
+  document.body.appendChild(overlay);
 }

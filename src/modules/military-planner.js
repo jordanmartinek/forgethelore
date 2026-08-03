@@ -52,7 +52,7 @@ function renderMilitaryList() {
       h('span', { class: `tag tag--${c.status === 'active' ? 'success' : c.status === 'failing' ? 'danger' : 'accent'}`, style: { fontSize: '9px' } }, `${c.progress}%`),
     ));
   });
-  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' } }, '+ New Force / Campaign')));
+  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddMilitaryModal }, '+ New Force / Campaign')));
   return list;
 }
 
@@ -88,4 +88,32 @@ function updateMilitarySidebar() {
   sb.appendChild(h('div', { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }));
   sb.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-muted)' } }, 'Campaigns'));
   campaigns.forEach(c => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '🎯'), h('span', { class: 'sidebar-item__label' }, c.name), h('span', { class: 'sidebar-item__count' }, `${c.progress}%`))));
+}
+
+
+function openAddMilitaryModal() {
+  const state = { name: '', type: 'Space Fleet', faction: '', commander: '', description: '' };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', placeholder: 'Force name', oninput: (e) => state.name = e.target.value })),
+    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Space Fleet', 'Ground Army', 'AI Strike Force', 'Bio-Fleet', 'Militia', 'Special Forces', 'Defense Force'].map(t => h('option', { value: t }, t)))),
+    ff('Faction', h('input', { class: 'input', placeholder: 'Faction', oninput: (e) => state.faction = e.target.value })),
+    ff('Commander', h('input', { class: 'input', placeholder: 'Commanding officer', oninput: (e) => state.commander = e.target.value })),
+    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this force...', oninput: (e) => state.description = e.target.value })),
+  );
+  modal('Add New Military Force', content, () => {
+    if (!state.name.trim()) return;
+    militaryForces.push({ id: `mil${Date.now()}`, name: state.name, type: state.type, faction: state.faction, commander: state.commander, strength: 50, ships: 0, personnel: 'Unknown', status: 'active', doctrine: 'Unknown', location: 'Unknown', description: state.description, color: '#6366f1' });
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
+function modal(title, content, onSave) {
+  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
+      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
+  document.body.appendChild(overlay);
 }

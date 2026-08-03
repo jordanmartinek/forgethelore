@@ -51,7 +51,7 @@ function renderPoliticsList() {
       h('span', { class: `tag tag--${t.status === 'active' ? 'success' : t.status === 'violated' ? 'danger' : 'warning'}`, style: { fontSize: '9px' } }, t.status),
     ));
   });
-  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' } }, '+ New Political Entity')));
+  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddPoliticsModal }, '+ New Political Entity')));
   return list;
 }
 
@@ -83,4 +83,31 @@ function updatePoliticsSidebar() {
   politicalEntities.forEach(pe => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '🏛️'), h('span', { class: 'sidebar-item__label' }, pe.name))));
   sb.appendChild(h('div', { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }));
   treaties.forEach(t => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '📋'), h('span', { class: 'sidebar-item__label' }, t.name))));
+}
+
+
+function openAddPoliticsModal() {
+  const state = { name: '', type: 'Government', leader: '', description: '' };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', placeholder: 'Political entity name', oninput: (e) => state.name = e.target.value })),
+    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Autocratic Council', 'Democratic Assembly', 'Monarchy', 'Federation', 'AI Consensus', 'Military Junta', 'Trade Federation', 'Theocracy', 'Other'].map(t => h('option', { value: t }, t)))),
+    ff('Leader', h('input', { class: 'input', placeholder: 'Current leader', oninput: (e) => state.leader = e.target.value })),
+    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this political entity...', oninput: (e) => state.description = e.target.value })),
+  );
+  modal4('Add New Political Entity', content, () => {
+    if (!state.name.trim()) return;
+    politicalEntities.push({ id: `pol${Date.now()}`, name: state.name, type: state.type, leader: state.leader, members: 0, description: state.description, stability: 50, legitimacy: 50, corruption: 25, color: '#6366f1' });
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
+function modal4(title, content, onSave) {
+  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
+      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
+  document.body.appendChild(overlay);
 }

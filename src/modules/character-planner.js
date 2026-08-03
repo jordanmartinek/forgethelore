@@ -51,7 +51,7 @@ function renderCharacterList(mode) {
   }
   
   list.appendChild(h('div', { style: { padding: '8px' } },
-    h('button', { class: 'btn btn--primary', style: { width: '100%' } }, '+ New Character')
+    h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddCharacterModal }, '+ New Character')
   ));
   
   return list;
@@ -185,4 +185,51 @@ function updateCharacterSidebar(mode) {
       );
     });
   });
+}
+
+
+function openAddCharacterModal() {
+  const state = { name: '', role: '', faction: 'Independent', description: '' };
+  const factionOptions = [...new Set(demoCharacters.map(c => c.faction)), 'Independent', 'Other'];
+  const content = h('div', {},
+    formField('Name', h('input', { class: 'input', placeholder: 'Character name', oninput: (e) => state.name = e.target.value })),
+    formField('Role', h('input', { class: 'input', placeholder: 'e.g. Military Commander', oninput: (e) => state.role = e.target.value })),
+    formField('Faction', h('select', { class: 'input', onchange: (e) => state.faction = e.target.value },
+      ...factionOptions.map(f => h('option', { value: f }, f)))),
+    formField('Description', h('textarea', { class: 'input', placeholder: 'Describe this character...', oninput: (e) => state.description = e.target.value })),
+  );
+  showModal('Add New Character', content, () => {
+    if (!state.name.trim()) return;
+    demoCharacters.push({ id: `c${Date.now()}`, name: state.name, role: state.role, faction: state.faction, color: '#6366f1', momentum: 'stable', status: 'active', description: state.description });
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
+    appStore.setState({ saveStatus: 'saving' });
+    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function formField(label, input) {
+  return h('div', { style: { marginBottom: '12px' } },
+    h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label),
+    input
+  );
+}
+
+function showModal(title, content, onSave) {
+  const existing = document.querySelector('.modal-overlay');
+  if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' },
+      h('div', { class: 'modal__header' },
+        h('span', { class: 'modal__title' }, title),
+        h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕'),
+      ),
+      h('div', { class: 'modal__body' }, content),
+      h('div', { class: 'modal__footer' },
+        h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'),
+        h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'),
+      ),
+    )
+  );
+  document.body.appendChild(overlay);
 }

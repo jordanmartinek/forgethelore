@@ -43,7 +43,7 @@ function renderTechList() {
       ));
     });
   });
-  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' } }, '+ New Technology')));
+  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddTechModal }, '+ New Technology')));
   return list;
 }
 
@@ -82,4 +82,34 @@ function updateTechSidebar() {
     sb.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: '8px' } }, era));
     technologies.filter(t => t.era === era).forEach(t => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '⚙️'), h('span', { class: 'sidebar-item__label' }, t.name))));
   });
+}
+
+
+function openAddTechModal() {
+  const state = { name: '', category: 'General', era: 'Era 3', inventor: '', faction: '', description: '' };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', placeholder: 'Technology name', oninput: (e) => state.name = e.target.value })),
+    ff('Category', h('select', { class: 'input', onchange: (e) => state.category = e.target.value },
+      ...['Propulsion', 'Energy', 'AI', 'Engineering', 'Military', 'Biology', 'Communication', 'General'].map(c => h('option', { value: c }, c)))),
+    ff('Era', h('select', { class: 'input', onchange: (e) => state.era = e.target.value },
+      ...['Era 1', 'Era 2', 'Era 3', 'Era 4'].map(e => h('option', { value: e }, e)))),
+    ff('Inventor', h('input', { class: 'input', placeholder: 'Who created this?', oninput: (e) => state.inventor = e.target.value })),
+    ff('Faction', h('input', { class: 'input', placeholder: 'Controlling faction', oninput: (e) => state.faction = e.target.value })),
+    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this technology...', oninput: (e) => state.description = e.target.value })),
+  );
+  modal('Add New Technology', content, () => {
+    if (!state.name.trim()) return;
+    technologies.push({ id: `tech${Date.now()}`, name: state.name, category: state.category, era: state.era, inventor: state.inventor, faction: state.faction, prerequisites: [], dependents: [], status: 'theoretical', description: state.description, impact: 'Unknown', year: 'Pending', color: '#6366f1' });
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
+function modal(title, content, onSave) {
+  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
+      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
+  document.body.appendChild(overlay);
 }

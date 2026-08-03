@@ -65,7 +65,7 @@ function renderMysteryList() {
       )
     ),
     h('div', { style: { marginTop: '12px' } },
-      h('button', { class: 'btn btn--primary', style: { width: '100%' } }, '+ New Mystery')
+      h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddMysteryModal }, '+ New Mystery')
     ),
   );
 }
@@ -198,4 +198,33 @@ function updateMysterySidebar() {
       );
     });
   });
+}
+
+
+function openAddMysteryModal() {
+  const state = { title: '', question: '', truth: '', importance: 'moderate' };
+  const content = h('div', {},
+    ff('Title', h('input', { class: 'input', placeholder: 'Mystery title', oninput: (e) => state.title = e.target.value })),
+    ff('Central Question', h('input', { class: 'input', placeholder: 'What is the question this mystery poses?', oninput: (e) => state.question = e.target.value })),
+    ff('Actual Truth (Creator Only)', h('textarea', { class: 'input', placeholder: 'The real answer...', oninput: (e) => state.truth = e.target.value })),
+    ff('Importance', h('select', { class: 'input', onchange: (e) => state.importance = e.target.value },
+      h('option', { value: 'critical' }, 'Critical'), h('option', { value: 'major' }, 'Major'), h('option', { value: 'moderate', selected: 'selected' }, 'Moderate'), h('option', { value: 'minor' }, 'Minor'))),
+  );
+  modal('Add New Mystery', content, () => {
+    if (!state.title.trim()) return;
+    demoMysteries.push({ id: `m${Date.now()}`, title: state.title, question: state.question, truth: state.truth, status: 'active', importance: state.importance, progress: 0, clues: 0, redHerrings: 0 });
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' });
+    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
+function modal(title, content, onSave) {
+  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
+      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
+  document.body.appendChild(overlay);
 }
