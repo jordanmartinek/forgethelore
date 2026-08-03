@@ -20,6 +20,7 @@ import { renderOrganizationPlanner } from '../modules/organization-planner.js';
 import { renderSpeciesPlanner } from '../modules/species-planner.js';
 import { renderTechnologyPlanner } from '../modules/technology-planner.js';
 import { renderMilitaryPlanner } from '../modules/military-planner.js';
+import { renderFactionPlanner } from '../modules/faction-planner.js';
 import { renderCommandPalette } from './command-palette.js';
 
 // Module definitions
@@ -259,8 +260,10 @@ function renderActiveModule() {
       renderWorldBuilder(content);
       break;
     case 'characters':
-    case 'factions':
       renderCharacterPlanner(content, state.activeModule);
+      break;
+    case 'factions':
+      renderFactionPlanner(content);
       break;
     case 'locations':
       renderLocationPlanner(content);
