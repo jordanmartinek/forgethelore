@@ -48,6 +48,15 @@ export const appStore = createStore({
   detailPanelOpen: false,
   selectedObjectId: null,
   contextMenu: null,
+  projectMenuOpen: false,
+  
+  // Projects
+  activeProjectId: 'proj1',
+  projects: [
+    { id: 'proj1', name: 'Void Dominion', icon: '🌌', lastOpened: Date.now(), description: 'Sci-fi universe — Dominion, Machinae, Swarm, Free Colonies' },
+    { id: 'proj2', name: 'The Shattered Kingdoms', icon: '⚔️', lastOpened: Date.now() - 86400000, description: 'Fantasy epic — warring kingdoms, ancient magic, prophecy' },
+    { id: 'proj3', name: 'Neon Requiem', icon: '🌃', lastOpened: Date.now() - 172800000, description: 'Cyberpunk noir — megacorps, hackers, rogue AI' },
+  ],
   
   // Sidebar
   sidebarCollapsed: false,
