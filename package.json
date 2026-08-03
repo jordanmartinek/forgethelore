@@ -1,0 +1,18 @@
+{
+  "name": "loreforge-planner",
+  "version": "0.1.0",
+  "description": "Creative Planning Operating System - Mission control for fictional universes",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "worldbuilding",
+    "creative-planning",
+    "fiction",
+    "universe-builder",
+    "strategic-planning"
+  ],
+  "license": "MIT"
+}

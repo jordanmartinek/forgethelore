@@ -1,0 +1,277 @@
+/* World Builder Canvas */
+.world-builder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.world-builder__toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.world-builder__breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.world-builder__crumb {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.world-builder__crumb:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.world-builder__crumb--current {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Object Palette (Left) */
+.world-builder__palette {
+  grid-row: 2;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  background: var(--surface-1);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.palette-group {
+  margin-bottom: var(--space-md);
+}
+
+.palette-group__title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: var(--space-xs) var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px var(--space-sm);
+  border-radius: var(--radius-md);
+  cursor: grab;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.palette-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.palette-item:active {
+  cursor: grabbing;
+  background: var(--bg-active);
+}
+
+.palette-item__icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* Infinite Canvas */
+.world-builder__canvas {
+  grid-row: 2;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-primary);
+  cursor: default;
+}
+
+.world-builder__canvas--panning {
+  cursor: grabbing;
+}
+
+.canvas-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, var(--border-subtle) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.5;
+}
+
+/* Canvas Objects (Nodes) */
+.canvas-node {
+  position: absolute;
+  min-width: 120px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  cursor: pointer;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+  user-select: none;
+}
+
+.canvas-node:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.canvas-node--selected {
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.canvas-node--dragging {
+  cursor: grabbing;
+  z-index: 100;
+  box-shadow: var(--shadow-lg);
+  opacity: 0.9;
+}
+
+.canvas-node__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.canvas-node__icon {
+  font-size: 16px;
+}
+
+.canvas-node__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.canvas-node__type {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.canvas-node__enter {
+  position: absolute;
+  bottom: var(--space-sm);
+  right: var(--space-sm);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: white;
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.canvas-node:hover .canvas-node__enter {
+  opacity: 1;
+}
+
+/* Connection Lines */
+.canvas-connections {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.canvas-connection {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.canvas-connection--active {
+  stroke: var(--accent-primary);
+  stroke-width: 2;
+}
+
+/* Zoom Controls */
+.canvas-controls {
+  position: absolute;
+  bottom: var(--space-lg);
+  right: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs);
+}
+
+.canvas-controls__btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  transition: all var(--transition-fast);
+}
+
+.canvas-controls__btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.canvas-controls__zoom {
+  font-size: 11px;
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--space-xs) 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Minimap */
+.canvas-minimap {
+  position: absolute;
+  bottom: var(--space-lg);
+  left: var(--space-lg);
+  width: 160px;
+  height: 120px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  opacity: 0.8;
+}
+
+.canvas-minimap__viewport {
+  position: absolute;
+  border: 1px solid var(--accent-primary);
+  background: rgba(99,102,241,0.1);
+  border-radius: 2px;
+}

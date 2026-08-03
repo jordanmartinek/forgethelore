@@ -1,0 +1,489 @@
+/* Strategic Conflict Board Styles */
+.conflict-board {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+}
+
+.conflict-board__toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.conflict-board__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.conflict-board__toolbar-center {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.conflict-board__layer-btn {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.conflict-board__layer-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.conflict-board__layer-btn--active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+/* Factions Panel (Left) */
+.conflict-board__factions {
+  grid-row: 2;
+  overflow-y: auto;
+  padding: var(--space-md);
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.faction-card {
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.faction-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.faction-card--selected {
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.faction-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.faction-card__color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.faction-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.faction-card__goal {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--surface-3);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-xs);
+}
+
+.faction-card__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.faction-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.faction-stat__value {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Main Board Canvas */
+.conflict-board__canvas {
+  grid-row: 2;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.chessboard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.chessboard--size-sm {
+  width: 480px;
+  height: 480px;
+}
+
+.chessboard--size-md {
+  width: 580px;
+  height: 580px;
+}
+
+.chessboard--size-lg {
+  width: 680px;
+  height: 680px;
+}
+
+.chessboard__cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.chessboard__cell--light {
+  background: var(--surface-3);
+}
+
+.chessboard__cell--dark {
+  background: var(--surface-1);
+}
+
+.chessboard__cell--highlight {
+  box-shadow: inset 0 0 20px rgba(99,102,241,0.3);
+}
+
+.chessboard__cell--heatmap-low {
+  box-shadow: inset 0 0 15px rgba(34,197,94,0.15);
+}
+
+.chessboard__cell--heatmap-med {
+  box-shadow: inset 0 0 20px rgba(245,158,11,0.25);
+}
+
+.chessboard__cell--heatmap-high {
+  box-shadow: inset 0 0 25px rgba(239,68,68,0.35);
+}
+
+/* Goal Cards (at board edges) */
+.goal-card {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-md) var(--space-xl);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  min-width: 200px;
+  box-shadow: var(--shadow-md);
+  z-index: 5;
+}
+
+.goal-card--top {
+  top: -60px;
+}
+
+.goal-card--bottom {
+  bottom: -60px;
+}
+
+.goal-card__faction {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+.goal-card__text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.goal-card__progress {
+  margin-top: var(--space-sm);
+}
+
+/* Chess Pieces */
+.chess-piece {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  transition: all var(--transition-fast);
+  z-index: 10;
+  border: 2px solid transparent;
+  box-shadow: var(--shadow-md);
+}
+
+.chess-piece:hover {
+  transform: scale(1.15);
+  z-index: 20;
+  box-shadow: var(--shadow-lg), 0 0 15px rgba(99,102,241,0.3);
+}
+
+.chess-piece--dragging {
+  cursor: grabbing;
+  transform: scale(1.2);
+  z-index: 30;
+  opacity: 0.9;
+}
+
+.chess-piece--selected {
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(99,102,241,0.4);
+}
+
+.chess-piece__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+}
+
+.chess-piece__momentum {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+}
+
+.chess-piece__name {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+}
+
+/* Conflict Lines (SVG overlay) */
+.conflict-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.conflict-line {
+  stroke-width: 2;
+  fill: none;
+  opacity: 0.6;
+  transition: opacity var(--transition-fast);
+}
+
+.conflict-line--opposition { stroke: var(--faction-red); }
+.conflict-line--alliance { stroke: var(--faction-blue); }
+.conflict-line--support { stroke: var(--faction-green); }
+.conflict-line--manipulation { stroke: var(--faction-yellow); }
+.conflict-line--hidden { stroke: var(--faction-purple); stroke-dasharray: 6 4; }
+.conflict-line--competition { stroke: var(--faction-orange); }
+.conflict-line--unknown { stroke: #666; stroke-dasharray: 3 3; }
+
+/* Intelligence Panel (Right) */
+.conflict-board__intel {
+  grid-row: 2;
+  overflow-y: auto;
+  padding: var(--space-md);
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.intel-section {
+  margin-bottom: var(--space-lg);
+}
+
+.intel-section__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.intel-card {
+  padding: var(--space-md);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-sm);
+}
+
+.intel-card__label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.intel-card__value {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.intel-card__bar {
+  margin-top: var(--space-xs);
+}
+
+/* AI Suggestions */
+.ai-suggestion {
+  padding: var(--space-md);
+  background: rgba(99,102,241,0.05);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.ai-suggestion__icon {
+  color: var(--accent-primary);
+  margin-right: var(--space-xs);
+}
+
+/* Timeline Slider */
+.conflict-board__timeline {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-xl);
+  background: var(--surface-1);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.timeline-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--surface-4);
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+}
+
+.timeline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  cursor: grab;
+  box-shadow: 0 0 8px rgba(99,102,241,0.4);
+}
+
+.timeline-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+/* Heatmap Overlay */
+.heatmap-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.5;
+}
+
+/* Board Selection Tabs */
+.board-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.board-tab {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.board-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.board-tab--active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Momentum Indicators */
+.momentum-rising { color: var(--success); }
+.momentum-falling { color: var(--danger); }
+.momentum-stable { color: var(--text-muted); }
+
+/* Piece Type Icons */
+.piece-king { font-size: 22px; }
+.piece-queen { font-size: 20px; }
+.piece-rook { font-size: 18px; }
+.piece-bishop { font-size: 18px; }
+.piece-knight { font-size: 18px; }
+.piece-pawn { font-size: 16px; }
