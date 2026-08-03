@@ -6,6 +6,7 @@
   grid-template-columns: 280px 1fr 320px;
   grid-template-rows: auto 1fr auto;
   overflow: hidden;
+  min-height: 0;
 }
 
 .conflict-board__toolbar {
@@ -60,6 +61,7 @@
   padding: var(--space-md);
   border-right: 1px solid var(--border-subtle);
   background: var(--surface-1);
+  min-height: 0;
 }
 
 .faction-card {
@@ -345,6 +347,7 @@
   padding: var(--space-md);
   border-left: 1px solid var(--border-subtle);
   background: var(--surface-1);
+  min-height: 0;
 }
 
 .intel-section {

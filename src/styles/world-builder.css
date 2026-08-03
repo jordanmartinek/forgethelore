@@ -6,6 +6,7 @@
   grid-template-columns: 240px 1fr;
   grid-template-rows: auto 1fr;
   overflow: hidden;
+  min-height: 0;
 }
 
 .world-builder__toolbar {
@@ -50,6 +51,7 @@
   padding: var(--space-sm);
   background: var(--surface-1);
   border-right: 1px solid var(--border-subtle);
+  min-height: 0;
 }
 
 .palette-group {
