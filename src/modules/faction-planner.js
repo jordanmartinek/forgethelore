@@ -39,6 +39,7 @@ function renderFactionList() {
     list.appendChild(h('div', {
       class: 'character-card',
       onclick: (e) => {
+        if (e.target.closest('.card-actions')) return;
         document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
         e.currentTarget.classList.add('character-card--active');
         const detail = document.querySelector('.character-detail');
@@ -50,7 +51,10 @@ function renderFactionList() {
         h('div', { class: 'character-card__name' }, fac.name),
         h('div', { class: 'character-card__role' }, `${fac.type} • ${fac.leader}`),
       ),
-      h('span', { class: `tag tag--${fac.status === 'dominant' ? 'danger' : fac.status === 'growing' || fac.status === 'expanding' ? 'success' : fac.status === 'neutral' ? 'accent' : 'warning'}`, style: { fontSize: '9px' } }, fac.status),
+      h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditFactionItemModal(fac); } }, '✏️'),
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteFaction(fac); } }, '🗑️'),
+      ),
     ));
   });
 
@@ -213,4 +217,32 @@ function updateFactionSidebar() {
       ));
     });
   });
+}
+
+
+function openEditFactionItemModal(fac) {
+  const state = { name: fac.name, type: fac.type, leader: fac.leader, goal: fac.goal, territory: fac.territory, description: fac.description };
+  const content = h('div', {},
+    formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('input', { class: 'input', value: state.type, oninput: (e) => state.type = e.target.value })),
+    formField('Leader', h('input', { class: 'input', value: state.leader, oninput: (e) => state.leader = e.target.value })),
+    formField('Strategic Goal', h('input', { class: 'input', value: state.goal, oninput: (e) => state.goal = e.target.value })),
+    formField('Territory', h('input', { class: 'input', value: state.territory, oninput: (e) => state.territory = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe...', value: state.description, label: 'Faction Description', oninput: (e) => state.description = e.target.value })),
+  );
+  showModal(`Edit: ${fac.name}`, content, () => {
+    Object.assign(fac, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteFaction(fac) {
+  if (!confirm(`Delete faction "${fac.name}"?`)) return;
+  const idx = factionData.findIndex(f => f.id === fac.id);
+  if (idx !== -1) factionData.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }

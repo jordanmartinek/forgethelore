@@ -62,6 +62,7 @@ function createCharacterCard(char) {
   return h('div', { 
     class: 'character-card',
     onclick: (e) => {
+      if (e.target.closest('.card-actions')) return;
       document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
       e.currentTarget.classList.add('character-card--active');
       const detail = document.querySelector('.character-detail');
@@ -76,8 +77,38 @@ function createCharacterCard(char) {
       h('div', { class: 'character-card__name' }, char.name),
       h('div', { class: 'character-card__role' }, `${char.role} • ${char.faction}`),
     ),
-    h('span', { class: `momentum-${char.momentum}`, style: { fontSize: '12px' } }, char.momentum === 'rising' ? '▲' : char.momentum === 'falling' ? '▼' : '■'),
+    h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+      h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditCharacterModal(char); } }, '✏️'),
+      h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteCharacter(char); } }, '🗑️'),
+    ),
   );
+}
+
+function openEditCharacterModal(char) {
+  const state = { name: char.name, role: char.role, faction: char.faction, description: char.description };
+  const factionOptions = [...new Set(demoCharacters.map(c => c.faction)), 'Independent', 'Other'];
+  const content = h('div', {},
+    formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    formField('Role', h('input', { class: 'input', value: state.role, oninput: (e) => state.role = e.target.value })),
+    formField('Faction', h('select', { class: 'input', onchange: (e) => state.faction = e.target.value },
+      ...factionOptions.map(f => h('option', { value: f, ...(f === state.faction ? { selected: 'selected' } : {}) }, f)))),
+    formField('Description', expandableText({ placeholder: 'Describe this character...', value: state.description, label: 'Character Description', oninput: (e) => state.description = e.target.value })),
+  );
+  showModal(`Edit: ${char.name}`, content, () => {
+    Object.assign(char, { name: state.name, role: state.role, faction: state.faction, description: state.description });
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteCharacter(char) {
+  if (!confirm(`Delete "${char.name}"?`)) return;
+  const idx = demoCharacters.findIndex(c => c.id === char.id);
+  if (idx !== -1) demoCharacters.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 
