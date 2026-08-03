@@ -39,6 +39,7 @@ function renderLocationList() {
     list.appendChild(h('div', {
       class: 'character-card',
       onclick: (e) => {
+        if (e.target.closest('.card-actions')) return;
         document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
         e.currentTarget.classList.add('character-card--active');
         const detail = document.querySelector('.character-detail');
@@ -49,6 +50,10 @@ function renderLocationList() {
       h('div', { class: 'character-card__info' },
         h('div', { class: 'character-card__name' }, loc.name),
         h('div', { class: 'character-card__role' }, `${loc.type} • ${loc.region}`),
+      ),
+      h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditLocationModal(loc); } }, '✏️'),
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteLocation(loc); } }, '🗑️'),
       ),
       h('span', { class: `tag tag--${loc.status === 'active' ? 'success' : 'danger'}`, style: { fontSize: '9px' } }, loc.status),
     ));
@@ -109,6 +114,32 @@ function openAddLocationModal() {
     appStore.setState({ saveStatus: 'saving' });
     setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
   });
+}
+
+function openEditLocationModal(loc) {
+  const state = { name: loc.name, type: loc.type, region: loc.region, faction: loc.faction, description: loc.description };
+  const content = h('div', {},
+    formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value }, ...LOCATION_TYPES.map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
+    formField('Region', h('input', { class: 'input', value: state.region, oninput: (e) => state.region = e.target.value })),
+    formField('Controlling Faction', h('input', { class: 'input', value: state.faction, oninput: (e) => state.faction = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this location...', label: 'Location Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+  );
+  showModal('Edit: ' + loc.name, content, () => {
+    Object.assign(loc, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteLocation(loc) {
+  if (!confirm(`Delete "${loc.name}"?`)) return;
+  const idx = locations.findIndex(i => i.id === loc.id);
+  if (idx !== -1) locations.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

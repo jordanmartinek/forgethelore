@@ -36,12 +36,17 @@ function renderMilitaryList() {
   list.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: '4px' } }, 'Forces'));
   militaryForces.forEach(mil => {
     list.appendChild(h('div', { class: 'character-card', onclick: (e) => {
+      if (e.target.closest('.card-actions')) return;
       document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
       e.currentTarget.classList.add('character-card--active');
       const d = document.querySelector('.character-detail'); if (d) { d.innerHTML = ''; d.appendChild(renderMilitaryDetailContent(mil)); }
     }},
       h('div', { class: 'character-card__avatar', style: { background: mil.color, fontSize: '14px' } }, '⚔️'),
       h('div', { class: 'character-card__info' }, h('div', { class: 'character-card__name' }, mil.name), h('div', { class: 'character-card__role' }, `${mil.type} • ${mil.faction}`)),
+      h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditMilitaryModal(mil); } }, '✏️'),
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteMilitary(mil); } }, '🗑️'),
+      ),
       h('span', { class: `tag tag--${mil.status === 'deployed' || mil.status === 'active' ? 'success' : mil.status === 'advancing' ? 'warning' : 'accent'}`, style: { fontSize: '9px' } }, mil.status),
     ));
   });
@@ -89,6 +94,34 @@ function updateMilitarySidebar() {
   sb.appendChild(h('div', { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }));
   sb.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-muted)' } }, 'Campaigns'));
   campaigns.forEach(c => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '🎯'), h('span', { class: 'sidebar-item__label' }, c.name), h('span', { class: 'sidebar-item__count' }, `${c.progress}%`))));
+}
+
+
+function openEditMilitaryModal(mil) {
+  const state = { name: mil.name, type: mil.type, faction: mil.faction, commander: mil.commander, description: mil.description };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Space Fleet', 'Ground Army', 'AI Strike Force', 'Bio-Fleet', 'Militia', 'Special Forces', 'Defense Force'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
+    ff('Faction', h('input', { class: 'input', value: state.faction, oninput: (e) => state.faction = e.target.value })),
+    ff('Commander', h('input', { class: 'input', value: state.commander, oninput: (e) => state.commander = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this force...', label: 'Military Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+  );
+  modal('Edit: ' + mil.name, content, () => {
+    Object.assign(mil, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteMilitary(mil) {
+  if (!confirm(`Delete "${mil.name}"?`)) return;
+  const idx = militaryForces.findIndex(i => i.id === mil.id);
+  if (idx !== -1) militaryForces.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 

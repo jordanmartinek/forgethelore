@@ -34,12 +34,17 @@ function renderTechList() {
     list.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: '8px' } }, era));
     technologies.filter(t => t.era === era).forEach(tech => {
       list.appendChild(h('div', { class: 'character-card', onclick: (e) => {
+        if (e.target.closest('.card-actions')) return;
         document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
         e.currentTarget.classList.add('character-card--active');
         const d = document.querySelector('.character-detail'); if (d) { d.innerHTML = ''; d.appendChild(renderTechDetailContent(tech)); }
       }},
         h('div', { class: 'character-card__avatar', style: { background: tech.color, fontSize: '14px' } }, '⚙️'),
         h('div', { class: 'character-card__info' }, h('div', { class: 'character-card__name' }, tech.name), h('div', { class: 'character-card__role' }, `${tech.category} • ${tech.faction}`)),
+        h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+          h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditTechModal(tech); } }, '✏️'),
+          h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteTech(tech); } }, '🗑️'),
+        ),
         h('span', { class: `tag tag--${tech.status === 'widespread' || tech.status === 'active' || tech.status === 'achieved' ? 'success' : tech.status === 'prototype' ? 'warning' : 'accent'}`, style: { fontSize: '9px' } }, tech.status),
       ));
     });
@@ -83,6 +88,36 @@ function updateTechSidebar() {
     sb.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: '8px' } }, era));
     technologies.filter(t => t.era === era).forEach(t => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '⚙️'), h('span', { class: 'sidebar-item__label' }, t.name))));
   });
+}
+
+
+function openEditTechModal(tech) {
+  const state = { name: tech.name, category: tech.category, era: tech.era, inventor: tech.inventor, faction: tech.faction, description: tech.description };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    ff('Category', h('select', { class: 'input', onchange: (e) => state.category = e.target.value },
+      ...['Propulsion', 'Energy', 'AI', 'Engineering', 'Military', 'Biology', 'Communication', 'General'].map(c => h('option', { value: c, selected: c === state.category ? 'selected' : undefined }, c)))),
+    ff('Era', h('select', { class: 'input', onchange: (e) => state.era = e.target.value },
+      ...['Era 1', 'Era 2', 'Era 3', 'Era 4'].map(e => h('option', { value: e, selected: e === state.era ? 'selected' : undefined }, e)))),
+    ff('Inventor', h('input', { class: 'input', value: state.inventor, oninput: (e) => state.inventor = e.target.value })),
+    ff('Faction', h('input', { class: 'input', value: state.faction, oninput: (e) => state.faction = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this technology...', label: 'Technology Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+  );
+  modal('Edit: ' + tech.name, content, () => {
+    Object.assign(tech, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteTech(tech) {
+  if (!confirm(`Delete "${tech.name}"?`)) return;
+  const idx = technologies.findIndex(i => i.id === tech.id);
+  if (idx !== -1) technologies.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 

@@ -28,12 +28,17 @@ function renderOrgList() {
   );
   organizations.forEach(org => {
     list.appendChild(h('div', { class: 'character-card', onclick: (e) => {
+      if (e.target.closest('.card-actions')) return;
       document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
       e.currentTarget.classList.add('character-card--active');
       const d = document.querySelector('.character-detail'); if (d) { d.innerHTML = ''; d.appendChild(renderOrgDetailContent(org)); }
     }},
       h('div', { class: 'character-card__avatar', style: { background: org.color, fontSize: '14px' } }, '🏢'),
       h('div', { class: 'character-card__info' }, h('div', { class: 'character-card__name' }, org.name), h('div', { class: 'character-card__role' }, `${org.type} • ${org.faction}`)),
+      h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditOrgModal(org); } }, '✏️'),
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteOrg(org); } }, '🗑️'),
+      ),
       h('span', { class: 'tag tag--accent', style: { fontSize: '9px' } }, org.status),
     ));
   });
@@ -64,6 +69,34 @@ function col(title, open, content) { return h('div', { class: `collapsible ${ope
 function updateOrgSidebar() {
   const sb = document.getElementById('sidebar-content'); if (!sb) return; sb.innerHTML = '';
   organizations.forEach(org => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '🏢'), h('span', { class: 'sidebar-item__label' }, org.name))));
+}
+
+
+function openEditOrgModal(org) {
+  const state = { name: org.name, type: org.type, faction: org.faction, leader: org.leader, description: org.description };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Intelligence Agency', 'Research Organization', 'Secret Society', 'Trade Guild', 'Military Order', 'Criminal Syndicate', 'Religious Order', 'Corporation', 'Other'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
+    ff('Faction', h('input', { class: 'input', value: state.faction, oninput: (e) => state.faction = e.target.value })),
+    ff('Leader', h('input', { class: 'input', value: state.leader, oninput: (e) => state.leader = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this organization...', label: 'Organization Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+  );
+  modal2('Edit: ' + org.name, content, () => {
+    Object.assign(org, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteOrg(org) {
+  if (!confirm(`Delete "${org.name}"?`)) return;
+  const idx = organizations.findIndex(i => i.id === org.id);
+  if (idx !== -1) organizations.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 

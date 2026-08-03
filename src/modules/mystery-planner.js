@@ -5,6 +5,7 @@
 
 import { h } from '../core/renderer.js';
 import { expandableText } from '../ui/expandable-text.js';
+import { appStore } from '../core/store.js';
 
 const demoMysteries = [
   { id: 'm1', title: 'The Void Conduit Origin', question: 'Who created the Void Conduits and why?', truth: 'An ancient civilization built them as escape routes from a dying universe', status: 'active', importance: 'critical', progress: 30, clues: 4, redHerrings: 2 },
@@ -43,12 +44,17 @@ function renderMysteryList() {
       h('div', { 
         class: `mystery-card ${mystery.id === 'm1' ? 'mystery-card--active' : ''}`,
         onclick: (e) => {
+          if (e.target.closest('.card-actions')) return;
           document.querySelectorAll('.mystery-card').forEach(c => c.classList.remove('mystery-card--active'));
           e.currentTarget.classList.add('mystery-card--active');
         }
       },
         h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
           h('div', { class: 'mystery-card__title' }, `🔍 ${mystery.title}`),
+          h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+            h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditMysteryModal(mystery); } }, '✏️'),
+            h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteMystery(mystery); } }, '🗑️'),
+          ),
           h('span', { class: `tag ${mystery.importance === 'critical' ? 'tag--danger' : mystery.importance === 'major' ? 'tag--warning' : 'tag--accent'}` }, mystery.importance),
         ),
         h('div', { class: 'mystery-card__question' }, `"${mystery.question}"`),
@@ -199,6 +205,33 @@ function updateMysterySidebar() {
       );
     });
   });
+}
+
+
+function openEditMysteryModal(mystery) {
+  const state = { title: mystery.title, question: mystery.question, truth: mystery.truth, importance: mystery.importance };
+  const content = h('div', {},
+    ff('Title', h('input', { class: 'input', value: state.title, oninput: (e) => state.title = e.target.value })),
+    ff('Central Question', h('input', { class: 'input', value: state.question, oninput: (e) => state.question = e.target.value })),
+    ff('Actual Truth (Creator Only)', expandableText({ placeholder: 'The real answer...', label: 'Mystery Truth', value: state.truth, oninput: (e) => state.truth = e.target.value })),
+    ff('Importance', h('select', { class: 'input', onchange: (e) => state.importance = e.target.value },
+      h('option', { value: 'critical', selected: state.importance === 'critical' ? 'selected' : undefined }, 'Critical'), h('option', { value: 'major', selected: state.importance === 'major' ? 'selected' : undefined }, 'Major'), h('option', { value: 'moderate', selected: state.importance === 'moderate' ? 'selected' : undefined }, 'Moderate'), h('option', { value: 'minor', selected: state.importance === 'minor' ? 'selected' : undefined }, 'Minor'))),
+  );
+  modal('Edit: ' + mystery.title, content, () => {
+    Object.assign(mystery, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteMystery(mystery) {
+  if (!confirm(`Delete "${mystery.title}"?`)) return;
+  const idx = demoMysteries.findIndex(i => i.id === mystery.id);
+  if (idx !== -1) demoMysteries.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 

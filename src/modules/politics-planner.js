@@ -35,6 +35,7 @@ function renderPoliticsList() {
   list.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: '4px' } }, 'Governments'));
   politicalEntities.forEach(pe => {
     list.appendChild(h('div', { class: 'character-card', onclick: (e) => {
+      if (e.target.closest('.card-actions')) return;
       document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
       e.currentTarget.classList.add('character-card--active');
       const d = document.querySelector('.character-detail');
@@ -42,6 +43,10 @@ function renderPoliticsList() {
     }},
       h('div', { class: 'character-card__avatar', style: { background: pe.color, fontSize: '14px' } }, '🏛️'),
       h('div', { class: 'character-card__info' }, h('div', { class: 'character-card__name' }, pe.name), h('div', { class: 'character-card__role' }, `${pe.type} • Led by ${pe.leader}`)),
+      h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditPoliticsModal(pe); } }, '✏️'),
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deletePolitics(pe); } }, '🗑️'),
+      ),
     ));
   });
   list.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: '12px' } }, 'Treaties'));
@@ -72,6 +77,32 @@ function renderPoliticsDetailContent(pe) {
     col('Diplomatic Relations', false, h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Alliances, enemies, sanctions...')),
     col('Notes', false, h('textarea', { class: 'input', placeholder: 'Notes...', style: { minHeight: '80px' } })),
   );
+}
+
+function openEditPoliticsModal(pe) {
+  const state = { name: pe.name, type: pe.type, leader: pe.leader, description: pe.description };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Autocratic Council', 'Democratic Assembly', 'Monarchy', 'Federation', 'AI Consensus', 'Military Junta', 'Trade Federation', 'Theocracy', 'Other'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
+    ff('Leader', h('input', { class: 'input', value: state.leader, oninput: (e) => state.leader = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this political entity...', label: 'Political Entity Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+  );
+  modal4('Edit: ' + pe.name, content, () => {
+    Object.assign(pe, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deletePolitics(pe) {
+  if (!confirm(`Delete "${pe.name}"?`)) return;
+  const idx = politicalEntities.findIndex(i => i.id === pe.id);
+  if (idx !== -1) politicalEntities.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 function meter(label, val) {

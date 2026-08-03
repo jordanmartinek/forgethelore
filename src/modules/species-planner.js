@@ -28,12 +28,17 @@ function renderSpeciesList() {
   );
   species.forEach(sp => {
     list.appendChild(h('div', { class: 'character-card', onclick: (e) => {
+      if (e.target.closest('.card-actions')) return;
       document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
       e.currentTarget.classList.add('character-card--active');
       const d = document.querySelector('.character-detail'); if (d) { d.innerHTML = ''; d.appendChild(renderSpeciesDetailContent(sp)); }
     }},
       h('div', { class: 'character-card__avatar', style: { background: sp.color, fontSize: '14px' } }, '🧬'),
       h('div', { class: 'character-card__info' }, h('div', { class: 'character-card__name' }, sp.name), h('div', { class: 'character-card__role' }, `${sp.type} • Pop: ${sp.population}`)),
+      h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditSpeciesModal(sp); } }, '✏️'),
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteSpecies(sp); } }, '🗑️'),
+      ),
       h('span', { class: `tag tag--${sp.status === 'dominant' || sp.status === 'growing' ? 'success' : sp.status === 'expanding' ? 'warning' : 'accent'}`, style: { fontSize: '9px' } }, sp.status),
     ));
   });
@@ -68,6 +73,33 @@ function col(title, open, content) { return h('div', { class: `collapsible ${ope
 function updateSpeciesSidebar() {
   const sb = document.getElementById('sidebar-content'); if (!sb) return; sb.innerHTML = '';
   species.forEach(sp => sb.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '🧬'), h('span', { class: 'sidebar-item__label' }, sp.name), h('span', { class: 'sidebar-item__count' }, sp.type))));
+}
+
+
+function openEditSpeciesModal(sp) {
+  const state = { name: sp.name, type: sp.type, origin: sp.origin, description: sp.description };
+  const content = h('div', {},
+    ff('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Organic', 'Synthetic', 'Bio-Collective', 'Hybrid', 'Energy', 'Other'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
+    ff('Origin', h('input', { class: 'input', value: state.origin, oninput: (e) => state.origin = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this species...', label: 'Species Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+  );
+  modal3('Edit: ' + sp.name, content, () => {
+    Object.assign(sp, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteSpecies(sp) {
+  if (!confirm(`Delete "${sp.name}"?`)) return;
+  const idx = species.findIndex(i => i.id === sp.id);
+  if (idx !== -1) species.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 

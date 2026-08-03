@@ -36,6 +36,7 @@ function renderReligionList() {
     list.appendChild(h('div', {
       class: 'character-card',
       onclick: (e) => {
+        if (e.target.closest('.card-actions')) return;
         document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
         e.currentTarget.classList.add('character-card--active');
         const detail = document.querySelector('.character-detail');
@@ -46,6 +47,10 @@ function renderReligionList() {
       h('div', { class: 'character-card__info' },
         h('div', { class: 'character-card__name' }, rel.name),
         h('div', { class: 'character-card__role' }, `${rel.type} • ${rel.followers}`),
+      ),
+      h('div', { class: 'card-actions', style: { display: 'flex', gap: '2px', marginLeft: 'auto' } },
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditReligionModal(rel); } }, '✏️'),
+        h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Delete', onclick: (e) => { e.stopPropagation(); deleteReligion(rel); } }, '🗑️'),
       ),
       h('span', { class: `tag tag--${rel.status === 'dominant' || rel.status === 'growing' ? 'success' : rel.status === 'declining' ? 'danger' : 'accent'}`, style: { fontSize: '9px' } }, rel.status),
     ));
@@ -102,6 +107,32 @@ function openAddReligionModal() {
     if (c) { c.innerHTML = ''; renderReligionPlanner(c); }
     appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
   });
+}
+
+function openEditReligionModal(rel) {
+  const state = { name: rel.name, type: rel.type, deity: rel.deity, description: rel.description };
+  const content = h('div', {},
+    field('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    field('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+      ...['Religion', 'Cult', 'Philosophy', 'State Religion', 'Techno-Religion', 'Mystical Order', 'Folk Religion', 'Other'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
+    field('Deity/Focus', h('input', { class: 'input', value: state.deity, oninput: (e) => state.deity = e.target.value })),
+    field('Description', expandableText({ placeholder: 'Describe this belief system...', label: 'Religion Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+  );
+  modal('Edit: ' + rel.name, content, () => {
+    Object.assign(rel, state);
+    const container = document.querySelector('.main-content');
+    if (container) { container.innerHTML = ''; renderReligionPlanner(container); }
+    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  });
+}
+
+function deleteReligion(rel) {
+  if (!confirm(`Delete "${rel.name}"?`)) return;
+  const idx = religions.findIndex(i => i.id === rel.id);
+  if (idx !== -1) religions.splice(idx, 1);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderReligionPlanner(container); }
+  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
 }
 
 function collapsible(title, open, content) {
