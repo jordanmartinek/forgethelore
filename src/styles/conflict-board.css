@@ -134,7 +134,7 @@
 .conflict-board__canvas {
   grid-row: 2;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-primary);
 }
 
@@ -148,7 +148,7 @@
   grid-template-rows: repeat(8, 1fr);
   border: 2px solid var(--border-strong);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: var(--shadow-lg);
 }
 
@@ -215,11 +215,11 @@
 }
 
 .goal-card--top {
-  top: -60px;
+  top: 12px;
 }
 
 .goal-card--bottom {
-  bottom: -60px;
+  bottom: 12px;
 }
 
 .goal-card__faction {
@@ -251,9 +251,10 @@
   justify-content: center;
   cursor: grab;
   transition: all var(--transition-fast);
-  z-index: 10;
+  z-index: 15;
   border: 2px solid transparent;
   box-shadow: var(--shadow-md);
+  pointer-events: auto;
 }
 
 .chess-piece:hover {

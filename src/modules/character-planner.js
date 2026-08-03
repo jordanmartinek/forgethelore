@@ -60,9 +60,9 @@ function renderCharacterList(mode) {
 function createCharacterCard(char) {
   return h('div', { 
     class: 'character-card',
-    onclick: () => {
+    onclick: (e) => {
       document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
-      event.currentTarget.classList.add('character-card--active');
+      e.currentTarget.classList.add('character-card--active');
       const detail = document.querySelector('.character-detail');
       if (detail) {
         detail.innerHTML = '';

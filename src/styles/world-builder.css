@@ -105,6 +105,7 @@
   overflow: hidden;
   background: var(--bg-primary);
   cursor: default;
+  touch-action: none;
 }
 
 .world-builder__canvas--panning {
