@@ -3,6 +3,7 @@
  */
 
 import { h } from '../core/renderer.js';
+import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 
 const demoCharacters = [
@@ -196,7 +197,7 @@ function openAddCharacterModal() {
     formField('Role', h('input', { class: 'input', placeholder: 'e.g. Military Commander', oninput: (e) => state.role = e.target.value })),
     formField('Faction', h('select', { class: 'input', onchange: (e) => state.faction = e.target.value },
       ...factionOptions.map(f => h('option', { value: f }, f)))),
-    formField('Description', h('textarea', { class: 'input', placeholder: 'Describe this character...', oninput: (e) => state.description = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this character...', label: 'Character Description', oninput: (e) => state.description = e.target.value })),
   );
   showModal('Add New Character', content, () => {
     if (!state.name.trim()) return;

@@ -4,6 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
+import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
@@ -74,7 +75,7 @@ function openAddOrgModal() {
       ...['Intelligence Agency', 'Research Organization', 'Secret Society', 'Trade Guild', 'Military Order', 'Criminal Syndicate', 'Religious Order', 'Corporation', 'Other'].map(t => h('option', { value: t }, t)))),
     ff('Faction', h('input', { class: 'input', placeholder: 'Affiliated faction', oninput: (e) => state.faction = e.target.value })),
     ff('Leader', h('input', { class: 'input', placeholder: 'Leader name', oninput: (e) => state.leader = e.target.value })),
-    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this organization...', oninput: (e) => state.description = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this organization...', label: 'Organization Description', oninput: (e) => state.description = e.target.value })),
   );
   modal2('Add New Organization', content, () => {
     if (!state.name.trim()) return;

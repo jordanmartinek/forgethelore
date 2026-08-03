@@ -4,6 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
+import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
@@ -93,7 +94,7 @@ function openAddPoliticsModal() {
     ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Autocratic Council', 'Democratic Assembly', 'Monarchy', 'Federation', 'AI Consensus', 'Military Junta', 'Trade Federation', 'Theocracy', 'Other'].map(t => h('option', { value: t }, t)))),
     ff('Leader', h('input', { class: 'input', placeholder: 'Current leader', oninput: (e) => state.leader = e.target.value })),
-    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this political entity...', oninput: (e) => state.description = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this political entity...', label: 'Political Entity Description', oninput: (e) => state.description = e.target.value })),
   );
   modal4('Add New Political Entity', content, () => {
     if (!state.name.trim()) return;

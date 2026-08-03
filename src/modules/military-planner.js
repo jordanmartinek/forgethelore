@@ -4,6 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
+import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
@@ -99,7 +100,7 @@ function openAddMilitaryModal() {
       ...['Space Fleet', 'Ground Army', 'AI Strike Force', 'Bio-Fleet', 'Militia', 'Special Forces', 'Defense Force'].map(t => h('option', { value: t }, t)))),
     ff('Faction', h('input', { class: 'input', placeholder: 'Faction', oninput: (e) => state.faction = e.target.value })),
     ff('Commander', h('input', { class: 'input', placeholder: 'Commanding officer', oninput: (e) => state.commander = e.target.value })),
-    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this force...', oninput: (e) => state.description = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this force...', label: 'Military Description', oninput: (e) => state.description = e.target.value })),
   );
   modal('Add New Military Force', content, () => {
     if (!state.name.trim()) return;

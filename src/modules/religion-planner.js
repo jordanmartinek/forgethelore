@@ -6,6 +6,7 @@
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
+import { expandableText } from '../ui/expandable-text.js';
 
 const religions = [
   { id: 'rel1', name: 'The Void Ascendancy', type: 'Mystical Cult', followers: '~12 million', founder: 'Unknown', origin: 'Pre-Dominion era', status: 'growing', description: 'Believes the Void Conduits are gateways to a higher plane. Adherents seek transcendence through Void exposure.', tenets: ['Void is salvation', 'Flesh is temporary', 'The Conduits are doors, not weapons'], deity: 'The Void Eternal', influence: 70, color: '#a855f7' },
@@ -92,7 +93,7 @@ function openAddReligionModal() {
     field('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Religion', 'Cult', 'Philosophy', 'State Religion', 'Techno-Religion', 'Mystical Order', 'Folk Religion', 'Other'].map(t => h('option', { value: t }, t)))),
     field('Deity/Focus', h('input', { class: 'input', placeholder: 'Central figure or concept', oninput: (e) => state.deity = e.target.value })),
-    field('Description', h('textarea', { class: 'input', placeholder: 'Describe this belief system...', oninput: (e) => state.description = e.target.value })),
+    field('Description', expandableText({ placeholder: 'Describe this belief system...', label: 'Religion Description', oninput: (e) => state.description = e.target.value })),
   );
   modal('Add New Religion', content, () => {
     if (!state.name.trim()) return;

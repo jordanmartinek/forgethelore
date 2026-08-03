@@ -6,6 +6,7 @@
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
+import { expandableText } from '../ui/expandable-text.js';
 
 const locations = [
   { id: 'loc1', name: 'Citadel Prime', type: 'Space Station', region: 'Core Systems', faction: 'The Dominion', population: '2.4 million', status: 'active', description: 'The political and military heart of the Dominion. A massive orbital station serving as the seat of government.', climate: 'Controlled', resources: 'High', strategicValue: 90, color: '#ef4444' },
@@ -98,7 +99,7 @@ function openAddLocationModal() {
     formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value }, ...LOCATION_TYPES.map(t => h('option', { value: t }, t)))),
     formField('Region', h('input', { class: 'input', placeholder: 'e.g. Core Systems', oninput: (e) => state.region = e.target.value })),
     formField('Controlling Faction', h('input', { class: 'input', placeholder: 'e.g. The Dominion', oninput: (e) => state.faction = e.target.value })),
-    formField('Description', h('textarea', { class: 'input', placeholder: 'Describe this location...', oninput: (e) => state.description = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this location...', label: 'Location Description', oninput: (e) => state.description = e.target.value })),
   );
   showModal('Add New Location', content, () => {
     if (!state.name.trim()) return;

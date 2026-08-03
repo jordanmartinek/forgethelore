@@ -4,6 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
+import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
@@ -77,7 +78,7 @@ function openAddSpeciesModal() {
     ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Organic', 'Synthetic', 'Bio-Collective', 'Hybrid', 'Energy', 'Other'].map(t => h('option', { value: t }, t)))),
     ff('Origin', h('input', { class: 'input', placeholder: 'Where did they come from?', oninput: (e) => state.origin = e.target.value })),
-    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this species...', oninput: (e) => state.description = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this species...', label: 'Species Description', oninput: (e) => state.description = e.target.value })),
   );
   modal3('Add New Species', content, () => {
     if (!state.name.trim()) return;

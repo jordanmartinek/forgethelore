@@ -6,6 +6,7 @@
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
+import { expandableText } from '../ui/expandable-text.js';
 
 const FACTION_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#64748b'];
 const FACTION_ICONS = ['🦅', '🤖', '🐛', '🌟', '⚔️', '🛡️', '🔥', '🌀', '👑', '💀', '🐉', '🕷️', '🦊', '🐺', '🦁', '🏴', '⚡', '🌑', '☀️', '🎭'];
@@ -134,7 +135,7 @@ function openAddFactionModal() {
     formField('Leader', h('input', { class: 'input', placeholder: 'Who leads this faction?', oninput: (e) => state.leader = e.target.value })),
     formField('Strategic Goal', h('input', { class: 'input', placeholder: 'What is their primary objective?', oninput: (e) => state.goal = e.target.value })),
     formField('Territory', h('input', { class: 'input', placeholder: 'e.g. Core Systems, Outer Rim', oninput: (e) => state.territory = e.target.value })),
-    formField('Description', h('textarea', { class: 'input', placeholder: 'Describe this faction...', oninput: (e) => state.description = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this faction...', label: 'Faction Description', oninput: (e) => state.description = e.target.value })),
   );
 
   showModal('Add New Faction', content, () => {

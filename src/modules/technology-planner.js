@@ -4,6 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
+import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
@@ -95,7 +96,7 @@ function openAddTechModal() {
       ...['Era 1', 'Era 2', 'Era 3', 'Era 4'].map(e => h('option', { value: e }, e)))),
     ff('Inventor', h('input', { class: 'input', placeholder: 'Who created this?', oninput: (e) => state.inventor = e.target.value })),
     ff('Faction', h('input', { class: 'input', placeholder: 'Controlling faction', oninput: (e) => state.faction = e.target.value })),
-    ff('Description', h('textarea', { class: 'input', placeholder: 'Describe this technology...', oninput: (e) => state.description = e.target.value })),
+    ff('Description', expandableText({ placeholder: 'Describe this technology...', label: 'Technology Description', oninput: (e) => state.description = e.target.value })),
   );
   modal('Add New Technology', content, () => {
     if (!state.name.trim()) return;
