@@ -18,14 +18,14 @@ const factions = [
 ];
 
 const pieces = [
-  { id: 'p1', name: 'Aurelian', faction: 'f1', type: 'king', position: { row: 7, col: 3 }, momentum: 'rising', goal: 'Control all Conduits', hiddenGoal: 'Reshape humanity through Void evolution', resources: { political: 85, military: 90, economic: 75, knowledge: 60 } },
-  { id: 'p2', name: 'Fleet Admiral Koss', faction: 'f1', type: 'rook', position: { row: 6, col: 1 }, momentum: 'stable', goal: 'Protect Dominion borders', hiddenGoal: '', resources: { political: 40, military: 95, economic: 50, knowledge: 30 } },
-  { id: 'p3', name: 'Senator Vex', faction: 'f1', type: 'bishop', position: { row: 6, col: 5 }, momentum: 'rising', goal: 'Eliminate political opposition', hiddenGoal: '', resources: { political: 90, military: 20, economic: 80, knowledge: 70 } },
-  { id: 'p4', name: 'AXIOM Prime', faction: 'f2', type: 'king', position: { row: 0, col: 4 }, momentum: 'stable', goal: 'Achieve synthetic consciousness', hiddenGoal: '', resources: { political: 30, military: 70, economic: 60, knowledge: 95 } },
-  { id: 'p5', name: 'Unit-7 Vanguard', faction: 'f2', type: 'knight', position: { row: 2, col: 2 }, momentum: 'rising', goal: 'Infiltrate Dominion networks', hiddenGoal: '', resources: { political: 10, military: 80, economic: 20, knowledge: 85 } },
-  { id: 'p6', name: 'The Overmind', faction: 'f3', type: 'queen', position: { row: 1, col: 6 }, momentum: 'rising', goal: 'Consume all organic life', hiddenGoal: '', resources: { political: 5, military: 85, economic: 10, knowledge: 50 } },
-  { id: 'p7', name: 'Captain Sera', faction: 'f4', type: 'knight', position: { row: 4, col: 3 }, momentum: 'falling', goal: 'Unite the Free Colonies', hiddenGoal: '', resources: { political: 60, military: 40, economic: 30, knowledge: 45 } },
-  { id: 'p8', name: 'Dr. Orin Voss', faction: 'f4', type: 'bishop', position: { row: 5, col: 6 }, momentum: 'stable', goal: 'Unlock Void technology safely', hiddenGoal: '', resources: { political: 20, military: 10, economic: 40, knowledge: 90 } },
+  { id: 'p1', name: 'Aurelian', faction: 'f1', type: 'king', role: 'antagonist', position: { row: 7, col: 3 }, momentum: 'rising', goal: 'Control all Conduits', hiddenGoal: 'Reshape humanity through Void evolution', resources: { political: 85, military: 90, economic: 75, knowledge: 60 } },
+  { id: 'p2', name: 'Fleet Admiral Koss', faction: 'f1', type: 'rook', role: 'henchman', position: { row: 6, col: 1 }, momentum: 'stable', goal: 'Protect Dominion borders', hiddenGoal: '', resources: { political: 40, military: 95, economic: 50, knowledge: 30 } },
+  { id: 'p3', name: 'Senator Vex', faction: 'f1', type: 'bishop', role: 'henchman', position: { row: 6, col: 5 }, momentum: 'rising', goal: 'Eliminate political opposition', hiddenGoal: '', resources: { political: 90, military: 20, economic: 80, knowledge: 70 } },
+  { id: 'p4', name: 'AXIOM Prime', faction: 'f2', type: 'king', role: 'opponent', position: { row: 0, col: 4 }, momentum: 'stable', goal: 'Achieve synthetic consciousness', hiddenGoal: '', resources: { political: 30, military: 70, economic: 60, knowledge: 95 } },
+  { id: 'p5', name: 'Unit-7 Vanguard', faction: 'f2', type: 'knight', role: 'opponent', position: { row: 2, col: 2 }, momentum: 'rising', goal: 'Infiltrate Dominion networks', hiddenGoal: '', resources: { political: 10, military: 80, economic: 20, knowledge: 85 } },
+  { id: 'p6', name: 'The Overmind', faction: 'f3', type: 'queen', role: 'antagonist', position: { row: 1, col: 6 }, momentum: 'rising', goal: 'Consume all organic life', hiddenGoal: '', resources: { political: 5, military: 85, economic: 10, knowledge: 50 } },
+  { id: 'p7', name: 'Captain Sera', faction: 'f4', type: 'knight', role: 'protagonist', position: { row: 4, col: 3 }, momentum: 'falling', goal: 'Unite the Free Colonies', hiddenGoal: '', resources: { political: 60, military: 40, economic: 30, knowledge: 45 } },
+  { id: 'p8', name: 'Dr. Orin Voss', faction: 'f4', type: 'bishop', role: 'ally', position: { row: 5, col: 6 }, momentum: 'stable', goal: 'Unlock Void technology safely', hiddenGoal: '', resources: { political: 20, military: 10, economic: 40, knowledge: 90 } },
 ];
 
 const conflictLines = [
@@ -49,9 +49,17 @@ const aiSuggestions = [
 
 const strategicLayers = ['All', 'Political', 'Military', 'Personal', 'Economic', 'Knowledge', 'Mystery'];
 const PIECE_TYPES = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn'];
+const PIECE_ROLES = ['protagonist', 'ally', 'antagonist', 'henchman', 'opponent'];
 const MOMENTUM_OPTIONS = ['rising', 'stable', 'falling'];
 const FACTION_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#64748b'];
 const FACTION_ICONS = ['🦅', '🤖', '🐛', '🌟', '⚔️', '🛡️', '🔥', '🌀', '👑', '💀', '🐉', '🕷️', '🦊', '🐺', '🦁', '🏴', '⚡', '🌑', '☀️', '🎭'];
+
+// ─── Multi-Board System ──────────────────────────────────────────────────────
+
+const boards = [
+  { id: 'global', name: 'Global Strategic Board' },
+];
+let activeBoardId = 'global';
 
 let selectedPiece = null;
 let dragState = null;
@@ -207,7 +215,7 @@ function removeFaction(faction) {
 // ─── Piece (Character) CRUD ──────────────────────────────────────────────────
 
 function openAddPieceModal() {
-  const state = { name: '', faction: factions[0]?.id || '', type: 'pawn', goal: '', hiddenGoal: '', momentum: 'stable', resources: { political: 50, military: 50, economic: 50, knowledge: 50 } };
+  const state = { name: '', faction: factions[0]?.id || '', type: 'pawn', role: 'opponent', goal: '', hiddenGoal: '', momentum: 'stable', resources: { political: 50, military: 50, economic: 50, knowledge: 50 } };
 
   const factionSelect = h('select', { class: 'input', onchange: (e) => state.faction = e.target.value },
     ...factions.map(f => h('option', { value: f.id }, `${f.icon} ${f.name}`))
@@ -215,6 +223,10 @@ function openAddPieceModal() {
 
   const typeSelect = h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
     ...PIECE_TYPES.map(t => h('option', { value: t }, `${getPieceSymbol(t)} ${t.charAt(0).toUpperCase() + t.slice(1)}`))
+  );
+
+  const roleSelect = h('select', { class: 'input', onchange: (e) => state.role = e.target.value },
+    ...PIECE_ROLES.map(r => h('option', { value: r }, `${getRoleIcon(r)} ${r.charAt(0).toUpperCase() + r.slice(1)}`))
   );
 
   const momentumSelect = h('select', { class: 'input', onchange: (e) => state.momentum = e.target.value },
@@ -234,6 +246,7 @@ function openAddPieceModal() {
     createFormField('Character Name', h('input', { class: 'input', placeholder: 'e.g. Commander Voss', oninput: (e) => state.name = e.target.value })),
     createFormField('Faction', factionSelect),
     createFormField('Piece Type', typeSelect),
+    createFormField('Role', roleSelect),
     createFormField('Momentum', momentumSelect),
     createFormField('Public Goal', h('input', { class: 'input', placeholder: 'What are they trying to achieve?', oninput: (e) => state.goal = e.target.value })),
     createFormField('Hidden Goal (optional)', h('input', { class: 'input', placeholder: 'Secret agenda...', oninput: (e) => state.hiddenGoal = e.target.value })),
@@ -256,6 +269,7 @@ function openAddPieceModal() {
       name: state.name,
       faction: state.faction,
       type: state.type,
+      role: state.role,
       position: placed,
       momentum: state.momentum,
       goal: state.goal,
@@ -278,6 +292,10 @@ function openEditPieceModal(piece) {
     ...PIECE_TYPES.map(t => h('option', { value: t, ...(t === state.type ? { selected: 'selected' } : {}) }, `${getPieceSymbol(t)} ${t.charAt(0).toUpperCase() + t.slice(1)}`))
   );
 
+  const roleSelect = h('select', { class: 'input', onchange: (e) => state.role = e.target.value },
+    ...PIECE_ROLES.map(r => h('option', { value: r, ...(r === state.role ? { selected: 'selected' } : {}) }, `${getRoleIcon(r)} ${r.charAt(0).toUpperCase() + r.slice(1)}`))
+  );
+
   const momentumSelect = h('select', { class: 'input', onchange: (e) => state.momentum = e.target.value },
     ...MOMENTUM_OPTIONS.map(m => h('option', { value: m, ...(m === state.momentum ? { selected: 'selected' } : {}) }, m.charAt(0).toUpperCase() + m.slice(1)))
   );
@@ -295,6 +313,7 @@ function openEditPieceModal(piece) {
     createFormField('Character Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
     createFormField('Faction', factionSelect),
     createFormField('Piece Type', typeSelect),
+    createFormField('Role', roleSelect),
     createFormField('Momentum', momentumSelect),
     createFormField('Public Goal', h('input', { class: 'input', value: state.goal, oninput: (e) => state.goal = e.target.value })),
     createFormField('Hidden Goal (optional)', h('input', { class: 'input', value: state.hiddenGoal || '', oninput: (e) => state.hiddenGoal = e.target.value })),
@@ -302,7 +321,7 @@ function openEditPieceModal(piece) {
   );
 
   showModal(`Edit Piece: ${piece.name}`, content, () => {
-    Object.assign(piece, { name: state.name, faction: state.faction, type: state.type, momentum: state.momentum, goal: state.goal, hiddenGoal: state.hiddenGoal, resources: state.resources });
+    Object.assign(piece, { name: state.name, faction: state.faction, type: state.type, role: state.role, momentum: state.momentum, goal: state.goal, hiddenGoal: state.hiddenGoal, resources: state.resources });
     rerenderBoard();
     triggerSave();
   });
@@ -351,6 +370,77 @@ function getPieceSymbol(type) {
   }
 }
 
+function getRoleIcon(role) {
+  switch (role) {
+    case 'protagonist': return '⭐';
+    case 'ally': return '🤝';
+    case 'antagonist': return '💀';
+    case 'henchman': return '🗡️';
+    case 'opponent': return '⚔️';
+    default: return '●';
+  }
+}
+
+// ─── Reset Board Positions ───────────────────────────────────────────────────
+// Places pieces in opposing starting positions based on their role:
+// Protagonists & Allies → bottom rows (6-7)
+// Antagonists & Henchmen → top rows (0-1)
+// Opponents → middle rows (2-5)
+
+function resetBoardPositions() {
+  if (!confirm('Reset all piece positions based on their roles?\n\nProtagonists & Allies → bottom (your side)\nAntagonists & Henchmen → top (opposing side)\nOpponents → middle (contested space)')) return;
+
+  const protagonists = pieces.filter(p => p.role === 'protagonist');
+  const allies = pieces.filter(p => p.role === 'ally');
+  const antagonists = pieces.filter(p => p.role === 'antagonist');
+  const henchmen = pieces.filter(p => p.role === 'henchman');
+  const opponents = pieces.filter(p => p.role === 'opponent');
+
+  // Place antagonists on row 0, henchmen on row 1
+  antagonists.forEach((p, i) => { p.position = { row: 0, col: Math.min(i * 2 + 1, 7) }; });
+  henchmen.forEach((p, i) => { p.position = { row: 1, col: Math.min(i * 2, 7) }; });
+
+  // Place opponents in middle rows
+  opponents.forEach((p, i) => {
+    const row = 3 + Math.floor(i / 4);
+    const col = (i % 4) * 2 + 1;
+    p.position = { row: Math.min(row, 5), col: Math.min(col, 7) };
+  });
+
+  // Place allies on row 6, protagonists on row 7
+  allies.forEach((p, i) => { p.position = { row: 6, col: Math.min(i * 2, 7) }; });
+  protagonists.forEach((p, i) => { p.position = { row: 7, col: Math.min(i * 2 + 1, 7) }; });
+
+  // Handle pieces with no role — put them in middle
+  pieces.filter(p => !p.role).forEach((p, i) => {
+    p.position = { row: 4, col: Math.min(i, 7) };
+  });
+
+  rerenderBoard();
+  triggerSave();
+}
+
+// ─── New Board Modal ─────────────────────────────────────────────────────────
+
+function openNewBoardModal() {
+  const state = { name: '' };
+  const content = h('div', {},
+    createFormField('Board Name', h('input', { class: 'input', placeholder: 'e.g. Book 1 Board, Faction Internal, Character Arc...', oninput: (e) => state.name = e.target.value })),
+    h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.6' } },
+      'Boards let you view the same pieces from different strategic perspectives. ',
+      'All boards share the same factions and pieces but can have independent positions.'
+    ),
+  );
+
+  showModal('Create New Board', content, () => {
+    if (!state.name.trim()) return;
+    boards.push({ id: generateId(), name: state.name });
+    activeBoardId = boards[boards.length - 1].id;
+    rerenderBoard();
+    triggerSave();
+  });
+}
+
 // ─── Render: Main Export ─────────────────────────────────────────────────────
 
 export function renderConflictBoard(container) {
@@ -384,22 +474,30 @@ function renderToolbar() {
       )
     ),
     h('div', { class: 'conflict-board__toolbar-center' },
-      ...(activeView === 'macro' ? strategicLayers.map((layer, i) =>
-        h('button', {
-          class: `conflict-board__layer-btn ${i === 0 ? 'conflict-board__layer-btn--active' : ''}`,
-          onclick: (e) => {
-            document.querySelectorAll('.conflict-board__layer-btn').forEach(b => b.classList.remove('conflict-board__layer-btn--active'));
-            e.target.classList.add('conflict-board__layer-btn--active');
-          }
-        }, layer)
-      ) : [
+      ...(activeView === 'macro' ? [
+        // Board selector
+        h('select', { class: 'input', style: { width: 'auto', fontSize: '11px', padding: '3px 8px' }, onchange: (e) => { activeBoardId = e.target.value; } },
+          ...boards.map(b => h('option', { value: b.id, ...(b.id === activeBoardId ? { selected: 'selected' } : {}) }, b.name))
+        ),
+        h('button', { class: 'btn btn--sm btn--ghost', onclick: openNewBoardModal, title: 'New Board' }, '+'),
+        h('span', { style: { width: '1px', height: '16px', background: 'var(--border-subtle)' } }),
+        ...strategicLayers.slice(0, 4).map((layer, i) =>
+          h('button', {
+            class: `conflict-board__layer-btn ${i === 0 ? 'conflict-board__layer-btn--active' : ''}`,
+            onclick: (e) => {
+              document.querySelectorAll('.conflict-board__layer-btn').forEach(b => b.classList.remove('conflict-board__layer-btn--active'));
+              e.target.classList.add('conflict-board__layer-btn--active');
+            }
+          }, layer)
+        ),
+      ] : [
         h('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `${scenes.length} scenes • ${scenes.filter(s => s.status === 'completed').length} completed`),
       ])
     ),
     h('div', { class: 'conflict-board__toolbar-left' },
       ...(activeView === 'macro' ? [
-        h('button', { class: 'btn btn--sm btn--ghost', onclick: toggleHeatmap }, '🔥 Heatmap'),
-        h('button', { class: 'btn btn--sm btn--ghost' }, '🧠 Simulate'),
+        h('button', { class: 'btn btn--sm btn--ghost', onclick: toggleHeatmap, title: 'Toggle Heatmap' }, '🔥'),
+        h('button', { class: 'btn btn--sm btn--ghost', onclick: resetBoardPositions, title: 'Reset Board Positions' }, '🔄 Reset'),
         h('button', { class: 'btn btn--sm btn--primary', onclick: openAddPieceModal }, '+ Piece'),
       ] : [
         h('button', { class: 'btn btn--sm btn--primary', onclick: openAddSceneModal }, '+ Add Scene'),
