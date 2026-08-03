@@ -925,13 +925,16 @@ function renderSceneList() {
 // ─── Scene Canvas (Center) ───────────────────────────────────────────────────
 
 function renderSceneCanvas() {
-  const canvas = h('div', { class: 'conflict-board__canvas', style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' } });
+  const canvas = h('div', { class: 'conflict-board__canvas' });
 
   if (!activeSceneId) {
+    canvas.style.display = 'flex';
+    canvas.style.alignItems = 'center';
+    canvas.style.justifyContent = 'center';
     canvas.appendChild(h('div', { style: { textAlign: 'center', color: 'var(--text-muted)' } },
       h('div', { style: { fontSize: '48px', marginBottom: '16px', opacity: '0.5' } }, '🎬'),
       h('div', { style: { fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' } }, 'Select a Scene'),
-      h('div', { style: { fontSize: '13px', maxWidth: '300px' } }, 'Click a scene from the left panel to view its conflict breakdown, participants, and power shifts.'),
+      h('div', { style: { fontSize: '13px', maxWidth: '300px' } }, 'Click a scene from the left panel to see its dedicated conflict board.'),
     ));
     return canvas;
   }
@@ -939,62 +942,115 @@ function renderSceneCanvas() {
   const scene = scenes.find(s => s.id === activeSceneId);
   if (!scene) return canvas;
 
-  // Scene detail view - mini chessboard showing only participants
-  const miniBoard = h('div', { style: { width: '400px', background: 'var(--surface-1)', borderRadius: '12px', padding: '20px', border: '1px solid var(--border-default)' } },
-    // Scene header
-    h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' } },
-      h('div', {},
-        h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' } }, `Scene ${scene.order}`),
-        h('div', { style: { fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' } }, scene.title),
-      ),
-      h('span', { class: `tag tag--${scene.status === 'completed' ? 'success' : scene.status === 'active' ? 'warning' : 'accent'}` }, scene.status),
+  // Initialize scene positions if not set
+  if (!scene.positions) {
+    scene.positions = {};
+    const participants = scene.participants.map(pid => pieces.find(pp => pp.id === pid)).filter(Boolean);
+    // Auto-position: protagonists/allies bottom, antagonists/henchmen top, opponents middle
+    const proSide = participants.filter(p => p.role === 'protagonist' || p.role === 'ally');
+    const antSide = participants.filter(p => p.role === 'antagonist' || p.role === 'henchman');
+    const neutral = participants.filter(p => p.role === 'opponent' || !p.role);
+    proSide.forEach((p, i) => { scene.positions[p.id] = { row: 7, col: Math.min(i * 2 + 2, 7) }; });
+    antSide.forEach((p, i) => { scene.positions[p.id] = { row: 0, col: Math.min(i * 2 + 2, 7) }; });
+    neutral.forEach((p, i) => { scene.positions[p.id] = { row: 3 + Math.floor(i / 4), col: Math.min(i * 2 + 1, 7) }; });
+  }
+
+  // Scene header above board
+  canvas.appendChild(h('div', { style: { position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', zIndex: '5' } },
+    h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' } }, `Scene ${scene.order} • ${scene.location}`),
+    h('div', { style: { fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' } }, scene.title),
+    h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '4px' } },
+      h('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: getConflictColor(scene.conflictType) } }),
+      h('span', { style: { fontSize: '11px', color: getConflictColor(scene.conflictType), fontWeight: '500' } }, scene.conflictType),
+      h('span', { class: `tag tag--${scene.status === 'completed' ? 'success' : scene.status === 'active' ? 'warning' : 'accent'}`, style: { fontSize: '9px', marginLeft: '6px' } }, scene.status),
     ),
-    h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.6' } }, scene.summary),
+  ));
 
-    // Participants as pieces
-    h('div', { style: { marginBottom: '16px' } },
-      h('div', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' } }, 'Participants'),
-      h('div', { style: { display: 'flex', gap: '12px', flexWrap: 'wrap' } },
-        ...scene.participants.map(pid => {
-          const p = pieces.find(pp => pp.id === pid);
-          const f = p ? factions.find(ff => ff.id === p.faction) : null;
-          if (!p || !f) return null;
-          return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid var(--border-subtle)' } },
-            h('div', { style: { width: '28px', height: '28px', borderRadius: '50%', background: f.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: 'white' } }, getPieceSymbol(p.type)),
-            h('div', {},
-              h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' } }, p.name),
-              h('div', { style: { fontSize: '10px', color: f.color } }, f.name),
-            ),
-          );
-        }).filter(Boolean)
-      ),
-    ),
+  // Dedicated chessboard for this scene
+  const cellSize = 72.5;
+  const board = h('div', { class: 'chessboard chessboard--size-md', id: 'scene-chessboard' });
 
-    // Conflict visualization
-    h('div', { style: { padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', border: `1px solid ${getConflictColor(scene.conflictType)}40`, marginBottom: '16px' } },
-      h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } },
-        h('div', { style: { width: '12px', height: '12px', borderRadius: '50%', background: getConflictColor(scene.conflictType) } }),
-        h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', textTransform: 'uppercase' } }, `Conflict Type: ${scene.conflictType}`),
-      ),
-      scene.outcome ? h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `Outcome: ${scene.outcome}`) : null,
-    ),
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const isLight = (row + col) % 2 === 0;
+      board.appendChild(h('div', {
+        class: `chessboard__cell ${isLight ? 'chessboard__cell--light' : 'chessboard__cell--dark'}`,
+        dataset: { row: String(row), col: String(col) },
+        ondrop: (e) => handleSceneDrop(e, scene, row, col),
+        ondragover: (e) => e.preventDefault(),
+      }));
+    }
+  }
 
-    // Power shifts
-    Object.keys(scene.powerShift).length > 0 ? h('div', {},
-      h('div', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' } }, 'Power Shift'),
-      ...Object.entries(scene.powerShift).map(([fid, shift]) => {
-        const f = factions.find(ff => ff.id === fid);
-        if (!f) return null;
-        return h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' } },
-          h('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `${f.icon} ${f.name}`),
-          h('span', { style: { fontSize: '12px', fontWeight: '700', color: shift > 0 ? 'var(--success)' : 'var(--danger)' } }, `${shift > 0 ? '+' : ''}${shift}%`),
-        );
-      }).filter(Boolean)
-    ) : null,
-  );
+  // Place only the participating pieces at their scene-specific positions
+  scene.participants.forEach(pid => {
+    const piece = pieces.find(pp => pp.id === pid);
+    if (!piece) return;
+    const faction = factions.find(ff => ff.id === piece.faction);
+    if (!faction) return;
+    const pos = scene.positions[pid] || { row: 4, col: 4 };
+    const left = pos.col * cellSize + cellSize / 2 - 24;
+    const top = pos.row * cellSize + cellSize / 2 - 24;
+    const momentumIcon = piece.momentum === 'rising' ? '▲' : piece.momentum === 'falling' ? '▼' : '■';
 
-  canvas.appendChild(miniBoard);
+    board.appendChild(h('div', {
+      class: `chess-piece ${selectedPiece === piece.id ? 'chess-piece--selected' : ''}`,
+      style: { left: `${left}px`, top: `${top}px`, background: faction.color, borderColor: selectedPiece === piece.id ? 'var(--accent-primary)' : faction.color },
+      dataset: { pieceId: piece.id },
+      draggable: 'true',
+      onclick: (e) => { e.stopPropagation(); selectPiece(piece.id); },
+      ondragstart: (e) => { dragState = piece; e.target.classList.add('chess-piece--dragging'); e.dataTransfer.effectAllowed = 'move'; },
+      ondragend: (e) => { e.target.classList.remove('chess-piece--dragging'); dragState = null; },
+    },
+      h('div', { class: 'chess-piece__avatar' }, getPieceSymbol(piece.type)),
+      h('span', { class: `chess-piece__momentum momentum-${piece.momentum}` }, momentumIcon),
+      h('span', { class: 'chess-piece__name' }, piece.name),
+    ));
+  });
+
+  // Conflict lines between participants
+  const svg = createSVGElement('svg', { class: 'conflict-lines', style: 'position:absolute;inset:0;pointer-events:none;z-index:5;' });
+  const sceneConflicts = conflictLines.filter(l => scene.participants.includes(l.from) && scene.participants.includes(l.to));
+  sceneConflicts.forEach(line => {
+    const fromPos = scene.positions[line.from];
+    const toPos = scene.positions[line.to];
+    if (!fromPos || !toPos) return;
+    svg.appendChild(createSVGElement('line', {
+      x1: String(fromPos.col * cellSize + cellSize / 2),
+      y1: String(fromPos.row * cellSize + cellSize / 2),
+      x2: String(toPos.col * cellSize + cellSize / 2),
+      y2: String(toPos.row * cellSize + cellSize / 2),
+      class: `conflict-line conflict-line--${line.type}`,
+    }));
+  });
+  svg.setAttribute('width', String(cellSize * 8));
+  svg.setAttribute('height', String(cellSize * 8));
+  svg.style.position = 'absolute';
+  svg.style.top = '50%';
+  svg.style.left = '50%';
+  svg.style.transform = 'translate(-50%, -50%)';
+
+  canvas.appendChild(board);
+  canvas.appendChild(svg);
+
+  // Outcome label at bottom if completed
+  if (scene.outcome && scene.status === 'completed') {
+    canvas.appendChild(h('div', { style: { position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', padding: '6px 16px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: '8px', zIndex: '5' } },
+      h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' } }, 'OUTCOME'),
+      h('div', { style: { fontSize: '12px', color: 'var(--text-primary)', fontWeight: '500' } }, scene.outcome),
+    ));
+  }
+
   return canvas;
+}
+
+function handleSceneDrop(e, scene, row, col) {
+  e.preventDefault();
+  if (!dragState) return;
+  if (!scene.positions) scene.positions = {};
+  scene.positions[dragState.id] = { row, col };
+  rerenderBoard();
+  triggerSave();
 }
 
 // ─── Scene Intel (Right Panel) ───────────────────────────────────────────────
