@@ -605,22 +605,22 @@ function renderBoardCanvas() {
     if (faction) board.appendChild(createPieceElement(piece, faction));
   });
 
-  // Conflict lines SVG
+  // Conflict lines SVG (inside the board for proper overlay)
+  board.appendChild(createConflictLinesSVG());
   canvas.appendChild(board);
-  canvas.appendChild(createConflictLinesSVG());
 
   return canvas;
 }
 
 function createPieceElement(piece, faction) {
-  const cellSize = boardSize === 'sm' ? 60 : boardSize === 'md' ? 72.5 : 85;
-  const left = piece.position.col * cellSize + cellSize / 2 - 24;
-  const top = piece.position.row * cellSize + cellSize / 2 - 24;
+  // Use percentage-based positioning so pieces scale with the board
+  const pctLeft = (piece.position.col + 0.5) / 8 * 100;
+  const pctTop = (piece.position.row + 0.5) / 8 * 100;
   const momentumIcon = piece.momentum === 'rising' ? '▲' : piece.momentum === 'falling' ? '▼' : '■';
 
   return h('div', {
     class: `chess-piece ${selectedPiece === piece.id ? 'chess-piece--selected' : ''}`,
-    style: { left: `${left}px`, top: `${top}px`, background: faction.color, borderColor: selectedPiece === piece.id ? 'var(--accent-primary)' : faction.color },
+    style: { left: `calc(${pctLeft}% - 24px)`, top: `calc(${pctTop}% - 24px)`, background: faction.color, borderColor: selectedPiece === piece.id ? 'var(--accent-primary)' : faction.color },
     dataset: { pieceId: piece.id },
     draggable: 'true',
     onclick: (e) => { e.stopPropagation(); selectPiece(piece.id); },
@@ -634,28 +634,25 @@ function createPieceElement(piece, faction) {
 }
 
 function createConflictLinesSVG() {
-  const svg = createSVGElement('svg', { class: 'conflict-lines', style: 'position:absolute;inset:0;pointer-events:none;z-index:5;' });
-  const cellSize = boardSize === 'sm' ? 60 : boardSize === 'md' ? 72.5 : 85;
+  const svg = createSVGElement('svg', { class: 'conflict-lines', style: 'position:absolute;inset:0;pointer-events:none;z-index:5;width:100%;height:100%;' });
+  svg.setAttribute('viewBox', '0 0 800 800');
+  svg.setAttribute('preserveAspectRatio', 'none');
 
   conflictLines.forEach(line => {
     const from = pieces.find(p => p.id === line.from);
     const to = pieces.find(p => p.id === line.to);
     if (!from || !to) return;
+    const x1 = (from.position.col + 0.5) / 8 * 800;
+    const y1 = (from.position.row + 0.5) / 8 * 800;
+    const x2 = (to.position.col + 0.5) / 8 * 800;
+    const y2 = (to.position.row + 0.5) / 8 * 800;
     svg.appendChild(createSVGElement('line', {
-      x1: String(from.position.col * cellSize + cellSize / 2),
-      y1: String(from.position.row * cellSize + cellSize / 2),
-      x2: String(to.position.col * cellSize + cellSize / 2),
-      y2: String(to.position.row * cellSize + cellSize / 2),
+      x1: String(x1), y1: String(y1),
+      x2: String(x2), y2: String(y2),
       class: `conflict-line conflict-line--${line.type}`,
     }));
   });
 
-  svg.setAttribute('width', String(cellSize * 8));
-  svg.setAttribute('height', String(cellSize * 8));
-  svg.style.position = 'absolute';
-  svg.style.top = '50%';
-  svg.style.left = '50%';
-  svg.style.transform = 'translate(-50%, -50%)';
   return svg;
 }
 
@@ -967,7 +964,6 @@ function renderSceneCanvas() {
   ));
 
   // Dedicated chessboard for this scene
-  const cellSize = 72.5;
   const board = h('div', { class: 'chessboard chessboard--size-md', id: 'scene-chessboard' });
 
   for (let row = 0; row < 8; row++) {
@@ -989,13 +985,13 @@ function renderSceneCanvas() {
     const faction = factions.find(ff => ff.id === piece.faction);
     if (!faction) return;
     const pos = scene.positions[pid] || { row: 4, col: 4 };
-    const left = pos.col * cellSize + cellSize / 2 - 24;
-    const top = pos.row * cellSize + cellSize / 2 - 24;
+    const pctLeft = (pos.col + 0.5) / 8 * 100;
+    const pctTop = (pos.row + 0.5) / 8 * 100;
     const momentumIcon = piece.momentum === 'rising' ? '▲' : piece.momentum === 'falling' ? '▼' : '■';
 
     board.appendChild(h('div', {
       class: `chess-piece ${selectedPiece === piece.id ? 'chess-piece--selected' : ''}`,
-      style: { left: `${left}px`, top: `${top}px`, background: faction.color, borderColor: selectedPiece === piece.id ? 'var(--accent-primary)' : faction.color },
+      style: { left: `calc(${pctLeft}% - 24px)`, top: `calc(${pctTop}% - 24px)`, background: faction.color, borderColor: selectedPiece === piece.id ? 'var(--accent-primary)' : faction.color },
       dataset: { pieceId: piece.id },
       draggable: 'true',
       onclick: (e) => { e.stopPropagation(); selectPiece(piece.id); },
@@ -1009,26 +1005,22 @@ function renderSceneCanvas() {
   });
 
   // Conflict lines between participants
-  const svg = createSVGElement('svg', { class: 'conflict-lines', style: 'position:absolute;inset:0;pointer-events:none;z-index:5;' });
+  const svg = createSVGElement('svg', { class: 'conflict-lines', style: 'position:absolute;inset:0;pointer-events:none;z-index:5;width:100%;height:100%;' });
+  svg.setAttribute('viewBox', '0 0 800 800');
+  svg.setAttribute('preserveAspectRatio', 'none');
   const sceneConflicts = conflictLines.filter(l => scene.participants.includes(l.from) && scene.participants.includes(l.to));
   sceneConflicts.forEach(line => {
     const fromPos = scene.positions[line.from];
     const toPos = scene.positions[line.to];
     if (!fromPos || !toPos) return;
     svg.appendChild(createSVGElement('line', {
-      x1: String(fromPos.col * cellSize + cellSize / 2),
-      y1: String(fromPos.row * cellSize + cellSize / 2),
-      x2: String(toPos.col * cellSize + cellSize / 2),
-      y2: String(toPos.row * cellSize + cellSize / 2),
+      x1: String((fromPos.col + 0.5) / 8 * 800),
+      y1: String((fromPos.row + 0.5) / 8 * 800),
+      x2: String((toPos.col + 0.5) / 8 * 800),
+      y2: String((toPos.row + 0.5) / 8 * 800),
       class: `conflict-line conflict-line--${line.type}`,
     }));
   });
-  svg.setAttribute('width', String(cellSize * 8));
-  svg.setAttribute('height', String(cellSize * 8));
-  svg.style.position = 'absolute';
-  svg.style.top = '50%';
-  svg.style.left = '50%';
-  svg.style.transform = 'translate(-50%, -50%)';
 
   canvas.appendChild(board);
   canvas.appendChild(svg);

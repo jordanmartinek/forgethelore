@@ -136,15 +136,14 @@
 .conflict-board__canvas {
   grid-row: 2;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chessboard {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
@@ -152,21 +151,25 @@
   border-radius: var(--radius-md);
   overflow: visible;
   box-shadow: var(--shadow-lg);
+  position: relative;
 }
 
 .chessboard--size-sm {
-  width: 480px;
-  height: 480px;
+  width: min(420px, calc(100% - 32px));
+  height: min(420px, calc(100% - 32px));
+  aspect-ratio: 1;
 }
 
 .chessboard--size-md {
-  width: 580px;
-  height: 580px;
+  width: min(520px, calc(100% - 32px));
+  height: min(520px, calc(100% - 32px));
+  aspect-ratio: 1;
 }
 
 .chessboard--size-lg {
-  width: 680px;
-  height: 680px;
+  width: min(620px, calc(100% - 32px));
+  height: min(620px, calc(100% - 32px));
+  aspect-ratio: 1;
 }
 
 .chessboard__cell {
@@ -206,22 +209,24 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  padding: var(--space-md) var(--space-xl);
+  padding: var(--space-sm) var(--space-lg);
   background: var(--surface-2);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   text-align: center;
-  min-width: 200px;
+  min-width: 180px;
+  max-width: 260px;
   box-shadow: var(--shadow-md);
   z-index: 5;
+  font-size: 11px;
 }
 
 .goal-card--top {
-  top: 12px;
+  top: 8px;
 }
 
 .goal-card--bottom {
-  bottom: 12px;
+  bottom: 8px;
 }
 
 .goal-card__faction {
