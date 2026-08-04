@@ -65,6 +65,7 @@ let activeBoardId = 'global';
 // Expose pieces and scenes globally for cross-module access
 window.__loreforge_pieces = pieces;
 window.__loreforge_scenes = scenes;
+window.__loreforge_factions = factions;
 
 let selectedPiece = null;
 let dragState = null;
