@@ -87,10 +87,18 @@ async function init() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((reg) => {
         console.log('[LoreForge] Service worker registered — app works offline');
-        // Check for updates periodically
-        setInterval(() => reg.update(), 60 * 60 * 1000); // hourly
+        // Listen for updates
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated') {
+              console.log('[LoreForge] Service worker updated — new files cached');
+            }
+          });
+        });
       }).catch(e => {
-        console.warn('[LoreForge] SW registration skipped:', e.message);
+        console.warn('[LoreForge] SW registration failed:', e.message);
+        // App still works without SW — just won't be offline-capable
       });
     }
     

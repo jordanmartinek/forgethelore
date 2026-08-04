@@ -4,16 +4,12 @@
  * without any network connection after first load.
  */
 
-const CACHE_NAME = 'loreforge-v2';
+const CACHE_NAME = 'loreforge-v3';
 
-// All files needed to run the app offline
-const APP_FILES = [
+// Critical files that MUST be cached for the app to work offline
+const CRITICAL_FILES = [
   '/',
   '/index.html',
-  '/sw.js',
-  '/public/manifest.json',
-  '/public/icons/icon.svg',
-  // Core
   '/src/main.js',
   '/src/core/database.js',
   '/src/core/events.js',
@@ -22,12 +18,10 @@ const APP_FILES = [
   '/src/core/progression.js',
   '/src/core/renderer.js',
   '/src/core/store.js',
-  // UI
   '/src/ui/app-shell.js',
   '/src/ui/command-palette.js',
   '/src/ui/expandable-text.js',
   '/src/ui/toast.js',
-  // Modules
   '/src/modules/analytics.js',
   '/src/modules/character-arc.js',
   '/src/modules/character-planner.js',
@@ -46,7 +40,6 @@ const APP_FILES = [
   '/src/modules/technology-planner.js',
   '/src/modules/timeline.js',
   '/src/modules/world-builder.js',
-  // Styles
   '/src/styles/main.css',
   '/src/styles/components.css',
   '/src/styles/conflict-board.css',
@@ -54,12 +47,31 @@ const APP_FILES = [
   '/src/styles/modules.css',
 ];
 
-// Install: cache all app files
+// Optional files — nice to have but won't break the app if missing
+const OPTIONAL_FILES = [
+  '/public/manifest.json',
+  '/public/icons/icon.svg',
+  '/public/icons/icon-192.png',
+  '/public/icons/icon-512.png',
+];
+
+// Install: cache critical files (fail gracefully on optional)
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching all app files for offline use');
-      return cache.addAll(APP_FILES);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Cache critical files — if any fail, the whole install fails
+      await cache.addAll(CRITICAL_FILES);
+      console.log('[SW] Critical files cached');
+
+      // Try optional files individually — don't fail install if they're missing
+      for (const file of OPTIONAL_FILES) {
+        try {
+          await cache.add(file);
+        } catch (e) {
+          console.warn('[SW] Optional file not cached:', file);
+        }
+      }
+      console.log('[SW] Install complete — app ready for offline');
     })
   );
   self.skipWaiting();
@@ -77,44 +89,40 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: cache-first strategy (serve from cache, fallback to network, then cache the response)
+// Fetch: cache-first, then network, with offline fallback
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Serve from cache immediately
-        // Also update cache in background (stale-while-revalidate)
+        // Serve from cache immediately — update in background
         event.waitUntil(
           fetch(event.request).then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
+            if (networkResponse && networkResponse.ok) {
               caches.open(CACHE_NAME).then((cache) => {
                 cache.put(event.request, networkResponse);
               });
             }
-          }).catch(() => {}) // Network failed — that's fine, we served from cache
+          }).catch(() => {})
         );
         return cachedResponse;
       }
 
       // Not in cache — try network
       return fetch(event.request).then((networkResponse) => {
-        // Cache successful responses for future offline use
-        if (networkResponse && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
+        if (networkResponse && networkResponse.ok) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return networkResponse;
       }).catch(() => {
-        // Network failed and not in cache — return offline fallback
-        if (event.request.destination === 'document') {
+        // Offline and not cached — serve index.html for navigation requests
+        if (event.request.mode === 'navigate' || event.request.destination === 'document') {
           return caches.match('/index.html');
         }
-        return new Response('Offline', { status: 503, statusText: 'Offline' });
+        // For other requests, return empty response
+        return new Response('', { status: 503 });
       });
     })
   );

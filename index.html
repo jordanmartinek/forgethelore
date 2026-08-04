@@ -32,5 +32,22 @@
 <body>
   <div id="app"></div>
   <script type="module" src="src/main.js"></script>
+  <script>
+    // Fallback: if the app doesn't render within 3 seconds, show offline message
+    setTimeout(function() {
+      var app = document.getElementById('app');
+      if (app && !app.hasChildNodes()) {
+        app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e8e8f0;font-family:system-ui;background:#0d0d12;">' +
+          '<div style="text-align:center;max-width:400px;padding:24px;">' +
+          '<div style="font-size:48px;margin-bottom:16px;">🏰</div>' +
+          '<h1 style="font-size:20px;margin-bottom:8px;">LoreForge Planner</h1>' +
+          '<p style="color:#9898b0;margin-bottom:16px;line-height:1.6;">The app needs to load once while online to cache files for offline use.</p>' +
+          '<p style="color:#9898b0;font-size:13px;">Please connect to the internet and refresh, or start the local server:</p>' +
+          '<pre style="background:#1c1c28;padding:12px;border-radius:8px;margin-top:12px;font-size:12px;color:#6366f1;text-align:left;">node server.js</pre>' +
+          '<p style="color:#4a4a60;font-size:11px;margin-top:16px;">After the first successful load, the app works fully offline.</p>' +
+          '</div></div>';
+      }
+    }, 3000);
+  </script>
 </body>
 </html>
