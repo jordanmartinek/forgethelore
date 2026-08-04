@@ -24,6 +24,7 @@ import { renderFactionPlanner } from '../modules/faction-planner.js';
 import { renderRelationshipPlanner } from '../modules/relationship-planner.js';
 import { renderCharacterArc } from '../modules/character-arc.js';
 import { renderQuickSceneLog } from '../modules/quick-scene-log.js';
+import { setActiveProject, saveData, loadData } from '../core/persist.js';
 import { renderCommandPalette } from './command-palette.js';
 
 // Module definitions
@@ -308,22 +309,13 @@ function switchProject(projectId) {
   const current = state.projects.find(p => p.id === state.activeProjectId);
   if (current) current.lastOpened = Date.now();
 
+  // Save project list and active project to global storage (not project-scoped)
   appStore.setState({ activeProjectId: projectId });
+  localStorage.setItem('loreforge_activeProjectId', projectId);
+  localStorage.setItem('loreforge_projects', JSON.stringify(state.projects));
 
-  // Update the top bar to show new project name
-  const newProject = state.projects.find(p => p.id === projectId);
-  if (newProject) {
-    newProject.lastOpened = Date.now();
-    // Re-render topbar project name
-    const topbar = document.querySelector('.topbar');
-    if (topbar) {
-      topbar.parentNode.replaceChild(createTopBar(), topbar);
-    }
-  }
-
-  // Trigger save indicator
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  // Reload the page — modules will load with the new project's data
+  window.location.reload();
 }
 
 function openNewProjectModal() {

@@ -50,13 +50,21 @@ export const appStore = createStore({
   contextMenu: null,
   projectMenuOpen: false,
   
-  // Projects
-  activeProjectId: 'proj1',
-  projects: [
-    { id: 'proj1', name: 'Void Dominion', icon: '🌌', lastOpened: Date.now(), description: 'Sci-fi universe — Dominion, Machinae, Swarm, Free Colonies' },
+  // Projects (loaded from localStorage if available)
+  activeProjectId: (() => {
+    try { return localStorage.getItem('loreforge_activeProjectId') || 'proj1'; } catch(e) { return 'proj1'; }
+  })(),
+  projects: (() => {
+    try {
+      const saved = localStorage.getItem('loreforge_projects');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return [
+      { id: 'proj1', name: 'Void Dominion', icon: '🌌', lastOpened: Date.now(), description: 'Sci-fi universe — Dominion, Machinae, Swarm, Free Colonies' },
     { id: 'proj2', name: 'The Shattered Kingdoms', icon: '⚔️', lastOpened: Date.now() - 86400000, description: 'Fantasy epic — warring kingdoms, ancient magic, prophecy' },
     { id: 'proj3', name: 'Neon Requiem', icon: '🌃', lastOpened: Date.now() - 172800000, description: 'Cyberpunk noir — megacorps, hackers, rogue AI' },
-  ],
+  ];
+  })(),
   
   // Sidebar
   sidebarCollapsed: false,

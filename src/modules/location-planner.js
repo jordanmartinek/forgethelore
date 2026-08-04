@@ -4,7 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData } from '../core/persist.js';
+import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
@@ -22,7 +22,8 @@ const LOCATION_TYPES = ['Planet', 'Moon', 'Space Station', 'City', 'Continent', 
 
 // Load persisted data
 const _saved_locations = loadData("locations", null);
-if (_saved_locations) { locations.length = 0; locations.push(..._saved_locations); }
+const _isDemo_locations = getActiveProjectId() === "proj1";
+if (_saved_locations) { locations.length = 0; locations.push(..._saved_locations); } else if (!_isDemo_locations) { locations.length = 0; }
 
 export function renderLocationPlanner(container) {
   const planner = h('div', { class: 'character-planner' },

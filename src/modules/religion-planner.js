@@ -4,7 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData } from '../core/persist.js';
+import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
@@ -19,7 +19,8 @@ let religions = [
 
 // Load persisted data
 const _saved_religions = loadData("religions", null);
-if (_saved_religions) { religions.length = 0; religions.push(..._saved_religions); }
+const _isDemo_religions = getActiveProjectId() === "proj1";
+if (_saved_religions) { religions.length = 0; religions.push(..._saved_religions); } else if (!_isDemo_religions) { religions.length = 0; }
 
 export function renderReligionPlanner(container) {
   const planner = h('div', { class: 'character-planner' },

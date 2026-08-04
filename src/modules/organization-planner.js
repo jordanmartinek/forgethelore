@@ -4,7 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData } from '../core/persist.js';
+import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
@@ -19,7 +19,8 @@ let organizations = [
 
 // Load persisted data
 const _saved_organizations = loadData("organizations", null);
-if (_saved_organizations) { organizations.length = 0; organizations.push(..._saved_organizations); }
+const _isDemo_organizations = getActiveProjectId() === "proj1";
+if (_saved_organizations) { organizations.length = 0; organizations.push(..._saved_organizations); } else if (!_isDemo_organizations) { organizations.length = 0; }
 
 export function renderOrganizationPlanner(container) {
   const planner = h('div', { class: 'character-planner' }, renderOrgList(), renderOrgDetail(organizations[0]));

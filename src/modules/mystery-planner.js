@@ -4,7 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData } from '../core/persist.js';
+import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 
@@ -27,7 +27,8 @@ const demoClues = [
 
 // Load persisted data
 const _saved_mysteries = loadData("mysteries", null);
-if (_saved_mysteries) { demoMysteries.length = 0; demoMysteries.push(..._saved_mysteries); }
+const _isDemo_mysteries = getActiveProjectId() === "proj1";
+if (_saved_mysteries) { demoMysteries.length = 0; demoMysteries.push(..._saved_mysteries); } else if (!_isDemo_mysteries) { demoMysteries.length = 0; }
 
 export function renderMysteryPlanner(container) {
   const board = h('div', { class: 'mystery-board' },

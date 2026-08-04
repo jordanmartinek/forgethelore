@@ -4,7 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData } from '../core/persist.js';
+import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
@@ -19,7 +19,8 @@ let species = [
 
 // Load persisted data
 const _saved_species = loadData("species", null);
-if (_saved_species) { species.length = 0; species.push(..._saved_species); }
+const _isDemo_species = getActiveProjectId() === "proj1";
+if (_saved_species) { species.length = 0; species.push(..._saved_species); } else if (!_isDemo_species) { species.length = 0; }
 
 export function renderSpeciesPlanner(container) {
   const planner = h('div', { class: 'character-planner' }, renderSpeciesList(), renderSpeciesDetail(species[0]));

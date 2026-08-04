@@ -8,7 +8,7 @@ import { h, createSVGElement } from '../core/renderer.js';
 import { boardStore, appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { propagateSceneOutcome } from '../core/progression.js';
-import { loadData, saveData } from '../core/persist.js';
+import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 
 // ─── Board Data (loaded from localStorage or defaults) ───────────────────────
 
@@ -50,11 +50,13 @@ const DEFAULT_SCENES = [
   { id: 'sc6', title: 'Void Weapon Test', order: 6, location: 'Classified', summary: 'The Dominion secretly tests a Void-powered weapon on an asteroid. The energy signature is detected galaxy-wide.', participants: ['p1', 'p2'], conflictType: 'escalation', outcome: 'Unknown', powerShift: {}, status: 'planned' },
 ];
 
-// Load persisted data or use defaults
-const factions = loadData('factions', DEFAULT_FACTIONS);
-const pieces = loadData('pieces', DEFAULT_PIECES);
-const conflictLines = loadData('conflictLines', DEFAULT_CONFLICT_LINES);
-const scenes = loadData('scenes', DEFAULT_SCENES);
+// Load persisted data or use defaults (defaults only for demo project 'proj1')
+// New projects start completely empty
+const _isDemo = getActiveProjectId() === 'proj1';
+const factions = loadData('factions', _isDemo ? DEFAULT_FACTIONS : []);
+const pieces = loadData('pieces', _isDemo ? DEFAULT_PIECES : []);
+const conflictLines = loadData('conflictLines', _isDemo ? DEFAULT_CONFLICT_LINES : []);
+const scenes = loadData('scenes', _isDemo ? DEFAULT_SCENES : []);
 
 const aiSuggestions = [
   { icon: '⚠️', text: 'Captain Sera currently has no meaningful opposition. Consider adding a direct antagonist or increasing pressure from the Dominion.' },

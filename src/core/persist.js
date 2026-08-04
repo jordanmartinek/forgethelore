@@ -1,6 +1,7 @@
 /**
  * LoreForge Planner - Simple Persistence Layer
  * Saves all module data to localStorage so changes survive page refreshes.
+ * Each project has its own isolated data namespace.
  * 
  * Usage:
  *   const myArray = loadData('characters', defaultData);
@@ -8,7 +9,23 @@
  *   saveData('characters', myArray);
  */
 
-const STORAGE_PREFIX = 'loreforge_';
+let STORAGE_PREFIX = 'loreforge_proj1_';
+
+/**
+ * Set the active project (changes storage namespace)
+ * Call this when switching projects — all subsequent load/save calls use the new prefix.
+ */
+export function setActiveProject(projectId) {
+  STORAGE_PREFIX = `loreforge_${projectId}_`;
+}
+
+/**
+ * Get the current active project ID from the prefix
+ */
+export function getActiveProjectId() {
+  const match = STORAGE_PREFIX.match(/loreforge_(.+)_$/);
+  return match ? match[1] : 'proj1';
+}
 
 /**
  * Save data to localStorage
@@ -37,24 +54,26 @@ export function loadData(key, defaultData) {
 }
 
 /**
- * Clear all saved data (reset to defaults)
+ * Clear all saved data for the current project
  */
-export function clearAllData() {
+export function clearProjectData() {
   const keys = Object.keys(localStorage).filter(k => k.startsWith(STORAGE_PREFIX));
   keys.forEach(k => localStorage.removeItem(k));
 }
 
 /**
- * Auto-save helper: wraps an array so mutations trigger saves
- * Call scheduleSave() after any modification to the array
+ * Clear all saved data across all projects
  */
-export function createAutoSaver(key, dataArray) {
-  let timer = null;
-  return function scheduleSave() {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      saveData(key, dataArray);
-      timer = null;
-    }, 300); // Debounce 300ms
-  };
+export function clearAllData() {
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('loreforge_'));
+  keys.forEach(k => localStorage.removeItem(k));
 }
+
+
+// Auto-initialize from localStorage on module load
+try {
+  const savedProjectId = localStorage.getItem('loreforge_activeProjectId');
+  if (savedProjectId) {
+    STORAGE_PREFIX = `loreforge_${savedProjectId}_`;
+  }
+} catch(e) {}

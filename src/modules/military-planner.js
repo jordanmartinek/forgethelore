@@ -4,7 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData } from '../core/persist.js';
+import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
@@ -26,7 +26,8 @@ const campaigns = [
 
 // Load persisted data
 const _saved_militaryForces = loadData("militaryForces", null);
-if (_saved_militaryForces) { militaryForces.length = 0; militaryForces.push(..._saved_militaryForces); }
+const _isDemo_militaryForces = getActiveProjectId() === "proj1";
+if (_saved_militaryForces) { militaryForces.length = 0; militaryForces.push(..._saved_militaryForces); } else if (!_isDemo_militaryForces) { militaryForces.length = 0; }
 
 export function renderMilitaryPlanner(container) {
   const planner = h('div', { class: 'character-planner' }, renderMilitaryList(), renderMilitaryDetail(militaryForces[0]));

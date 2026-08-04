@@ -9,7 +9,7 @@
  */
 
 import { generateId } from './objects.js';
-import { loadData, saveData } from './persist.js';
+import { loadData, saveData, getActiveProjectId } from './persist.js';
 
 // ─── Relationship Types ──────────────────────────────────────────────────────
 
@@ -158,8 +158,9 @@ const DEFAULT_ARCS = [
 ];
 
 // Load persisted relationship and arc data
-export let relationships = loadData('relationships', DEFAULT_RELATIONSHIPS);
-export let characterArcs = loadData('characterArcs', DEFAULT_ARCS);
+const _isProgDemo = getActiveProjectId() === 'proj1';
+export let relationships = loadData('relationships', _isProgDemo ? DEFAULT_RELATIONSHIPS : []);
+export let characterArcs = loadData('characterArcs', _isProgDemo ? DEFAULT_ARCS : []);
 
 export function saveProgressionData() {
   saveData('relationships', relationships);
