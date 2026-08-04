@@ -25,6 +25,9 @@ const _saved_factionData = loadData("factionData", null);
 const _isDemo_factionData = getActiveProjectId() === "proj1";
 if (_saved_factionData) { factionData.length = 0; factionData.push(..._saved_factionData); } else if (!_isDemo_factionData) { factionData.length = 0; }
 
+// Expose faction data globally so other modules can read faction names
+window.__loreforge_factionData = factionData;
+
 export function renderFactionPlanner(container) {
   const planner = h('div', { class: 'character-planner' },
     renderFactionList(),

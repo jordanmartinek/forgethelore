@@ -100,7 +100,12 @@ function createCharacterCard(char) {
 
 function openEditCharacterModal(char) {
   const state = { name: char.name, role: char.role, faction: char.faction, description: char.description };
-  const factionOptions = [...new Set(demoCharacters.map(c => c.faction)), 'Independent', 'Other'];
+  const factionOptions = [
+    ...(window.__loreforge_factions || []).map(f => f.name),
+    ...(window.__loreforge_factionData || []).map(f => f.name),
+    ...new Set(demoCharacters.map(c => c.faction)),
+    'Independent', 'Other'
+  ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
   const content = h('div', {},
     formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
     formField('Role', h('input', { class: 'input', value: state.role, oninput: (e) => state.role = e.target.value })),
@@ -236,7 +241,12 @@ function updateCharacterSidebar(mode) {
 
 function openAddCharacterModal() {
   const state = { name: '', role: '', faction: 'Independent', description: '' };
-  const factionOptions = [...new Set(demoCharacters.map(c => c.faction)), 'Independent', 'Other'];
+  const factionOptions = [
+    ...(window.__loreforge_factions || []).map(f => f.name),
+    ...(window.__loreforge_factionData || []).map(f => f.name),
+    ...new Set(demoCharacters.map(c => c.faction)),
+    'Independent', 'Other'
+  ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
   const content = h('div', {},
     formField('Name', h('input', { class: 'input', placeholder: 'Character name', oninput: (e) => state.name = e.target.value })),
     formField('Role', h('input', { class: 'input', placeholder: 'e.g. Military Commander', oninput: (e) => state.role = e.target.value })),
