@@ -25,7 +25,16 @@ if (_saved_religions) { religions.length = 0; religions.push(..._saved_religions
 export function renderReligionPlanner(container) {
   const planner = h('div', { class: 'character-planner' },
     renderReligionList(),
-    renderReligionDetail(religions[0])
+    religions.length > 0
+      ? renderReligionDetail(religions[0])
+      : h("div", { class: "character-detail", style: { display: "flex", alignItems: "center", justifyContent: "center" } },
+          h("div", { style: { textAlign: "center", color: "var(--text-muted)" } },
+            h("div", { style: { fontSize: "48px", marginBottom: "16px", opacity: "0.5" } }, "🕯️"),
+            h("div", { style: { fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", marginBottom: "8px" } }, "No Religions Yet"),
+            h("div", { style: { fontSize: "13px", marginBottom: "16px" } }, "Create your first entry to get started."),
+            h("button", { class: "btn btn--primary", onclick: openAddReligionModal }, "+ New"),
+          )
+        )
   );
   container.appendChild(planner);
   updateReligionSidebar();

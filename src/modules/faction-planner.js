@@ -28,7 +28,16 @@ if (_saved_factionData) { factionData.length = 0; factionData.push(..._saved_fac
 export function renderFactionPlanner(container) {
   const planner = h('div', { class: 'character-planner' },
     renderFactionList(),
-    renderFactionDetail(factionData[0])
+    factionData.length > 0
+      ? renderFactionDetail(factionData[0])
+      : h("div", { class: "character-detail", style: { display: "flex", alignItems: "center", justifyContent: "center" } },
+          h("div", { style: { textAlign: "center", color: "var(--text-muted)" } },
+            h("div", { style: { fontSize: "48px", marginBottom: "16px", opacity: "0.5" } }, "⚔️"),
+            h("div", { style: { fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", marginBottom: "8px" } }, "No Factions Yet"),
+            h("div", { style: { fontSize: "13px", marginBottom: "16px" } }, "Create your first entry to get started."),
+            h("button", { class: "btn btn--primary", onclick: openAddFactionModal }, "+ New"),
+          )
+        )
   );
   container.appendChild(planner);
   updateFactionSidebar();

@@ -23,7 +23,16 @@ const _isDemo_organizations = getActiveProjectId() === "proj1";
 if (_saved_organizations) { organizations.length = 0; organizations.push(..._saved_organizations); } else if (!_isDemo_organizations) { organizations.length = 0; }
 
 export function renderOrganizationPlanner(container) {
-  const planner = h('div', { class: 'character-planner' }, renderOrgList(), renderOrgDetail(organizations[0]));
+  const planner = h('div', { class: 'character-planner' }, renderOrgList(), organizations.length > 0
+      ? renderOrgDetail(organizations[0])
+      : h("div", { class: "character-detail", style: { display: "flex", alignItems: "center", justifyContent: "center" } },
+          h("div", { style: { textAlign: "center", color: "var(--text-muted)" } },
+            h("div", { style: { fontSize: "48px", marginBottom: "16px", opacity: "0.5" } }, "🏢"),
+            h("div", { style: { fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", marginBottom: "8px" } }, "No Organizations Yet"),
+            h("div", { style: { fontSize: "13px", marginBottom: "16px" } }, "Create your first entry to get started."),
+            h("button", { class: "btn btn--primary", onclick: openAddOrgModal }, "+ New"),
+          )
+        ));
   container.appendChild(planner);
   updateOrgSidebar();
 }

@@ -34,7 +34,16 @@ export function renderMysteryPlanner(container) {
   const board = h('div', { class: 'mystery-board' },
     renderMysteryList(),
     renderMysteryCanvas(),
-    renderMysteryDetail(demoMysteries[0])
+    demoMysteries.length > 0
+      ? renderMysteryDetail(demoMysteries[0])
+      : h("div", { class: "character-detail", style: { display: "flex", alignItems: "center", justifyContent: "center" } },
+          h("div", { style: { textAlign: "center", color: "var(--text-muted)" } },
+            h("div", { style: { fontSize: "48px", marginBottom: "16px", opacity: "0.5" } }, "🔍"),
+            h("div", { style: { fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", marginBottom: "8px" } }, "No Mysteries Yet"),
+            h("div", { style: { fontSize: "13px", marginBottom: "16px" } }, "Create your first entry to get started."),
+            h("button", { class: "btn btn--primary", onclick: openAddMysteryModal }, "+ New"),
+          )
+        )
   );
   container.appendChild(board);
   updateMysterySidebar();

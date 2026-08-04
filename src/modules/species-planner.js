@@ -23,7 +23,16 @@ const _isDemo_species = getActiveProjectId() === "proj1";
 if (_saved_species) { species.length = 0; species.push(..._saved_species); } else if (!_isDemo_species) { species.length = 0; }
 
 export function renderSpeciesPlanner(container) {
-  const planner = h('div', { class: 'character-planner' }, renderSpeciesList(), renderSpeciesDetail(species[0]));
+  const planner = h('div', { class: 'character-planner' }, renderSpeciesList(), species.length > 0
+      ? renderSpeciesDetail(species[0])
+      : h("div", { class: "character-detail", style: { display: "flex", alignItems: "center", justifyContent: "center" } },
+          h("div", { style: { textAlign: "center", color: "var(--text-muted)" } },
+            h("div", { style: { fontSize: "48px", marginBottom: "16px", opacity: "0.5" } }, "🧬"),
+            h("div", { style: { fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", marginBottom: "8px" } }, "No Species Yet"),
+            h("div", { style: { fontSize: "13px", marginBottom: "16px" } }, "Create your first entry to get started."),
+            h("button", { class: "btn btn--primary", onclick: openAddSpeciesModal }, "+ New"),
+          )
+        ));
   container.appendChild(planner);
   updateSpeciesSidebar();
 }
