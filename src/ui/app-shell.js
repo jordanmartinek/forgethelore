@@ -21,6 +21,8 @@ import { renderSpeciesPlanner } from '../modules/species-planner.js';
 import { renderTechnologyPlanner } from '../modules/technology-planner.js';
 import { renderMilitaryPlanner } from '../modules/military-planner.js';
 import { renderFactionPlanner } from '../modules/faction-planner.js';
+import { renderRelationshipPlanner } from '../modules/relationship-planner.js';
+import { renderCharacterArc } from '../modules/character-arc.js';
 import { renderCommandPalette } from './command-palette.js';
 
 // Module definitions
@@ -41,7 +43,7 @@ const modules = [
   { id: 'canon', icon: '📜', label: 'Canon', category: 'planning' },
   { id: 'knowledge-graph', icon: '🕸️', label: 'Knowledge Graph', category: 'analysis' },
   { id: 'relationships', icon: '💫', label: 'Relationships', category: 'analysis' },
-  { id: 'knowledge-matrix', icon: '📚', label: 'Knowledge Matrix', category: 'analysis' },
+  { id: 'knowledge-matrix', icon: '📈', label: 'Character Arcs', category: 'analysis' },
   { id: 'analytics', icon: '📊', label: 'Analytics', category: 'analysis' },
 ];
 
@@ -468,8 +470,13 @@ function renderActiveModule() {
       renderTimeline(content);
       break;
     case 'knowledge-graph':
-    case 'relationships':
       renderKnowledgeGraph(content);
+      break;
+    case 'relationships':
+      renderRelationshipPlanner(content);
+      break;
+    case 'knowledge-matrix':
+      renderCharacterArc(content);
       break;
     case 'analytics':
       renderAnalytics(content);

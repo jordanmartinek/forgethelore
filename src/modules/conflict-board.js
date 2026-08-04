@@ -7,6 +7,7 @@
 import { h, createSVGElement } from '../core/renderer.js';
 import { boardStore, appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
+import { propagateSceneOutcome } from '../core/progression.js';
 
 // ─── Board Data ──────────────────────────────────────────────────────────────
 
@@ -60,6 +61,10 @@ const boards = [
   { id: 'global', name: 'Global Strategic Board' },
 ];
 let activeBoardId = 'global';
+
+// Expose pieces and scenes globally for cross-module access
+window.__loreforge_pieces = pieces;
+window.__loreforge_scenes = scenes;
 
 let selectedPiece = null;
 let dragState = null;
@@ -1217,6 +1222,13 @@ function openAddSceneModal() {
       status: state.status,
     });
     activeSceneId = scenes[scenes.length - 1].id;
+    
+    // Auto-propagate if scene is completed
+    const newScene = scenes[scenes.length - 1];
+    if (newScene.status === 'completed' && Object.keys(newScene.powerShift).length > 0) {
+      propagateSceneOutcome(newScene, pieces);
+    }
+    
     rerenderBoard();
     triggerSave();
   });
