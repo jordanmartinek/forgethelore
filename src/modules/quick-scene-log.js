@@ -8,7 +8,7 @@
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
-import { propagateSceneOutcome, relationships, characterArcs, createRelationship } from '../core/progression.js';
+import { propagateSceneOutcome, relationships, characterArcs, createRelationship, saveProgressionData } from '../core/progression.js';
 
 function getPieces() { return window.__loreforge_pieces || []; }
 function getScenes() { return window.__loreforge_scenes || []; }
@@ -262,8 +262,9 @@ function submitSceneLog(state) {
   });
 
   // Show success and re-render
+  saveProgressionData();
   appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
 
   const container = document.querySelector('.main-content');
   if (container) {

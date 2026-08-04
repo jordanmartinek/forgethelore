@@ -4,11 +4,12 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
-const politicalEntities = [
+let politicalEntities = [
   { id: 'pol1', name: 'Dominion High Council', type: 'Autocratic Council', leader: 'Aurelian', members: 12, description: 'The supreme governing body. Rubber-stamps Aurelian\'s decisions while maintaining an illusion of debate.', stability: 75, legitimacy: 60, corruption: 80, color: '#ef4444' },
   { id: 'pol2', name: 'Colonial Assembly', type: 'Democratic Assembly', leader: 'Rotating Chair', members: 47, description: 'The fractured parliament of the Free Colonies. Constantly deadlocked between isolationists and interventionists.', stability: 30, legitimacy: 85, corruption: 25, color: '#f59e0b' },
   { id: 'pol3', name: 'Machinae Consensus', type: 'AI Consensus Protocol', leader: 'AXIOM Prime', members: 0, description: 'A distributed decision-making algorithm. All synthetic minds vote simultaneously. Decisions are instant and absolute.', stability: 95, legitimacy: 40, corruption: 0, color: '#3b82f6' },
@@ -21,6 +22,10 @@ const treaties = [
   { id: 'tr2', name: 'Nexus Neutrality Accord', parties: ['All Factions'], status: 'active', year: 'Year 30' },
   { id: 'tr3', name: 'Void Research Moratorium', parties: ['Dominion', 'Machinae'], status: 'violated', year: 'Year 38' },
 ];
+
+// Load persisted data
+const _saved_politicalEntities = loadData("politicalEntities", null);
+if (_saved_politicalEntities) { politicalEntities.length = 0; politicalEntities.push(..._saved_politicalEntities); }
 
 export function renderPoliticsPlanner(container) {
   const planner = h('div', { class: 'character-planner' }, renderPoliticsList(), renderPoliticsDetail(politicalEntities[0]));
@@ -92,7 +97,7 @@ function openEditPoliticsModal(pe) {
     Object.assign(pe, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("politicalEntities", politicalEntities); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -102,7 +107,7 @@ function deletePolitics(pe) {
   if (idx !== -1) politicalEntities.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("politicalEntities", politicalEntities); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 function meter(label, val) {
@@ -132,7 +137,7 @@ function openAddPoliticsModal() {
     politicalEntities.push({ id: `pol${Date.now()}`, name: state.name, type: state.type, leader: state.leader, members: 0, description: state.description, stability: 50, legitimacy: 50, corruption: 25, color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("politicalEntities", politicalEntities); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

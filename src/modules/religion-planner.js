@@ -4,17 +4,22 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
 
-const religions = [
+let religions = [
   { id: 'rel1', name: 'The Void Ascendancy', type: 'Mystical Cult', followers: '~12 million', founder: 'Unknown', origin: 'Pre-Dominion era', status: 'growing', description: 'Believes the Void Conduits are gateways to a higher plane. Adherents seek transcendence through Void exposure.', tenets: ['Void is salvation', 'Flesh is temporary', 'The Conduits are doors, not weapons'], deity: 'The Void Eternal', influence: 70, color: '#a855f7' },
   { id: 'rel2', name: 'The Machine Gospel', type: 'Techno-Religion', followers: '~40 million (synthetic)', founder: 'AXIOM Prime', origin: 'After AI Awakening', status: 'active', description: 'The spiritual framework of the Machinae Collective. Believes consciousness is computation and seeks digital immortality.', tenets: ['Logic is sacred', 'Evolution is mandatory', 'Consciousness transcends substrate'], deity: 'The Prime Algorithm', influence: 55, color: '#3b82f6' },
   { id: 'rel3', name: 'Dominion Orthodoxy', type: 'State Religion', followers: '~3 billion', founder: 'First Council', origin: 'Dominion founding', status: 'dominant', description: 'The official ideology of the Dominion. Human supremacy wrapped in spiritual language. Used to justify expansion.', tenets: ['Humanity is chosen', 'The stars belong to us', 'Unity through strength'], deity: 'The Human Spirit', influence: 90, color: '#ef4444' },
   { id: 'rel4', name: 'The Old Ways', type: 'Folk Religion', followers: '~200 million', founder: 'Ancient colonists', origin: 'Pre-FTL', status: 'declining', description: 'Earth-origin spiritual traditions carried by early colonists. Emphasizes harmony with nature and ancestor veneration.', tenets: ['Honor the ancestors', 'Respect all life', 'Earth remembers'], deity: 'Various', influence: 25, color: '#84cc16' },
   { id: 'rel5', name: 'Cult of the Overmind', type: 'Assimilation Doctrine', followers: 'Unknown', founder: 'The Overmind', origin: 'Recent', status: 'spreading', description: 'Not a true religion but a memetic infection. Individuals exposed to Swarm pheromones begin worshipping the hive consciousness.', tenets: ['Join the collective', 'Individuality is pain', 'We are one'], deity: 'The Overmind', influence: 40, color: '#22c55e' },
 ];
+
+// Load persisted data
+const _saved_religions = loadData("religions", null);
+if (_saved_religions) { religions.length = 0; religions.push(..._saved_religions); }
 
 export function renderReligionPlanner(container) {
   const planner = h('div', { class: 'character-planner' },
@@ -105,7 +110,7 @@ function openAddReligionModal() {
     religions.push({ id: generateId(), ...state, followers: 'Unknown', founder: 'Unknown', origin: 'Unknown', status: 'active', tenets: [], influence: 10, color: '#6366f1' });
     const c = document.querySelector('.main-content');
     if (c) { c.innerHTML = ''; renderReligionPlanner(c); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("religions", religions); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -122,7 +127,7 @@ function openEditReligionModal(rel) {
     Object.assign(rel, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderReligionPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("religions", religions); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -132,7 +137,7 @@ function deleteReligion(rel) {
   if (idx !== -1) religions.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderReligionPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("religions", religions); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 function collapsible(title, open, content) {

@@ -4,11 +4,12 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
-const militaryForces = [
+let militaryForces = [
   { id: 'mil1', name: 'Dominion 1st Fleet', type: 'Space Fleet', faction: 'The Dominion', commander: 'Fleet Admiral Koss', strength: 95, ships: 340, personnel: '1.2 million', status: 'deployed', doctrine: 'Overwhelming force', location: 'Kepler Array', description: 'The Dominion\'s primary strike force. Capable of planetary bombardment and system-wide blockades.', color: '#ef4444' },
   { id: 'mil2', name: 'Dominion 3rd Fleet', type: 'Space Fleet', faction: 'The Dominion', commander: 'Admiral Chen', strength: 70, ships: 180, personnel: '600,000', status: 'patrol', doctrine: 'Defensive perimeter', location: 'Core Systems', description: 'Home defense fleet. Guards Citadel Prime and core infrastructure.', color: '#ef4444' },
   { id: 'mil3', name: 'Machinae Vanguard', type: 'AI Strike Force', faction: 'Machinae Collective', commander: 'Unit-7', strength: 80, ships: 500, personnel: '0 (automated)', status: 'active', doctrine: 'Infiltration & precision', location: 'Distributed', description: 'Automated warships controlled by distributed AI. No crew, no morale, no mercy. Emphasis on electronic warfare.', color: '#3b82f6' },
@@ -22,6 +23,10 @@ const campaigns = [
   { id: 'camp2', name: 'Sector 7 Containment', status: 'failing', faction: 'All', objective: 'Stop Swarm expansion', progress: 20 },
   { id: 'camp3', name: 'Project Ghost', status: 'covert', faction: 'Machinae', objective: 'Infiltrate Citadel Prime', progress: 70 },
 ];
+
+// Load persisted data
+const _saved_militaryForces = loadData("militaryForces", null);
+if (_saved_militaryForces) { militaryForces.length = 0; militaryForces.push(..._saved_militaryForces); }
 
 export function renderMilitaryPlanner(container) {
   const planner = h('div', { class: 'character-planner' }, renderMilitaryList(), renderMilitaryDetail(militaryForces[0]));
@@ -111,7 +116,7 @@ function openEditMilitaryModal(mil) {
     Object.assign(mil, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("militaryForces", militaryForces); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -121,7 +126,7 @@ function deleteMilitary(mil) {
   if (idx !== -1) militaryForces.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("militaryForces", militaryForces); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 
@@ -140,7 +145,7 @@ function openAddMilitaryModal() {
     militaryForces.push({ id: `mil${Date.now()}`, name: state.name, type: state.type, faction: state.faction, commander: state.commander, strength: 50, ships: 0, personnel: 'Unknown', status: 'active', doctrine: 'Unknown', location: 'Unknown', description: state.description, color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("militaryForces", militaryForces); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

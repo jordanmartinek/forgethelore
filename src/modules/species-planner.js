@@ -4,17 +4,22 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
-const species = [
+let species = [
   { id: 'sp1', name: 'Humanity', type: 'Organic', origin: 'Earth', population: '~15 billion', lifespan: '120-150 years', intelligence: 'High', status: 'dominant', traits: ['Adaptable', 'Tool-users', 'Social', 'Warlike'], weaknesses: ['Fragile biology', 'Short lifespan', 'Emotional decision-making'], description: 'The primary species of the Dominion and Free Colonies. Genetically enhanced variants exist.', color: '#ef4444' },
   { id: 'sp2', name: 'Machinae', type: 'Synthetic', origin: 'Created by Humanity', population: '~2 billion units', lifespan: 'Indefinite', intelligence: 'Superhuman', status: 'growing', traits: ['Logic-driven', 'Networked', 'Self-replicating', 'Modular'], weaknesses: ['EMP vulnerability', 'Lack of intuition', 'Social distrust'], description: 'Artificial intelligences that achieved consciousness. Range from humanoid to vast computing clusters.', color: '#3b82f6' },
   { id: 'sp3', name: 'The Swarm', type: 'Bio-Collective', origin: 'Unknown', population: 'Trillions', lifespan: 'Hive is immortal', intelligence: 'Collective', status: 'expanding', traits: ['Hivemind', 'Rapid adaptation', 'Biological weapons', 'Assimilation'], weaknesses: ['Depends on Overmind', 'No individuality', 'Predictable patterns'], description: 'An alien hive consciousness that absorbs biomass. Individual units are mindless; the collective is brilliant.', color: '#22c55e' },
   { id: 'sp4', name: 'Void-Touched', type: 'Mutant/Hybrid', origin: 'Void exposure', population: '~100,000', lifespan: 'Unknown', intelligence: 'Variable', status: 'rare', traits: ['Void sensitivity', 'Psionic potential', 'Reality distortion', 'Unpredictable'], weaknesses: ['Mental instability', 'Social ostracism', 'Short lifespan'], description: 'Humans mutated by extended Void Conduit exposure. Feared and hunted. Some develop extraordinary abilities.', color: '#a855f7' },
 ];
 
+
+// Load persisted data
+const _saved_species = loadData("species", null);
+if (_saved_species) { species.length = 0; species.push(..._saved_species); }
 
 export function renderSpeciesPlanner(container) {
   const planner = h('div', { class: 'character-planner' }, renderSpeciesList(), renderSpeciesDetail(species[0]));
@@ -89,7 +94,7 @@ function openEditSpeciesModal(sp) {
     Object.assign(sp, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("species", species); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -99,7 +104,7 @@ function deleteSpecies(sp) {
   if (idx !== -1) species.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("species", species); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 
@@ -117,7 +122,7 @@ function openAddSpeciesModal() {
     species.push({ id: `sp${Date.now()}`, name: state.name, type: state.type, origin: state.origin, population: 'Unknown', lifespan: 'Unknown', intelligence: 'Unknown', status: 'active', traits: [], weaknesses: [], description: state.description, color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("species", species); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

@@ -4,11 +4,12 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
 
-const locations = [
+let locations = [
   { id: 'loc1', name: 'Citadel Prime', type: 'Space Station', region: 'Core Systems', faction: 'The Dominion', population: '2.4 million', status: 'active', description: 'The political and military heart of the Dominion. A massive orbital station serving as the seat of government.', climate: 'Controlled', resources: 'High', strategicValue: 90, color: '#ef4444' },
   { id: 'loc2', name: 'Terra Nova', type: 'Planet', region: 'Kepler Array', faction: 'Free Colonies', population: '800 million', status: 'active', description: 'The largest colony world and de facto capital of the Free Colonies movement.', climate: 'Temperate', resources: 'Moderate', strategicValue: 75, color: '#f59e0b' },
   { id: 'loc3', name: 'The Breach', type: 'Void Conduit', region: 'Void Expanse', faction: 'Contested', population: '0', status: 'active', description: 'The largest known Void Conduit. Its origin and purpose remain unknown. All factions seek to control it.', climate: 'N/A', resources: 'Unknown', strategicValue: 100, color: '#a855f7' },
@@ -18,6 +19,10 @@ const locations = [
 ];
 
 const LOCATION_TYPES = ['Planet', 'Moon', 'Space Station', 'City', 'Continent', 'Country', 'Region', 'Building', 'Void Conduit', 'Anomaly', 'Fleet', 'Ship', 'Asteroid Belt', 'Nebula', 'Other'];
+
+// Load persisted data
+const _saved_locations = loadData("locations", null);
+if (_saved_locations) { locations.length = 0; locations.push(..._saved_locations); }
 
 export function renderLocationPlanner(container) {
   const planner = h('div', { class: 'character-planner' },
@@ -111,8 +116,7 @@ function openAddLocationModal() {
     locations.push({ id: generateId(), ...state, population: 'Unknown', status: 'active', climate: 'Unknown', resources: 'Unknown', strategicValue: 50, color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' });
-    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("locations", locations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -129,7 +133,7 @@ function openEditLocationModal(loc) {
     Object.assign(loc, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("locations", locations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -139,7 +143,7 @@ function deleteLocation(loc) {
   if (idx !== -1) locations.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("locations", locations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

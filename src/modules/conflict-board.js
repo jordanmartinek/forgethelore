@@ -8,17 +8,18 @@ import { h, createSVGElement } from '../core/renderer.js';
 import { boardStore, appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { propagateSceneOutcome } from '../core/progression.js';
+import { loadData, saveData } from '../core/persist.js';
 
-// ─── Board Data ──────────────────────────────────────────────────────────────
+// ─── Board Data (loaded from localStorage or defaults) ───────────────────────
 
-const factions = [
+const DEFAULT_FACTIONS = [
   { id: 'f1', name: 'The Dominion', color: '#ef4444', icon: '🦅', goal: 'Secure the Void Conduit', goalProgress: 60 },
   { id: 'f2', name: 'Machinae Collective', color: '#3b82f6', icon: '🤖', goal: 'Prevent Dominion Expansion', goalProgress: 35 },
   { id: 'f3', name: 'The Swarm', color: '#22c55e', icon: '🐛', goal: 'Assimilate the System', goalProgress: 45 },
   { id: 'f4', name: 'Free Colonies', color: '#f59e0b', icon: '🌟', goal: 'Survive the War', goalProgress: 25 },
 ];
 
-const pieces = [
+const DEFAULT_PIECES = [
   { id: 'p1', name: 'Aurelian', faction: 'f1', type: 'king', role: 'antagonist', position: { row: 7, col: 3 }, momentum: 'rising', goal: 'Control all Conduits', hiddenGoal: 'Reshape humanity through Void evolution', resources: { political: 85, military: 90, economic: 75, knowledge: 60 } },
   { id: 'p2', name: 'Fleet Admiral Koss', faction: 'f1', type: 'rook', role: 'henchman', position: { row: 6, col: 1 }, momentum: 'stable', goal: 'Protect Dominion borders', hiddenGoal: '', resources: { political: 40, military: 95, economic: 50, knowledge: 30 } },
   { id: 'p3', name: 'Senator Vex', faction: 'f1', type: 'bishop', role: 'henchman', position: { row: 6, col: 5 }, momentum: 'rising', goal: 'Eliminate political opposition', hiddenGoal: '', resources: { political: 90, military: 20, economic: 80, knowledge: 70 } },
@@ -29,7 +30,7 @@ const pieces = [
   { id: 'p8', name: 'Dr. Orin Voss', faction: 'f4', type: 'bishop', role: 'ally', position: { row: 5, col: 6 }, momentum: 'stable', goal: 'Unlock Void technology safely', hiddenGoal: '', resources: { political: 20, military: 10, economic: 40, knowledge: 90 } },
 ];
 
-const conflictLines = [
+const DEFAULT_CONFLICT_LINES = [
   { from: 'p1', to: 'p4', type: 'opposition' },
   { from: 'p1', to: 'p6', type: 'opposition' },
   { from: 'p2', to: 'p5', type: 'opposition' },
@@ -39,6 +40,21 @@ const conflictLines = [
   { from: 'p1', to: 'p3', type: 'alliance' },
   { from: 'p5', to: 'p8', type: 'hidden' },
 ];
+
+const DEFAULT_SCENES = [
+  { id: 'sc1', title: 'The Conduit Discovery', order: 1, location: 'The Breach', summary: 'Dominion scouts discover the largest Void Conduit. AXIOM Prime detects the signal simultaneously.', participants: ['p1', 'p4', 'p2'], conflictType: 'competition', outcome: 'Dominion claims territory first', powerShift: { f1: 10, f2: -5 }, status: 'completed' },
+  { id: 'sc2', title: 'Senate Betrayal', order: 2, location: 'Citadel Prime', summary: 'Senator Vex maneuvers to discredit Captain Sera\'s colonial petition, cutting off diplomatic options.', participants: ['p3', 'p7'], conflictType: 'manipulation', outcome: 'Sera loses political credibility', powerShift: { f1: 5, f4: -15 }, status: 'completed' },
+  { id: 'sc3', title: 'Unit-7 Infiltration', order: 3, location: 'Dominion Networks', summary: 'Unit-7 Vanguard breaches Dominion military databases. Dr. Voss receives leaked research data.', participants: ['p5', 'p2', 'p8'], conflictType: 'opposition', outcome: 'Partial success — detected but data extracted', powerShift: { f2: 10, f1: -5, f4: 5 }, status: 'completed' },
+  { id: 'sc4', title: 'Swarm Assault on Obsidian', order: 4, location: 'Obsidian', summary: 'The Overmind launches a full bio-assault on Obsidian, overwhelming the mining colony in hours.', participants: ['p6', 'p2'], conflictType: 'opposition', outcome: 'Swarm victory — planet falls', powerShift: { f3: 20, f1: -10 }, status: 'completed' },
+  { id: 'sc5', title: 'The Alliance Proposal', order: 5, location: 'Nexus Hub', summary: 'Captain Sera proposes a colonial-Machinae alliance against both Dominion and Swarm threats.', participants: ['p7', 'p4', 'p8'], conflictType: 'alliance', outcome: 'Pending — AXIOM deliberating', powerShift: {}, status: 'active' },
+  { id: 'sc6', title: 'Void Weapon Test', order: 6, location: 'Classified', summary: 'The Dominion secretly tests a Void-powered weapon on an asteroid. The energy signature is detected galaxy-wide.', participants: ['p1', 'p2'], conflictType: 'escalation', outcome: 'Unknown', powerShift: {}, status: 'planned' },
+];
+
+// Load persisted data or use defaults
+const factions = loadData('factions', DEFAULT_FACTIONS);
+const pieces = loadData('pieces', DEFAULT_PIECES);
+const conflictLines = loadData('conflictLines', DEFAULT_CONFLICT_LINES);
+const scenes = loadData('scenes', DEFAULT_SCENES);
 
 const aiSuggestions = [
   { icon: '⚠️', text: 'Captain Sera currently has no meaningful opposition. Consider adding a direct antagonist or increasing pressure from the Dominion.' },
@@ -70,14 +86,7 @@ let activeSceneId = null;
 
 // ─── Scene Data (Micro Board) ────────────────────────────────────────────────
 
-const scenes = [
-  { id: 'sc1', title: 'The Conduit Discovery', order: 1, location: 'The Breach', summary: 'Dominion scouts discover the largest Void Conduit. AXIOM Prime detects the signal simultaneously.', participants: ['p1', 'p4', 'p2'], conflictType: 'competition', outcome: 'Dominion claims territory first', powerShift: { f1: +10, f2: -5 }, status: 'completed' },
-  { id: 'sc2', title: 'Senate Betrayal', order: 2, location: 'Citadel Prime', summary: 'Senator Vex maneuvers to discredit Captain Sera\'s colonial petition, cutting off diplomatic options.', participants: ['p3', 'p7'], conflictType: 'manipulation', outcome: 'Sera loses political credibility', powerShift: { f1: +5, f4: -15 }, status: 'completed' },
-  { id: 'sc3', title: 'Unit-7 Infiltration', order: 3, location: 'Dominion Networks', summary: 'Unit-7 Vanguard breaches Dominion military databases. Dr. Voss receives leaked research data.', participants: ['p5', 'p2', 'p8'], conflictType: 'opposition', outcome: 'Partial success — detected but data extracted', powerShift: { f2: +10, f1: -5, f4: +5 }, status: 'completed' },
-  { id: 'sc4', title: 'Swarm Assault on Obsidian', order: 4, location: 'Obsidian', summary: 'The Overmind launches a full bio-assault on Obsidian, overwhelming the mining colony in hours.', participants: ['p6', 'p2'], conflictType: 'opposition', outcome: 'Swarm victory — planet falls', powerShift: { f3: +20, f1: -10 }, status: 'completed' },
-  { id: 'sc5', title: 'The Alliance Proposal', order: 5, location: 'Nexus Hub', summary: 'Captain Sera proposes a colonial-Machinae alliance against both Dominion and Swarm threats.', participants: ['p7', 'p4', 'p8'], conflictType: 'alliance', outcome: 'Pending — AXIOM deliberating', powerShift: {}, status: 'active' },
-  { id: 'sc6', title: 'Void Weapon Test', order: 6, location: 'Classified', summary: 'The Dominion secretly tests a Void-powered weapon on an asteroid. The energy signature is detected galaxy-wide.', participants: ['p1', 'p2'], conflictType: 'escalation', outcome: 'Unknown', powerShift: {}, status: 'planned' },
-];
+// (scenes already loaded above from localStorage)
 
 
 // Expose pieces, scenes, and factions globally for cross-module access
@@ -353,7 +362,12 @@ function removePiece(piece) {
 
 function triggerSave() {
   appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  // Persist all board data to localStorage
+  saveData('factions', factions);
+  saveData('pieces', pieces);
+  saveData('conflictLines', conflictLines);
+  saveData('scenes', scenes);
+  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
 }
 
 function rerenderBoard() {

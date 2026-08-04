@@ -3,10 +3,11 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 
-const demoCharacters = [
+let demoCharacters = [
   { id: 'c1', name: 'Aurelian', role: 'Supreme Commander', faction: 'The Dominion', color: '#ef4444', momentum: 'rising', status: 'active', description: 'The charismatic and ruthless leader of the Dominion. Publicly champions human survival but secretly pursues Void evolution.' },
   { id: 'c2', name: 'Fleet Admiral Koss', role: 'Military Commander', faction: 'The Dominion', color: '#ef4444', momentum: 'stable', status: 'active', description: 'A loyal military strategist torn between duty and growing doubts about Dominion methods.' },
   { id: 'c3', name: 'Senator Vex', role: 'Political Operative', faction: 'The Dominion', color: '#ef4444', momentum: 'rising', status: 'active', description: 'Master manipulator working to consolidate political power. Plans diverge from Aurelian.' },
@@ -17,10 +18,23 @@ const demoCharacters = [
   { id: 'c8', name: 'Dr. Orin Voss', role: 'Void Researcher', faction: 'Free Colonies', color: '#f59e0b', momentum: 'stable', status: 'active', description: 'Brilliant scientist studying Void technology. His discoveries could change the war.' },
 ];
 
+// Load persisted data (replaces demo data if user has saved)
+const _savedChars = loadData("characters", null);
+if (_savedChars) { demoCharacters.length = 0; demoCharacters.push(..._savedChars); }
+
 export function renderCharacterPlanner(container, mode = 'characters') {
   const planner = h('div', { class: 'character-planner' },
     renderCharacterList(mode),
-    renderCharacterDetail(demoCharacters[0])
+    demoCharacters.length > 0
+      ? renderCharacterDetail(demoCharacters[0])
+      : h('div', { class: 'character-detail', style: { display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+          h('div', { style: { textAlign: 'center', color: 'var(--text-muted)' } },
+            h('div', { style: { fontSize: '48px', marginBottom: '16px', opacity: '0.5' } }, '👤'),
+            h('div', { style: { fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' } }, 'No Characters Yet'),
+            h('div', { style: { fontSize: '13px', marginBottom: '16px' } }, 'Create your first character to get started.'),
+            h('button', { class: 'btn btn--primary', onclick: openAddCharacterModal }, '+ New Character'),
+          )
+        )
   );
   container.appendChild(planner);
   updateCharacterSidebar(mode);
@@ -98,7 +112,7 @@ function openEditCharacterModal(char) {
     Object.assign(char, { name: state.name, role: state.role, faction: state.faction, description: state.description });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("characters", demoCharacters); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -108,7 +122,7 @@ function deleteCharacter(char) {
   if (idx !== -1) demoCharacters.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("characters", demoCharacters); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 
@@ -235,8 +249,7 @@ function openAddCharacterModal() {
     demoCharacters.push({ id: `c${Date.now()}`, name: state.name, role: state.role, faction: state.faction, color: '#6366f1', momentum: 'stable', status: 'active', description: state.description });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
-    appStore.setState({ saveStatus: 'saving' });
-    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("characters", demoCharacters); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 

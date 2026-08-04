@@ -9,6 +9,7 @@
  */
 
 import { generateId } from './objects.js';
+import { loadData, saveData } from './persist.js';
 
 // ─── Relationship Types ──────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ export const RELATIONSHIP_DIMENSIONS = {
 // ─── Relationship Data Store ─────────────────────────────────────────────────
 
 // Each relationship tracks values across multiple dimensions and logs history
-export const relationships = [
+const DEFAULT_RELATIONSHIPS = [
   {
     id: 'rel1',
     sourceId: 'p7', // Captain Sera
@@ -108,7 +109,7 @@ export const relationships = [
 // ─── Character Arc / Progression Data ────────────────────────────────────────
 
 // Each character accumulates events that change their state over time
-export const characterArcs = [
+const DEFAULT_ARCS = [
   {
     characterId: 'p7', // Captain Sera
     events: [
@@ -155,6 +156,15 @@ export const characterArcs = [
     ],
   },
 ];
+
+// Load persisted relationship and arc data
+export let relationships = loadData('relationships', DEFAULT_RELATIONSHIPS);
+export let characterArcs = loadData('characterArcs', DEFAULT_ARCS);
+
+export function saveProgressionData() {
+  saveData('relationships', relationships);
+  saveData('characterArcs', characterArcs);
+}
 
 // ─── Engine Functions ────────────────────────────────────────────────────────
 
@@ -325,6 +335,9 @@ export function propagateSceneOutcome(scene, pieces, affectedRelationships = [])
       });
     }
   }
+
+  // Persist changes
+  saveProgressionData();
 }
 
 /**
@@ -340,6 +353,7 @@ export function createRelationship(sourceId, targetId, type = 'professional') {
     history: [],
   };
   relationships.push(rel);
+  saveProgressionData();
   return rel;
 }
 

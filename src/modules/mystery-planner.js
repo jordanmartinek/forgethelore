@@ -4,10 +4,11 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 
-const demoMysteries = [
+let demoMysteries = [
   { id: 'm1', title: 'The Void Conduit Origin', question: 'Who created the Void Conduits and why?', truth: 'An ancient civilization built them as escape routes from a dying universe', status: 'active', importance: 'critical', progress: 30, clues: 4, redHerrings: 2 },
   { id: 'm2', title: 'Aurelian\'s True Agenda', question: 'What does Aurelian really want with the Conduits?', truth: 'He wants to merge human consciousness with Void energy', status: 'active', importance: 'major', progress: 15, clues: 2, redHerrings: 1 },
   { id: 'm3', title: 'The Swarm Intelligence', question: 'Is the Swarm truly mindless or secretly calculating?', truth: 'The Swarm is a fallen AI from the ancient civilization', status: 'active', importance: 'major', progress: 45, clues: 6, redHerrings: 3 },
@@ -23,6 +24,10 @@ const demoClues = [
   { id: 'cl5', mystery: 'm1', text: 'AXIOM detects consciousness patterns within', type: 'foreshadowing', position: { x: 350, y: 280 } },
   { id: 'cl6', mystery: 'm1', text: 'The Truth', type: 'reveal', position: { x: 550, y: 200 } },
 ];
+
+// Load persisted data
+const _saved_mysteries = loadData("mysteries", null);
+if (_saved_mysteries) { demoMysteries.length = 0; demoMysteries.push(..._saved_mysteries); }
 
 export function renderMysteryPlanner(container) {
   const board = h('div', { class: 'mystery-board' },
@@ -221,7 +226,7 @@ function openEditMysteryModal(mystery) {
     Object.assign(mystery, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("mysteries", demoMysteries); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -231,7 +236,7 @@ function deleteMystery(mystery) {
   if (idx !== -1) demoMysteries.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("mysteries", demoMysteries); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 
@@ -249,8 +254,7 @@ function openAddMysteryModal() {
     demoMysteries.push({ id: `m${Date.now()}`, title: state.title, question: state.question, truth: state.truth, status: 'active', importance: state.importance, progress: 0, clues: 0, redHerrings: 0 });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' });
-    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("mysteries", demoMysteries); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 

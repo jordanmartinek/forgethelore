@@ -4,6 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
@@ -11,13 +12,17 @@ import { expandableText } from '../ui/expandable-text.js';
 const FACTION_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#64748b'];
 const FACTION_ICONS = ['🦅', '🤖', '🐛', '🌟', '⚔️', '🛡️', '🔥', '🌀', '👑', '💀', '🐉', '🕷️', '🦊', '🐺', '🦁', '🏴', '⚡', '🌑', '☀️', '🎭'];
 
-const factionData = [
+let factionData = [
   { id: 'fac1', name: 'The Dominion', color: '#ef4444', icon: '🦅', goal: 'Secure the Void Conduit', type: 'Empire', leader: 'Aurelian', territory: 'Core Systems', population: '8 billion', militaryStrength: 90, politicalPower: 85, economicPower: 75, status: 'dominant', description: 'A militaristic human empire that believes in human supremacy and expansion. Controls the largest fleet and most territory.' },
   { id: 'fac2', name: 'Machinae Collective', color: '#3b82f6', icon: '🤖', goal: 'Prevent Dominion Expansion', type: 'AI Collective', leader: 'AXIOM Prime', territory: 'Distributed Networks', population: '2 billion units', militaryStrength: 70, politicalPower: 30, economicPower: 60, status: 'growing', description: 'A coalition of synthetic intelligences seeking sovereignty and recognition. Operates through distributed networks rather than territory.' },
   { id: 'fac3', name: 'The Swarm', color: '#22c55e', icon: '🐛', goal: 'Assimilate the System', type: 'Hive Mind', leader: 'The Overmind', territory: 'Sector 7 (expanding)', population: 'Trillions', militaryStrength: 85, politicalPower: 5, economicPower: 10, status: 'expanding', description: 'An alien collective consciousness that absorbs all organic life. No diplomacy, no negotiation. Only assimilation.' },
   { id: 'fac4', name: 'Free Colonies', color: '#f59e0b', icon: '🌟', goal: 'Survive the War', type: 'Loose Alliance', leader: 'Captain Sera (unofficial)', territory: 'Outer Rim', population: '1.2 billion', militaryStrength: 35, politicalPower: 60, economicPower: 30, status: 'struggling', description: 'A fractured coalition of independent colonies trying to maintain autonomy against all major powers. Underfunded but determined.' },
   { id: 'fac5', name: 'Nexus Trade Consortium', color: '#06b6d4', icon: '💎', goal: 'Profit from all sides', type: 'Trade Federation', leader: 'Guildmaster Riven Khol', territory: 'Neutral Zones', population: '340 million', militaryStrength: 20, politicalPower: 50, economicPower: 90, status: 'neutral', description: 'Controls all neutral trade routes and stations. Officially neutral, secretly sells to everyone. War is good for business.' },
 ];
+
+// Load persisted data
+const _saved_factionData = loadData("factionData", null);
+if (_saved_factionData) { factionData.length = 0; factionData.push(..._saved_factionData); }
 
 export function renderFactionPlanner(container) {
   const planner = h('div', { class: 'character-planner' },
@@ -147,8 +152,7 @@ function openAddFactionModal() {
     factionData.push({ id: generateId(), name: state.name, color: state.color, icon: state.icon, goal: state.goal, type: state.type, leader: state.leader, territory: state.territory, population: 'Unknown', militaryStrength: 50, politicalPower: 50, economicPower: 50, status: 'active', description: state.description });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' });
-    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("factionData", factionData); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -234,7 +238,7 @@ function openEditFactionItemModal(fac) {
     Object.assign(fac, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("factionData", factionData); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -244,5 +248,5 @@ function deleteFaction(fac) {
   if (idx !== -1) factionData.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("factionData", factionData); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }

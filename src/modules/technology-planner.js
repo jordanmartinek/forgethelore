@@ -4,11 +4,12 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
-const technologies = [
+let technologies = [
   { id: 'tech1', name: 'FTL Drive', era: 'Era 1', category: 'Propulsion', inventor: 'Dr. Elara Voss (ancestor)', faction: 'Humanity', prerequisites: [], dependents: ['tech2', 'tech5'], status: 'widespread', description: 'Faster-than-light travel via spacetime compression. The technology that enabled interstellar colonization.', impact: 'Civilization-changing', year: 'Year 5', color: '#22c55e' },
   { id: 'tech2', name: 'Void Energy Harvesting', era: 'Era 2', category: 'Energy', inventor: 'Unknown', faction: 'Pre-Dominion', prerequisites: ['tech1'], dependents: ['tech3', 'tech6'], status: 'restricted', description: 'Extraction of energy from Void Conduits. Immensely powerful but poorly understood. Only the Dominion controls it.', impact: 'Strategic', year: 'Year 35', color: '#a855f7' },
   { id: 'tech3', name: 'Synthetic Consciousness', era: 'Era 2', category: 'AI', inventor: 'Project AXIOM', faction: 'Humanity → Machinae', prerequisites: ['tech2'], dependents: ['tech4'], status: 'achieved', description: 'True artificial consciousness — not simulation but genuine self-awareness. Led to the Machinae uprising.', impact: 'Existential', year: 'Year 42', color: '#3b82f6' },
@@ -18,6 +19,10 @@ const technologies = [
   { id: 'tech7', name: 'Swarm Bio-Integration', era: 'Era 2', category: 'Biology', inventor: 'The Overmind', faction: 'Swarm', prerequisites: [], dependents: [], status: 'active', description: 'The Swarm\'s ability to absorb and repurpose organic matter, integrating it into the hive.', impact: 'Existential threat', year: 'Unknown', color: '#22c55e' },
 ];
 
+
+// Load persisted data
+const _saved_technologies = loadData("technologies", null);
+if (_saved_technologies) { technologies.length = 0; technologies.push(..._saved_technologies); }
 
 export function renderTechnologyPlanner(container) {
   const planner = h('div', { class: 'character-planner' }, renderTechList(), renderTechDetail(technologies[0]));
@@ -107,7 +112,7 @@ function openEditTechModal(tech) {
     Object.assign(tech, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("technologies", technologies); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -117,7 +122,7 @@ function deleteTech(tech) {
   if (idx !== -1) technologies.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("technologies", technologies); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 
@@ -138,7 +143,7 @@ function openAddTechModal() {
     technologies.push({ id: `tech${Date.now()}`, name: state.name, category: state.category, era: state.era, inventor: state.inventor, faction: state.faction, prerequisites: [], dependents: [], status: 'theoretical', description: state.description, impact: 'Unknown', year: 'Pending', color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("technologies", technologies); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

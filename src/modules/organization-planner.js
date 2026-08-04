@@ -4,17 +4,22 @@
  */
 
 import { h } from '../core/renderer.js';
+import { loadData, saveData } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
-const organizations = [
+let organizations = [
   { id: 'org1', name: 'Dominion Intelligence Bureau', type: 'Intelligence Agency', faction: 'The Dominion', leader: 'Director Sylas Crane', members: '~50,000', purpose: 'Espionage, counter-intelligence, internal security', secrecy: 95, influence: 85, status: 'active', color: '#ef4444', description: 'The Dominion\'s shadow arm. Operates black sites, maintains surveillance networks, and eliminates threats before they materialize.' },
   { id: 'org2', name: 'Void Research Institute', type: 'Research Organization', faction: 'Independent', leader: 'Dr. Orin Voss', members: '~2,000', purpose: 'Study Void energy and Conduit technology', secrecy: 40, influence: 60, status: 'active', color: '#a855f7', description: 'Officially neutral scientific body. In practice, every faction tries to infiltrate it. Dr. Voss maintains independence through indispensability.' },
   { id: 'org3', name: 'The Unseen', type: 'Secret Society', faction: 'Unknown', leader: 'Unknown', members: 'Unknown', purpose: 'Unknown — possibly Void worship', secrecy: 100, influence: 50, status: 'active', color: '#1e1e2a', description: 'A rumored organization with members in every faction. Their goals are unclear but they seem to be guiding events toward a specific outcome.' },
   { id: 'org4', name: 'Stellar Merchants Guild', type: 'Trade Guild', faction: 'Nexus', leader: 'Guildmaster Riven Khol', members: '~500,000', purpose: 'Control interstellar trade routes', secrecy: 20, influence: 70, status: 'active', color: '#06b6d4', description: 'The economic backbone of neutral space. Controls shipping lanes, enforces trade contracts, and profits from every conflict.' },
 ];
 
+
+// Load persisted data
+const _saved_organizations = loadData("organizations", null);
+if (_saved_organizations) { organizations.length = 0; organizations.push(..._saved_organizations); }
 
 export function renderOrganizationPlanner(container) {
   const planner = h('div', { class: 'character-planner' }, renderOrgList(), renderOrgDetail(organizations[0]));
@@ -86,7 +91,7 @@ function openEditOrgModal(org) {
     Object.assign(org, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("organizations", organizations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 
@@ -96,7 +101,7 @@ function deleteOrg(org) {
   if (idx !== -1) organizations.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  saveData("organizations", organizations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
 }
 
 
@@ -115,7 +120,7 @@ function openAddOrgModal() {
     organizations.push({ id: `org${Date.now()}`, name: state.name, type: state.type, faction: state.faction, leader: state.leader, members: 'Unknown', purpose: '', secrecy: 50, influence: 30, status: 'active', color: '#6366f1', description: state.description });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' }); setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    saveData("organizations", organizations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
