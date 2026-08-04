@@ -3,10 +3,12 @@
   "short_name": "LoreForge",
   "description": "Creative Planning Operating System — Mission control for fictional universes",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0d0d12",
   "theme_color": "#6366f1",
-  "orientation": "landscape",
+  "orientation": "any",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "/public/icons/icon-192.png",

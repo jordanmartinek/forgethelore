@@ -83,10 +83,13 @@ async function init() {
     // Update object count in status bar
     updateObjectCount();
     
-    // Register service worker for PWA install (desktop icon)
+    // Register service worker for PWA install (desktop icon) and offline support
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(e => {
-        // SW may fail on some hosts — non-critical
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        console.log('[LoreForge] Service worker registered — app works offline');
+        // Check for updates periodically
+        setInterval(() => reg.update(), 60 * 60 * 1000); // hourly
+      }).catch(e => {
         console.warn('[LoreForge] SW registration skipped:', e.message);
       });
     }
