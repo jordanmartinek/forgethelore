@@ -62,11 +62,6 @@ const boards = [
 ];
 let activeBoardId = 'global';
 
-// Expose pieces and scenes globally for cross-module access
-window.__loreforge_pieces = pieces;
-window.__loreforge_scenes = scenes;
-window.__loreforge_factions = factions;
-
 let selectedPiece = null;
 let dragState = null;
 let boardSize = 'md';
@@ -84,6 +79,11 @@ const scenes = [
   { id: 'sc6', title: 'Void Weapon Test', order: 6, location: 'Classified', summary: 'The Dominion secretly tests a Void-powered weapon on an asteroid. The energy signature is detected galaxy-wide.', participants: ['p1', 'p2'], conflictType: 'escalation', outcome: 'Unknown', powerShift: {}, status: 'planned' },
 ];
 
+
+// Expose pieces, scenes, and factions globally for cross-module access
+window.__loreforge_pieces = pieces;
+window.__loreforge_scenes = scenes;
+window.__loreforge_factions = factions;
 
 // ─── Modal System ────────────────────────────────────────────────────────────
 
