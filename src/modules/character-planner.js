@@ -42,28 +42,32 @@ export function renderCharacterPlanner(container, mode = 'characters') {
 
 
 function renderCharacterList(mode) {
-  const chars = mode === 'factions' 
-    ? [...new Set(demoCharacters.map(c => c.faction))].map(f => ({ name: f, characters: demoCharacters.filter(c => c.faction === f) }))
-    : null;
+  const factionColors = {};
+  // Build faction color map from all sources
+  (window.__loreforge_factions || []).forEach(f => { factionColors[f.name] = f.color; });
+  (window.__loreforge_factionData || []).forEach(f => { factionColors[f.name] = f.color; });
+  
+  // Get unique factions for filter
+  const allFactions = [...new Set(demoCharacters.map(c => c.faction))];
   
   const list = h('div', { class: 'character-list' },
-    h('div', { style: { padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-      h('input', { class: 'input', placeholder: 'Search characters...', style: { fontSize: '12px' } }),
+    // Search
+    h('div', { style: { padding: '8px 12px' } },
+      h('input', { class: 'input', placeholder: 'Search characters...', style: { fontSize: '12px', marginBottom: '6px' }, oninput: (e) => filterCharacterList(e.target.value, list) }),
+    ),
+    // Filter by faction
+    h('div', { style: { padding: '0 12px 8px' } },
+      h('select', { class: 'input', style: { fontSize: '11px', padding: '4px 8px' }, onchange: (e) => filterCharactersByFaction(e.target.value) },
+        h('option', { value: '' }, 'All Factions'),
+        ...allFactions.map(f => h('option', { value: f }, f))
+      ),
     ),
   );
   
-  if (mode === 'factions' && chars) {
-    chars.forEach(faction => {
-      list.appendChild(h('div', { style: { padding: '8px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginTop: '8px' } }, faction.name));
-      faction.characters.forEach(char => {
-        list.appendChild(createCharacterCard(char));
-      });
-    });
-  } else {
-    demoCharacters.forEach(char => {
-      list.appendChild(createCharacterCard(char));
-    });
-  }
+  demoCharacters.forEach(char => {
+    const fColor = factionColors[char.faction] || char.color || '#6366f1';
+    list.appendChild(createCharacterCard(char, fColor));
+  });
   
   list.appendChild(h('div', { style: { padding: '8px' } },
     h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddCharacterModal }, '+ New Character')
@@ -72,9 +76,67 @@ function renderCharacterList(mode) {
   return list;
 }
 
-function createCharacterCard(char) {
+function filterCharacterList(query, list) {
+  const lower = query.toLowerCase();
+  list.querySelectorAll('.character-card').forEach(card => {
+    const name = card.querySelector('.character-card__name')?.textContent?.toLowerCase() || '';
+    const role = card.querySelector('.character-card__role')?.textContent?.toLowerCase() || '';
+    card.style.display = (name.includes(lower) || role.includes(lower)) ? '' : 'none';
+  });
+}
+
+function filterCharactersByFaction(faction) {
+  const container = document.querySelector('.main-content');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  if (!faction) {
+    renderCharacterPlanner(container, 'characters');
+    return;
+  }
+  
+  // Temporarily filter and re-render
+  const filtered = demoCharacters.filter(c => c.faction === faction);
+  const factionColors = {};
+  (window.__loreforge_factions || []).forEach(f => { factionColors[f.name] = f.color; });
+  (window.__loreforge_factionData || []).forEach(f => { factionColors[f.name] = f.color; });
+  
+  const allFactions = [...new Set(demoCharacters.map(c => c.faction))];
+  
+  const list = h('div', { class: 'character-list' },
+    h('div', { style: { padding: '8px 12px' } },
+      h('input', { class: 'input', placeholder: 'Search characters...', style: { fontSize: '12px', marginBottom: '6px' } }),
+    ),
+    h('div', { style: { padding: '0 12px 8px' } },
+      h('select', { class: 'input', style: { fontSize: '11px', padding: '4px 8px' }, onchange: (e) => filterCharactersByFaction(e.target.value) },
+        h('option', { value: '' }, 'All Factions'),
+        ...allFactions.map(f => h('option', { value: f, ...(f === faction ? { selected: 'selected' } : {}) }, f))
+      ),
+    ),
+  );
+  filtered.forEach(char => {
+    const fColor = factionColors[char.faction] || char.color || '#6366f1';
+    list.appendChild(createCharacterCard(char, fColor));
+  });
+  list.appendChild(h('div', { style: { padding: '8px' } }, h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: openAddCharacterModal }, '+ New Character')));
+  
+  const planner = h('div', { class: 'character-planner' },
+    list,
+    filtered.length > 0
+      ? renderCharacterDetail(filtered[0])
+      : h('div', { class: 'character-detail', style: { display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+          h('div', { style: { textAlign: 'center', color: 'var(--text-muted)' } },
+            h('div', { style: { fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)' } }, `No characters in "${faction}"`),
+          ))
+  );
+  container.appendChild(planner);
+}
+
+function createCharacterCard(char, factionColor) {
+  const color = factionColor || char.color || '#6366f1';
   return h('div', { 
     class: 'character-card',
+    dataset: { faction: char.faction },
     onclick: (e) => {
       if (e.target.closest('.card-actions')) return;
       document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
@@ -86,7 +148,7 @@ function createCharacterCard(char) {
       }
     }
   },
-    h('div', { class: 'character-card__avatar', style: { background: char.color } }, char.name[0]),
+    h('div', { class: 'character-card__avatar', style: { background: color } }, char.name[0]),
     h('div', { class: 'character-card__info' },
       h('div', { class: 'character-card__name' }, char.name),
       h('div', { class: 'character-card__role' }, `${char.role} • ${char.faction}`),

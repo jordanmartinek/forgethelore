@@ -44,15 +44,34 @@ export function renderLocationPlanner(container) {
 }
 
 function renderLocationList() {
+  const allTypes = [...new Set(locations.map(l => l.type))];
+  
   const list = h('div', { class: 'character-list' },
     h('div', { style: { padding: '8px 12px' } },
-      h('input', { class: 'input', placeholder: 'Search locations...', style: { fontSize: '12px' } }),
+      h('input', { class: 'input', placeholder: 'Search locations...', style: { fontSize: '12px', marginBottom: '6px' }, oninput: (e) => {
+        const q = e.target.value.toLowerCase();
+        list.querySelectorAll('.character-card').forEach(card => {
+          const text = card.textContent.toLowerCase();
+          card.style.display = text.includes(q) ? '' : 'none';
+        });
+      }}),
+      h('select', { class: 'input', style: { fontSize: '11px', padding: '4px 8px' }, onchange: (e) => {
+        const filter = e.target.value;
+        list.querySelectorAll('.character-card').forEach(card => {
+          if (!filter) { card.style.display = ''; return; }
+          card.style.display = card.dataset.type === filter ? '' : 'none';
+        });
+      }},
+        h('option', { value: '' }, 'All Types'),
+        ...allTypes.map(t => h('option', { value: t }, t))
+      ),
     ),
   );
 
   locations.forEach(loc => {
     list.appendChild(h('div', {
       class: 'character-card',
+      dataset: { type: loc.type },
       onclick: (e) => {
         if (e.target.closest('.card-actions')) return;
         document.querySelectorAll('.character-card').forEach(c => c.classList.remove('character-card--active'));
