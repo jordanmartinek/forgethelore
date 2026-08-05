@@ -25,6 +25,7 @@ import { renderRelationshipPlanner } from '../modules/relationship-planner.js';
 import { renderCharacterArc } from '../modules/character-arc.js';
 import { renderQuickSceneLog } from '../modules/quick-scene-log.js';
 import { setActiveProject, saveData, loadData } from '../core/persist.js';
+import { renderExportImport, exportProject, importProject } from '../ui/export-import.js';
 import { renderCommandPalette } from './command-palette.js';
 
 // Module definitions
@@ -48,6 +49,7 @@ const modules = [
   { id: 'relationships', icon: '💫', label: 'Relationships', category: 'analysis' },
   { id: 'knowledge-matrix', icon: '📈', label: 'Character Arcs', category: 'analysis' },
   { id: 'analytics', icon: '📊', label: 'Analytics', category: 'analysis' },
+  { id: 'export-import', icon: '💾', label: 'Export / Import', category: 'analysis' },
 ];
 
 export function initAppShell() {
@@ -477,6 +479,9 @@ function renderActiveModule() {
       break;
     case 'analytics':
       renderAnalytics(content);
+      break;
+    case 'export-import':
+      renderExportImport(content);
       break;
     default:
       renderPlaceholderModule(content, state.activeModule);
