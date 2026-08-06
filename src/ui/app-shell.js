@@ -188,10 +188,13 @@ function createActivityBar() {
     h('div', { style: { flex: '1' } }),
     h('div', {
       class: 'activity-bar__item',
-      title: 'Toggle Sidebar (Ctrl+B)',
-      onclick: toggleSidebar,
-      id: 'activity-bar-sidebar-toggle',
-    }, '☰')
+      title: 'Expand/Collapse Toolbar',
+      onclick: toggleToolbar,
+      id: 'activity-bar-toolbar-toggle',
+    },
+      h('span', { class: 'activity-bar__icon' }, '☰'),
+      h('span', { class: 'activity-bar__label' }, 'Collapse'),
+    )
   );
   
   return bar;
@@ -235,6 +238,17 @@ function toggleSidebar() {
     toggleBtn.textContent = isCollapsed ? '▶' : '◀';
     toggleBtn.title = isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
   }
+}
+
+function toggleToolbar() {
+  const layout = document.querySelector('.app-layout');
+  if (!layout) return;
+  
+  const isExpanded = layout.classList.toggle('app-layout--toolbar-expanded');
+  
+  // Update the toggle button label
+  const label = document.querySelector('#activity-bar-toolbar-toggle .activity-bar__label');
+  if (label) label.textContent = isExpanded ? 'Collapse' : 'Expand';
 }
 
 // ─── Project Switcher ────────────────────────────────────────────────────────
