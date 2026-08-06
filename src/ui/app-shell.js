@@ -24,6 +24,7 @@ import { renderFactionPlanner } from '../modules/faction-planner.js';
 import { renderRelationshipPlanner } from '../modules/relationship-planner.js';
 import { renderCharacterArc } from '../modules/character-arc.js';
 import { renderQuickSceneLog } from '../modules/quick-scene-log.js';
+import { renderManuscriptPlanner } from '../modules/manuscript-planner.js';
 import { setActiveProject, saveData, loadData } from '../core/persist.js';
 import { renderExportImport, exportProject, importProject } from '../ui/export-import.js';
 import { renderCommandPalette } from './command-palette.js';
@@ -31,6 +32,7 @@ import { renderCommandPalette } from './command-palette.js';
 // Module definitions
 const modules = [
   { id: 'quick-log', icon: '⚡', label: 'Quick Scene Log', category: 'core' },
+  { id: 'manuscript', icon: '📖', label: 'Manuscript', category: 'core' },
   { id: 'conflict-board', icon: '♟️', label: 'Strategic Board', category: 'core' },
   { id: 'world-builder', icon: '🌌', label: 'World Builder', category: 'core' },
   { id: 'characters', icon: '👤', label: 'Characters', category: 'planning' },
@@ -428,6 +430,9 @@ function renderActiveModule() {
   switch (state.activeModule) {
     case 'quick-log':
       renderQuickSceneLog(content);
+      break;
+    case 'manuscript':
+      renderManuscriptPlanner(content);
       break;
     case 'conflict-board':
       renderConflictBoard(content);
