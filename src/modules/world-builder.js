@@ -280,6 +280,12 @@ function createCanvasNode(node) {
     h('div', { class: 'canvas-node__header' },
       h('span', { class: 'canvas-node__icon' }, ObjectIcons[node.type]),
       h('span', { class: 'canvas-node__name' }, node.name),
+      h('button', {
+        style: { marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'var(--text-muted)', padding: '2px 4px', borderRadius: '4px' },
+        title: 'Edit',
+        onclick: (e) => { e.stopPropagation(); openEditNodeModal(node); },
+        onmousedown: (e) => e.stopPropagation(),
+      }, '✏️'),
     ),
     h('div', { class: 'canvas-node__type' }, node.type.replace(/_/g, ' ')),
     // Enter button — always visible, indicates you can drill in
@@ -397,6 +403,71 @@ function updateCanvasTransform() {
   if (t) t.style.transform = `translate(${canvasState.panX}px, ${canvasState.panY}px) scale(${canvasState.zoom})`;
   const g = document.getElementById('canvas-grid');
   if (g) { g.style.backgroundSize = `${40 * canvasState.zoom}px ${40 * canvasState.zoom}px`; g.style.backgroundPosition = `${canvasState.panX}px ${canvasState.panY}px`; }
+}
+
+// ─── Edit / Delete Nodes ─────────────────────────────────────────────────────
+
+function openEditNodeModal(node) {
+  const NODE_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316', '#3b82f6', '#84cc16'];
+  const state = { name: node.name, color: node.color };
+
+  const colorGrid = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+    ...NODE_COLORS.map(c => h('div', {
+      style: { width: '24px', height: '24px', borderRadius: '6px', background: c, cursor: 'pointer', border: c === state.color ? '2px solid white' : '2px solid transparent' },
+      onclick: (e) => { state.color = c; e.currentTarget.parentElement.querySelectorAll('div').forEach(d => d.style.border = '2px solid transparent'); e.currentTarget.style.border = '2px solid white'; }
+    }))
+  );
+
+  const content = h('div', {},
+    h('div', { style: { marginBottom: '12px' } },
+      h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, 'Name'),
+      h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value }),
+    ),
+    h('div', { style: { marginBottom: '12px' } },
+      h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, 'Color'),
+      colorGrid,
+    ),
+    h('div', { style: { marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' } },
+      h('button', { class: 'btn', style: { color: 'var(--danger)', width: '100%' }, onclick: () => { deleteNode(node); document.querySelector('.modal-overlay')?.remove(); } }, '🗑️ Delete This Node'),
+    ),
+  );
+
+  // Modal
+  const existing = document.querySelector('.modal-overlay');
+  if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' },
+      h('div', { class: 'modal__header' },
+        h('span', { class: 'modal__title' }, `Edit: ${node.name}`),
+        h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕'),
+      ),
+      h('div', { class: 'modal__body' }, content),
+      h('div', { class: 'modal__footer' },
+        h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'),
+        h('button', { class: 'btn btn--primary', onclick: () => {
+          node.name = state.name;
+          node.color = state.color;
+          saveWorld();
+          rerender();
+          overlay.remove();
+        }}, 'Save'),
+      ),
+    )
+  );
+  document.body.appendChild(overlay);
+}
+
+function deleteNode(node) {
+  if (!confirm(`Delete "${node.name}" and all its children?`)) return;
+  const level = getCurrentLevel();
+  const idx = level.nodes.findIndex(n => n.id === node.id);
+  if (idx !== -1) level.nodes.splice(idx, 1);
+  // Remove connections involving this node
+  level.connections = level.connections.filter(c => c.from !== node.id && c.to !== node.id);
+  // Remove children data
+  delete worldData[node.id];
+  saveWorld();
+  rerender();
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
