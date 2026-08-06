@@ -1,24 +1,24 @@
 /**
  * LoreForge Planner - World Builder
- * Infinite zoomable canvas with hierarchical branching
+ * Infinite zoomable canvas with hierarchical branching.
+ * Click into any node to explore its children.
  */
 
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { ObjectTypes, ObjectIcons, generateId } from '../core/objects.js';
+import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 
 // World object palette categories
 const paletteCategories = [
   { name: 'Cosmic', items: [
     { type: ObjectTypes.UNIVERSE, label: 'Universe' },
-    { type: ObjectTypes.MULTIVERSE, label: 'Multiverse' },
     { type: ObjectTypes.GALAXY, label: 'Galaxy' },
     { type: ObjectTypes.NEBULA, label: 'Nebula' },
     { type: ObjectTypes.STAR_CLUSTER, label: 'Star Cluster' },
   ]},
   { name: 'Stellar', items: [
     { type: ObjectTypes.SOLAR_SYSTEM, label: 'Solar System' },
-    { type: ObjectTypes.BINARY_STAR, label: 'Binary Star' },
     { type: ObjectTypes.PLANET, label: 'Planet' },
     { type: ObjectTypes.MOON, label: 'Moon' },
     { type: ObjectTypes.ASTEROID_BELT, label: 'Asteroid Belt' },
@@ -29,24 +29,19 @@ const paletteCategories = [
     { type: ObjectTypes.FLEET, label: 'Fleet' },
     { type: ObjectTypes.SHIP, label: 'Ship' },
   ]},
-
   { name: 'Geography', items: [
     { type: ObjectTypes.CONTINENT, label: 'Continent' },
     { type: ObjectTypes.COUNTRY, label: 'Country' },
-    { type: ObjectTypes.KINGDOM, label: 'Kingdom' },
     { type: ObjectTypes.CITY, label: 'City' },
-    { type: ObjectTypes.DISTRICT, label: 'District' },
     { type: ObjectTypes.VILLAGE, label: 'Village' },
   ]},
   { name: 'Structures', items: [
     { type: ObjectTypes.BUILDING, label: 'Building' },
-    { type: ObjectTypes.FLOOR, label: 'Floor' },
     { type: ObjectTypes.ROOM, label: 'Room' },
   ]},
   { name: 'Natural', items: [
     { type: ObjectTypes.FOREST, label: 'Forest' },
     { type: ObjectTypes.MOUNTAIN, label: 'Mountain' },
-    { type: ObjectTypes.RIVER, label: 'River' },
     { type: ObjectTypes.OCEAN, label: 'Ocean' },
   ]},
   { name: 'Anomalous', items: [
@@ -57,43 +52,75 @@ const paletteCategories = [
   ]},
 ];
 
+// ─── Hierarchical World Data ─────────────────────────────────────────────────
+// Each node can have children. Navigating "into" a node shows its children.
 
-// Demo canvas nodes
-const demoNodes = [
-  { id: 'n1', type: ObjectTypes.GALAXY, name: 'Andromeda Reach', position: { x: 200, y: 150 }, color: '#6366f1' },
-  { id: 'n2', type: ObjectTypes.GALAXY, name: 'Void Expanse', position: { x: 500, y: 200 }, color: '#a855f7' },
-  { id: 'n3', type: ObjectTypes.SOLAR_SYSTEM, name: 'Sol Prime', position: { x: 150, y: 350 }, color: '#f59e0b' },
-  { id: 'n4', type: ObjectTypes.SOLAR_SYSTEM, name: 'Kepler Array', position: { x: 400, y: 380 }, color: '#06b6d4' },
-  { id: 'n5', type: ObjectTypes.PLANET, name: 'Terra Nova', position: { x: 100, y: 520 }, color: '#22c55e' },
-  { id: 'n6', type: ObjectTypes.PLANET, name: 'Obsidian', position: { x: 320, y: 500 }, color: '#ef4444' },
-  { id: 'n7', type: ObjectTypes.SPACE_STATION, name: 'Citadel Prime', position: { x: 550, y: 420 }, color: '#3b82f6' },
-  { id: 'n8', type: ObjectTypes.VOID_CONDUIT, name: 'The Breach', position: { x: 650, y: 300 }, color: '#ec4899' },
-  { id: 'n9', type: ObjectTypes.FLEET, name: 'Dominion 1st Fleet', position: { x: 700, y: 480 }, color: '#ef4444' },
-  { id: 'n10', type: ObjectTypes.ANOMALY, name: 'Quantum Rift', position: { x: 450, y: 120 }, color: '#8b5cf6' },
-];
-
-const demoConnections = [
-  { from: 'n1', to: 'n3' },
-  { from: 'n1', to: 'n4' },
-  { from: 'n2', to: 'n8' },
-  { from: 'n3', to: 'n5' },
-  { from: 'n4', to: 'n6' },
-  { from: 'n4', to: 'n7' },
-  { from: 'n8', to: 'n10' },
-];
-
-let canvasState = {
-  zoom: 1,
-  panX: 0,
-  panY: 0,
-  isPanning: false,
-  startPan: { x: 0, y: 0 },
-  selectedNode: null,
-  dragNode: null,
+const _isDemo = getActiveProjectId() === 'proj1';
+const DEFAULT_WORLD = {
+  'root': {
+    nodes: [
+      { id: 'n1', type: ObjectTypes.GALAXY, name: 'Andromeda Reach', position: { x: 200, y: 150 }, color: '#6366f1' },
+      { id: 'n2', type: ObjectTypes.GALAXY, name: 'Void Expanse', position: { x: 500, y: 200 }, color: '#a855f7' },
+      { id: 'n10', type: ObjectTypes.ANOMALY, name: 'Quantum Rift', position: { x: 420, y: 80 }, color: '#8b5cf6' },
+    ],
+    connections: [{ from: 'n2', to: 'n10' }],
+  },
+  'n1': {
+    nodes: [
+      { id: 'n3', type: ObjectTypes.SOLAR_SYSTEM, name: 'Sol Prime', position: { x: 150, y: 150 }, color: '#f59e0b' },
+      { id: 'n4', type: ObjectTypes.SOLAR_SYSTEM, name: 'Kepler Array', position: { x: 450, y: 180 }, color: '#06b6d4' },
+    ],
+    connections: [],
+  },
+  'n2': {
+    nodes: [
+      { id: 'n8', type: ObjectTypes.VOID_CONDUIT, name: 'The Breach', position: { x: 300, y: 200 }, color: '#ec4899' },
+      { id: 'n9', type: ObjectTypes.FLEET, name: 'Dominion 1st Fleet', position: { x: 550, y: 250 }, color: '#ef4444' },
+    ],
+    connections: [],
+  },
+  'n3': {
+    nodes: [
+      { id: 'n5', type: ObjectTypes.PLANET, name: 'Terra Nova', position: { x: 200, y: 150 }, color: '#22c55e' },
+    ],
+    connections: [],
+  },
+  'n4': {
+    nodes: [
+      { id: 'n6', type: ObjectTypes.PLANET, name: 'Obsidian', position: { x: 200, y: 150 }, color: '#ef4444' },
+      { id: 'n7', type: ObjectTypes.SPACE_STATION, name: 'Citadel Prime', position: { x: 450, y: 200 }, color: '#3b82f6' },
+    ],
+    connections: [{ from: 'n6', to: 'n7' }],
+  },
+  'n5': {
+    nodes: [
+      { id: 'n5c1', type: ObjectTypes.CONTINENT, name: 'Nova Prime', position: { x: 200, y: 150 }, color: '#22c55e' },
+      { id: 'n5c2', type: ObjectTypes.OCEAN, name: 'The Vast Blue', position: { x: 450, y: 200 }, color: '#3b82f6' },
+    ],
+    connections: [],
+  },
 };
 
-let worldPath = [{ id: 'universe', name: 'The Cosmos', type: 'universe' }];
+let worldData = loadData('worldBuilder', _isDemo ? DEFAULT_WORLD : { root: { nodes: [], connections: [] } });
 
+function saveWorld() {
+  saveData('worldBuilder', worldData);
+  appStore.setState({ saveStatus: 'saving' });
+  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+}
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
+let canvasState = { zoom: 1, panX: 0, panY: 0, isPanning: false, startPan: { x: 0, y: 0 }, selectedNode: null, dragNode: null };
+let worldPath = [{ id: 'root', name: 'Universe', type: 'universe' }];
+
+function getCurrentLevel() {
+  const currentId = worldPath[worldPath.length - 1].id;
+  if (!worldData[currentId]) worldData[currentId] = { nodes: [], connections: [] };
+  return worldData[currentId];
+}
+
+// ─── Main Render ─────────────────────────────────────────────────────────────
 
 export function renderWorldBuilder(container) {
   const builder = h('div', { class: 'world-builder' },
@@ -106,32 +133,31 @@ export function renderWorldBuilder(container) {
 }
 
 function renderWorldToolbar() {
+  const level = getCurrentLevel();
   return h('div', { class: 'world-builder__toolbar' },
     h('div', { class: 'world-builder__breadcrumbs' },
       ...worldPath.map((crumb, i) => [
         i > 0 ? h('span', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, '›') : null,
-        h('span', { 
+        h('span', {
           class: `world-builder__crumb ${i === worldPath.length - 1 ? 'world-builder__crumb--current' : ''}`,
           onclick: () => navigateToLevel(i)
         }, `${ObjectIcons[crumb.type] || '🌌'} ${crumb.name}`)
       ]).flat().filter(Boolean)
     ),
     h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-      h('button', { class: 'btn btn--sm btn--ghost' }, '🔲 Snap to Grid'),
-      h('button', { class: 'btn btn--sm btn--ghost' }, '🔗 Connect Mode'),
-      h('button', { class: 'btn btn--sm btn--ghost' }, '📐 Auto Layout'),
-      h('span', { style: { fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' } }, `${demoNodes.length} objects`),
+      h('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, `${level.nodes.length} objects at this level`),
+      h('button', { class: 'btn btn--sm btn--ghost', onclick: () => navigateToLevel(0) }, '🏠 Root'),
     )
   );
 }
 
 function renderPalette() {
   return h('div', { class: 'world-builder__palette' },
-    ...paletteCategories.map(category => 
+    ...paletteCategories.map(category =>
       h('div', { class: 'palette-group' },
         h('div', { class: 'palette-group__title' }, category.name),
-        ...category.items.map(item => 
-          h('div', { 
+        ...category.items.map(item =>
+          h('div', {
             class: 'palette-item',
             draggable: 'true',
             ondragstart: (e) => {
@@ -148,9 +174,10 @@ function renderPalette() {
   );
 }
 
+// ─── Canvas ──────────────────────────────────────────────────────────────────
 
 function renderCanvas() {
-  const canvas = h('div', { 
+  const canvas = h('div', {
     class: 'world-builder__canvas',
     ondrop: handleCanvasDrop,
     ondragover: (e) => e.preventDefault(),
@@ -159,76 +186,95 @@ function renderCanvas() {
     onmouseup: handleCanvasMouseUp,
     onwheel: handleCanvasWheel,
   });
-  
-  // Grid background
+
   canvas.appendChild(h('div', { class: 'canvas-grid', id: 'canvas-grid' }));
-  
-  // Transform container
-  const transform = h('div', { 
+
+  const transform = h('div', {
     id: 'canvas-transform',
-    style: { 
-      position: 'absolute', 
-      inset: '0', 
-      transform: `translate(${canvasState.panX}px, ${canvasState.panY}px) scale(${canvasState.zoom})`,
-      transformOrigin: '0 0',
-      transition: 'none',
-    }
+    style: { position: 'absolute', inset: '0', transform: `translate(${canvasState.panX}px, ${canvasState.panY}px) scale(${canvasState.zoom})`, transformOrigin: '0 0' }
   });
-  
-  // Connection lines (SVG)
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'canvas-connections');
-  svg.style.position = 'absolute';
-  svg.style.inset = '0';
-  svg.style.width = '100%';
-  svg.style.height = '100%';
-  svg.style.pointerEvents = 'none';
-  svg.style.overflow = 'visible';
-  
-  demoConnections.forEach(conn => {
-    const from = demoNodes.find(n => n.id === conn.from);
-    const to = demoNodes.find(n => n.id === conn.to);
-    if (!from || !to) return;
-    
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', String(from.position.x + 60));
-    line.setAttribute('y1', String(from.position.y + 25));
-    line.setAttribute('x2', String(to.position.x + 60));
-    line.setAttribute('y2', String(to.position.y + 25));
-    line.setAttribute('class', 'canvas-connection');
-    svg.appendChild(line);
-  });
-  
-  transform.appendChild(svg);
-  
+
+  const level = getCurrentLevel();
+
   // Nodes
-  demoNodes.forEach(node => {
-    transform.appendChild(createCanvasNode(node));
-  });
-  
+  level.nodes.forEach(node => transform.appendChild(createCanvasNode(node)));
+
   canvas.appendChild(transform);
-  
+
+  // SVG for connections (rendered on top, updates dynamically)
+  canvas.appendChild(renderConnections());
+
   // Zoom controls
-  canvas.appendChild(
-    h('div', { class: 'canvas-controls' },
-      h('button', { class: 'canvas-controls__btn', onclick: () => zoomCanvas(0.1) }, '+'),
-      h('div', { class: 'canvas-controls__zoom', id: 'zoom-level' }, `${Math.round(canvasState.zoom * 100)}%`),
-      h('button', { class: 'canvas-controls__btn', onclick: () => zoomCanvas(-0.1) }, '−'),
-      h('button', { class: 'canvas-controls__btn', onclick: resetCanvas, title: 'Reset View' }, '⊡'),
-    )
-  );
-  
+  canvas.appendChild(h('div', { class: 'canvas-controls' },
+    h('button', { class: 'canvas-controls__btn', onclick: () => zoomCanvas(0.1) }, '+'),
+    h('div', { class: 'canvas-controls__zoom', id: 'zoom-level' }, `${Math.round(canvasState.zoom * 100)}%`),
+    h('button', { class: 'canvas-controls__btn', onclick: () => zoomCanvas(-0.1) }, '−'),
+    h('button', { class: 'canvas-controls__btn', onclick: resetCanvas, title: 'Reset' }, '⊡'),
+  ));
+
+  // Empty state
+  if (level.nodes.length === 0) {
+    canvas.appendChild(h('div', { style: { position: 'absolute', inset: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' } },
+      h('div', { style: { textAlign: 'center', color: 'var(--text-muted)' } },
+        h('div', { style: { fontSize: '36px', marginBottom: '8px', opacity: '0.5' } }, '🌌'),
+        h('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' } }, 'Empty Space'),
+        h('div', { style: { fontSize: '12px' } }, 'Drag objects from the left palette to populate this level'),
+      )
+    ));
+  }
+
   return canvas;
 }
 
+function renderConnections() {
+  const level = getCurrentLevel();
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'world-connections-svg';
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;';
+
+  level.connections.forEach(conn => {
+    const from = level.nodes.find(n => n.id === conn.from);
+    const to = level.nodes.find(n => n.id === conn.to);
+    if (!from || !to) return;
+
+    const x1 = (from.position.x + 60) * canvasState.zoom + canvasState.panX;
+    const y1 = (from.position.y + 25) * canvasState.zoom + canvasState.panY;
+    const x2 = (to.position.x + 60) * canvasState.zoom + canvasState.panX;
+    const y2 = (to.position.y + 25) * canvasState.zoom + canvasState.panY;
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(x1));
+    line.setAttribute('y1', String(y1));
+    line.setAttribute('x2', String(x2));
+    line.setAttribute('y2', String(y2));
+    line.setAttribute('stroke', 'rgba(99,102,241,0.4)');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-dasharray', '6 4');
+    svg.appendChild(line);
+  });
+
+  return svg;
+}
+
+function updateConnections() {
+  const oldSvg = document.getElementById('world-connections-svg');
+  if (oldSvg) {
+    const newSvg = renderConnections();
+    oldSvg.parentNode.replaceChild(newSvg, oldSvg);
+  }
+}
+
+// ─── Canvas Nodes ────────────────────────────────────────────────────────────
 
 function createCanvasNode(node) {
+  const hasChildren = !!worldData[node.id] && worldData[node.id].nodes.length > 0;
+
   return h('div', {
     class: `canvas-node ${canvasState.selectedNode === node.id ? 'canvas-node--selected' : ''}`,
     style: { left: `${node.position.x}px`, top: `${node.position.y}px`, borderLeftColor: node.color, borderLeftWidth: '3px' },
-    dataset: { nodeId: node.id, contextmenu: 'object' },
+    dataset: { nodeId: node.id },
     onclick: (e) => { e.stopPropagation(); selectNode(node.id); },
-    ondblclick: () => enterNode(node),
+    ondblclick: (e) => { e.stopPropagation(); enterNode(node); },
     onmousedown: (e) => startNodeDrag(e, node),
   },
     h('div', { class: 'canvas-node__header' },
@@ -236,9 +282,17 @@ function createCanvasNode(node) {
       h('span', { class: 'canvas-node__name' }, node.name),
     ),
     h('div', { class: 'canvas-node__type' }, node.type.replace(/_/g, ' ')),
-    h('div', { class: 'canvas-node__enter', title: 'Enter (explore inside)' }, '→'),
+    // Enter button — always visible, indicates you can drill in
+    h('div', {
+      class: 'canvas-node__enter',
+      style: { opacity: '1', background: hasChildren ? 'var(--accent-primary)' : 'var(--surface-4)', cursor: 'pointer' },
+      title: hasChildren ? `Enter (${worldData[node.id].nodes.length} children)` : 'Enter (empty — add children inside)',
+      onclick: (e) => { e.stopPropagation(); enterNode(node); },
+    }, '→'),
   );
 }
+
+// ─── Interaction ─────────────────────────────────────────────────────────────
 
 function selectNode(nodeId) {
   canvasState.selectedNode = canvasState.selectedNode === nodeId ? null : nodeId;
@@ -248,33 +302,23 @@ function selectNode(nodeId) {
 }
 
 function enterNode(node) {
-  // Navigate into this node (hierarchical branching)
+  // Create the level if it doesn't exist
+  if (!worldData[node.id]) worldData[node.id] = { nodes: [], connections: [] };
   worldPath.push({ id: node.id, name: node.name, type: node.type });
-  // In a full implementation, this would load child objects
-  // For now, show a fresh canvas
-  const container = document.querySelector('.main-content');
-  if (container) {
-    container.innerHTML = '';
-    renderWorldBuilder(container);
-  }
+  canvasState = { zoom: 1, panX: 0, panY: 0, isPanning: false, startPan: { x: 0, y: 0 }, selectedNode: null, dragNode: null };
+  rerender();
 }
 
 function navigateToLevel(index) {
   worldPath = worldPath.slice(0, index + 1);
-  const container = document.querySelector('.main-content');
-  if (container) {
-    container.innerHTML = '';
-    renderWorldBuilder(container);
-  }
+  canvasState = { zoom: 1, panX: 0, panY: 0, isPanning: false, startPan: { x: 0, y: 0 }, selectedNode: null, dragNode: null };
+  rerender();
 }
 
-
-// Canvas interaction handlers
 function handleCanvasMouseDown(e) {
   if (e.target.closest('.canvas-node') || e.target.closest('.canvas-controls')) return;
   canvasState.isPanning = true;
   canvasState.startPan = { x: e.clientX - canvasState.panX, y: e.clientY - canvasState.panY };
-  e.target.closest('.world-builder__canvas')?.classList.add('world-builder__canvas--panning');
 }
 
 function handleCanvasMouseMove(e) {
@@ -282,118 +326,109 @@ function handleCanvasMouseMove(e) {
     canvasState.panX = e.clientX - canvasState.startPan.x;
     canvasState.panY = e.clientY - canvasState.startPan.y;
     updateCanvasTransform();
+    updateConnections();
   }
   if (canvasState.dragNode) {
-    const node = demoNodes.find(n => n.id === canvasState.dragNode);
+    const level = getCurrentLevel();
+    const node = level.nodes.find(n => n.id === canvasState.dragNode);
     if (node) {
       node.position.x += e.movementX / canvasState.zoom;
       node.position.y += e.movementY / canvasState.zoom;
       const el = document.querySelector(`[data-node-id="${node.id}"]`);
-      if (el) {
-        el.style.left = `${node.position.x}px`;
-        el.style.top = `${node.position.y}px`;
-      }
+      if (el) { el.style.left = `${node.position.x}px`; el.style.top = `${node.position.y}px`; }
+      updateConnections();
     }
   }
 }
 
-function handleCanvasMouseUp(e) {
+function handleCanvasMouseUp() {
+  if (canvasState.dragNode) saveWorld();
   canvasState.isPanning = false;
   canvasState.dragNode = null;
-  document.querySelector('.world-builder__canvas')?.classList.remove('world-builder__canvas--panning');
-  document.querySelectorAll('.canvas-node--dragging').forEach(el => el.classList.remove('canvas-node--dragging'));
 }
 
 function handleCanvasWheel(e) {
   e.preventDefault();
-  const delta = e.deltaY > 0 ? -0.05 : 0.05;
-  zoomCanvas(delta);
+  zoomCanvas(e.deltaY > 0 ? -0.05 : 0.05);
 }
 
 function startNodeDrag(e, node) {
   if (e.button !== 0) return;
   e.stopPropagation();
   canvasState.dragNode = node.id;
-  e.target.closest('.canvas-node')?.classList.add('canvas-node--dragging');
 }
 
 function handleCanvasDrop(e) {
   e.preventDefault();
   const data = e.dataTransfer.getData('text/plain');
   if (!data) return;
-  
   try {
     const item = JSON.parse(data);
     const rect = e.target.closest('.world-builder__canvas').getBoundingClientRect();
     const x = (e.clientX - rect.left - canvasState.panX) / canvasState.zoom;
     const y = (e.clientY - rect.top - canvasState.panY) / canvasState.zoom;
-    
-    const newNode = {
-      id: generateId(),
-      type: item.type,
-      name: `New ${item.label}`,
-      position: { x, y },
-      color: '#6366f1',
-    };
-    
-    demoNodes.push(newNode);
-    
-    const transform = document.getElementById('canvas-transform');
-    if (transform) {
-      transform.appendChild(createCanvasNode(newNode));
-    }
-    
-    // Trigger save
-    appStore.setState({ saveStatus: 'saving' });
-    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
-  } catch(e) {}
+    const level = getCurrentLevel();
+    level.nodes.push({ id: generateId(), type: item.type, name: `New ${item.label}`, position: { x, y }, color: '#6366f1' });
+    saveWorld();
+    rerender();
+  } catch(err) {}
 }
 
+// ─── Zoom / Pan ──────────────────────────────────────────────────────────────
+
 function zoomCanvas(delta) {
-  canvasState.zoom = Math.max(0.2, Math.min(3, canvasState.zoom + delta));
+  canvasState.zoom = Math.max(0.3, Math.min(3, canvasState.zoom + delta));
   updateCanvasTransform();
-  const zoomEl = document.getElementById('zoom-level');
-  if (zoomEl) zoomEl.textContent = `${Math.round(canvasState.zoom * 100)}%`;
+  updateConnections();
+  const el = document.getElementById('zoom-level');
+  if (el) el.textContent = `${Math.round(canvasState.zoom * 100)}%`;
 }
 
 function resetCanvas() {
-  canvasState.zoom = 1;
-  canvasState.panX = 0;
-  canvasState.panY = 0;
+  canvasState.zoom = 1; canvasState.panX = 0; canvasState.panY = 0;
   updateCanvasTransform();
-  const zoomEl = document.getElementById('zoom-level');
-  if (zoomEl) zoomEl.textContent = '100%';
+  updateConnections();
+  const el = document.getElementById('zoom-level');
+  if (el) el.textContent = '100%';
 }
 
 function updateCanvasTransform() {
-  const transform = document.getElementById('canvas-transform');
-  if (transform) {
-    transform.style.transform = `translate(${canvasState.panX}px, ${canvasState.panY}px) scale(${canvasState.zoom})`;
-  }
-  const grid = document.getElementById('canvas-grid');
-  if (grid) {
-    grid.style.backgroundSize = `${40 * canvasState.zoom}px ${40 * canvasState.zoom}px`;
-    grid.style.backgroundPosition = `${canvasState.panX}px ${canvasState.panY}px`;
-  }
+  const t = document.getElementById('canvas-transform');
+  if (t) t.style.transform = `translate(${canvasState.panX}px, ${canvasState.panY}px) scale(${canvasState.zoom})`;
+  const g = document.getElementById('canvas-grid');
+  if (g) { g.style.backgroundSize = `${40 * canvasState.zoom}px ${40 * canvasState.zoom}px`; g.style.backgroundPosition = `${canvasState.panX}px ${canvasState.panY}px`; }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function rerender() {
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderWorldBuilder(container); }
 }
 
 function updateWorldSidebar() {
   const sidebar = document.getElementById('sidebar-content');
   if (!sidebar) return;
   sidebar.innerHTML = '';
-  
-  sidebar.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Current Level'));
-  
-  demoNodes.forEach(node => {
-    sidebar.appendChild(
-      h('div', { 
-        class: `sidebar-item ${canvasState.selectedNode === node.id ? 'sidebar-item--active' : ''}`,
-        onclick: () => selectNode(node.id),
-        ondblclick: () => enterNode(node),
-      },
-        h('span', { class: 'sidebar-item__icon' }, ObjectIcons[node.type]),
-        h('span', { class: 'sidebar-item__label' }, node.name),
-      )
-    );
+
+  const level = getCurrentLevel();
+
+  sidebar.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginBottom: '4px' } }, `Level: ${worldPath[worldPath.length-1].name}`));
+
+  level.nodes.forEach(node => {
+    const hasChildren = !!worldData[node.id] && worldData[node.id].nodes.length > 0;
+    sidebar.appendChild(h('div', {
+      class: `sidebar-item ${canvasState.selectedNode === node.id ? 'sidebar-item--active' : ''}`,
+      onclick: () => selectNode(node.id),
+      ondblclick: () => enterNode(node),
+    },
+      h('span', { class: 'sidebar-item__icon' }, ObjectIcons[node.type]),
+      h('span', { class: 'sidebar-item__label' }, node.name),
+      hasChildren ? h('span', { class: 'sidebar-item__count' }, `${worldData[node.id].nodes.length}`) : null,
+    ));
   });
+
+  if (level.nodes.length === 0) {
+    sidebar.appendChild(h('div', { style: { padding: '8px 12px', fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Drag objects from the palette'));
+  }
 }
