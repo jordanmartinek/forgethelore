@@ -172,7 +172,10 @@ function createActivityBar() {
       onclick: () => {
         appStore.setState({ activeModule: mod.id });
       }
-    }, mod.icon)
+    },
+      h('span', { class: 'activity-bar__icon' }, mod.icon),
+      h('span', { class: 'activity-bar__label' }, mod.label),
+    )
   );
   
   bar.append(

@@ -1,7 +1,7 @@
 /* Application Shell */
 .app-layout {
   display: grid;
-  grid-template-columns: 56px 240px 1fr;
+  grid-template-columns: 72px 240px 1fr;
   grid-template-rows: 44px 1fr 28px;
   height: 100vh;
   overflow: hidden;
@@ -9,7 +9,7 @@
 }
 
 .app-layout--sidebar-collapsed {
-  grid-template-columns: 56px 0px 1fr;
+  grid-template-columns: 72px 0px 1fr;
 }
 
 .app-layout--sidebar-collapsed .sidebar {
@@ -128,7 +128,7 @@
   flex-direction: column;
   align-items: center;
   padding: var(--space-sm) 0;
-  gap: var(--space-xs);
+  gap: 2px;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-subtle);
   overflow-y: auto;
@@ -136,18 +136,35 @@
 }
 
 .activity-bar__item {
-  width: 40px;
-  height: 40px;
+  width: 64px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
+  padding: 6px 4px;
   border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--text-muted);
   transition: all var(--transition-fast);
   position: relative;
   user-select: none;
+}
+
+.activity-bar__icon {
   font-size: 18px;
+  line-height: 1;
+}
+
+.activity-bar__label {
+  font-size: 9px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .activity-bar__item:hover {
@@ -164,18 +181,18 @@
   content: '';
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
+  top: 6px;
+  bottom: 6px;
   width: 2px;
   background: var(--accent-primary);
   border-radius: 0 2px 2px 0;
 }
 
 .activity-bar__separator {
-  width: 24px;
+  width: 40px;
   height: 1px;
   background: var(--border-subtle);
-  margin: var(--space-sm) 0;
+  margin: 4px 0;
 }
 
 /* Sidebar */
