@@ -246,9 +246,16 @@ function toggleToolbar() {
   
   const isExpanded = layout.classList.toggle('app-layout--toolbar-expanded');
   
-  // Update the toggle button label
-  const label = document.querySelector('#activity-bar-toolbar-toggle .activity-bar__label');
-  if (label) label.textContent = isExpanded ? 'Collapse' : 'Expand';
+  // Directly toggle label visibility to ensure it works regardless of CSS specificity
+  document.querySelectorAll('.activity-bar__label').forEach(label => {
+    label.style.display = isExpanded ? 'block' : 'none';
+  });
+  
+  // Update item alignment
+  document.querySelectorAll('.activity-bar__item').forEach(item => {
+    item.style.justifyContent = isExpanded ? 'flex-start' : 'center';
+    item.style.padding = isExpanded ? '8px 12px' : '8px 6px';
+  });
 }
 
 // ─── Project Switcher ────────────────────────────────────────────────────────
