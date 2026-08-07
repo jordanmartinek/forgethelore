@@ -25,6 +25,7 @@ import { renderRelationshipPlanner } from '../modules/relationship-planner.js';
 import { renderCharacterArc } from '../modules/character-arc.js';
 import { renderQuickSceneLog } from '../modules/quick-scene-log.js';
 import { renderManuscriptPlanner } from '../modules/manuscript-planner.js';
+import { renderLanguagePlanner } from '../modules/language-planner.js';
 import { setActiveProject, saveData, loadData } from '../core/persist.js';
 import { renderExportImport, exportProject, importProject } from '../ui/export-import.js';
 import { renderCommandPalette } from './command-palette.js';
@@ -39,6 +40,7 @@ const modules = [
   { id: 'factions', icon: '⚔️', label: 'Factions', category: 'planning' },
   { id: 'locations', icon: '📍', label: 'Locations', category: 'planning' },
   { id: 'species', icon: '🧬', label: 'Species', category: 'planning' },
+  { id: 'languages', icon: '🗣️', label: 'Languages', category: 'planning' },
   { id: 'organizations', icon: '🏢', label: 'Organizations', category: 'planning' },
   { id: 'religions', icon: '🕯️', label: 'Religions', category: 'planning' },
   { id: 'politics', icon: '🏛️', label: 'Politics', category: 'planning' },
@@ -475,6 +477,9 @@ function renderActiveModule() {
       break;
     case 'species':
       renderSpeciesPlanner(content);
+      break;
+    case 'languages':
+      renderLanguagePlanner(content);
       break;
     case 'organizations':
       renderOrganizationPlanner(content);
