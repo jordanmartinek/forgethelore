@@ -169,12 +169,15 @@ function renderLanguageDetailContent(lang) {
     collapsible('Grammar & Syntax', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.grammar || 'Not yet defined.')),
     collapsible('Writing System', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.writingSystem || 'Not yet defined.')),
     collapsible('Naming Conventions', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.namingConventions || 'Not yet defined.')),
-    collapsible('Vocabulary & Lexicon', false, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.vocabulary || 'Not yet defined.')),
-    collapsible('Dialects & Variants', false, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.dialects || 'Not yet defined.')),
-    collapsible('Idioms & Expressions', false, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.idioms || 'Not yet defined.')),
-    collapsible('Taboos & Forbidden Words', false, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.taboos || 'Not yet defined.')),
-    collapsible('Cultural Notes', false, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.culturalNotes || 'Not yet defined.')),
-    collapsible('Relationship to Other Languages', false, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.relationship || 'Not yet defined.')),
+    collapsible('Vocabulary & Lexicon', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.vocabulary || 'Not yet defined.')),
+    collapsible('Dialects & Variants', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.dialects || 'Not yet defined.')),
+    collapsible('Idioms & Expressions', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.idioms || 'Not yet defined.')),
+    collapsible('Taboos & Forbidden Words', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.taboos || 'Not yet defined.')),
+    collapsible('Cultural Notes', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.culturalNotes || 'Not yet defined.')),
+    collapsible('Relationship to Other Languages', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, lang.relationship || 'Not yet defined.')),
+
+    // Connected Characters & Factions
+    collapsible('Connected Characters & Factions', true, renderConnections(lang)),
   );
 }
 
@@ -246,6 +249,98 @@ function deleteLanguage(lang) {
   if (idx !== -1) languages.splice(idx, 1);
   save();
   rerender();
+}
+
+// ─── Character / Faction Connections ─────────────────────────────────────────
+
+function renderConnections(lang) {
+  const chars = lang.connectedCharacters || [];
+  const facs = lang.connectedFactions || [];
+  const allPieces = window.__loreforge_pieces || [];
+  const allFactions = [...(window.__loreforge_factions || []), ...(window.__loreforge_factionData || [])];
+
+  return h('div', {},
+    // Connected Factions
+    h('div', { style: { marginBottom: '12px' } },
+      h('div', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' } }, 'FACTIONS THAT SPEAK THIS LANGUAGE'),
+      facs.length > 0
+        ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+            ...facs.map(fName => {
+              const fac = allFactions.find(f => f.name === fName);
+              return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', background: fac ? fac.color + '20' : 'var(--surface-3)', border: `1px solid ${fac ? fac.color + '40' : 'var(--border-subtle)'}`, fontSize: '11px', color: fac ? fac.color : 'var(--text-secondary)' } },
+                fac ? fac.icon || '⚔️' : '⚔️', fName,
+                h('button', { style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }, onclick: () => { lang.connectedFactions = facs.filter(f => f !== fName); save(); rerender(); } }, '✕'),
+              );
+            })
+          )
+        : h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'None connected'),
+      h('button', { class: 'btn btn--ghost btn--sm', style: { marginTop: '6px' }, onclick: () => openConnectFactionModal(lang) }, '+ Connect Faction'),
+    ),
+
+    // Connected Characters
+    h('div', {},
+      h('div', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' } }, 'CHARACTERS WHO SPEAK THIS LANGUAGE'),
+      chars.length > 0
+        ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+            ...chars.map(cName => {
+              const chr = allPieces.find(p => p.name === cName);
+              const fac = chr ? allFactions.find(f => f.id === chr.faction || f.name === chr.faction) : null;
+              return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', background: 'var(--surface-3)', border: '1px solid var(--border-subtle)', fontSize: '11px', color: 'var(--text-secondary)' } },
+                '👤', cName,
+                h('button', { style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }, onclick: () => { lang.connectedCharacters = chars.filter(c => c !== cName); save(); rerender(); } }, '✕'),
+              );
+            })
+          )
+        : h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'None connected'),
+      h('button', { class: 'btn btn--ghost btn--sm', style: { marginTop: '6px' }, onclick: () => openConnectCharacterModal(lang) }, '+ Connect Character'),
+    ),
+  );
+}
+
+function openConnectFactionModal(lang) {
+  const allFactions = [...(window.__loreforge_factions || []), ...(window.__loreforge_factionData || [])];
+  const existing = lang.connectedFactions || [];
+  const available = allFactions.filter(f => !existing.includes(f.name));
+
+  if (available.length === 0) { alert('No more factions to connect. Create new factions in the Factions module.'); return; }
+
+  const state = { selected: available[0]?.name || '' };
+  const content = h('div', {},
+    formField('Select Faction', h('select', { class: 'input', onchange: (e) => state.selected = e.target.value },
+      ...available.map(f => h('option', { value: f.name }, `${f.icon || '⚔️'} ${f.name}`))
+    )),
+  );
+
+  showModal('Connect Faction to Language', content, () => {
+    if (!state.selected) return;
+    if (!lang.connectedFactions) lang.connectedFactions = [];
+    lang.connectedFactions.push(state.selected);
+    save();
+    rerender();
+  });
+}
+
+function openConnectCharacterModal(lang) {
+  const allPieces = window.__loreforge_pieces || [];
+  const existing = lang.connectedCharacters || [];
+  const available = allPieces.filter(p => !existing.includes(p.name));
+
+  if (available.length === 0) { alert('No more characters to connect. Create characters on the Strategic Board or Characters module.'); return; }
+
+  const state = { selected: available[0]?.name || '' };
+  const content = h('div', {},
+    formField('Select Character', h('select', { class: 'input', onchange: (e) => state.selected = e.target.value },
+      ...available.map(p => h('option', { value: p.name }, `👤 ${p.name}`))
+    )),
+  );
+
+  showModal('Connect Character to Language', content, () => {
+    if (!state.selected) return;
+    if (!lang.connectedCharacters) lang.connectedCharacters = [];
+    lang.connectedCharacters.push(state.selected);
+    save();
+    rerender();
+  });
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
