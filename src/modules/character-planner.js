@@ -174,6 +174,7 @@ function openEditCharacterModal(char) {
     formField('Faction', h('select', { class: 'input', onchange: (e) => state.faction = e.target.value },
       ...factionOptions.map(f => h('option', { value: f, ...(f === state.faction ? { selected: 'selected' } : {}) }, f)))),
     formField('Archetype', h('input', { class: 'input', value: state.archetype || '', placeholder: 'e.g. The Mentor, Anti-Hero, Trickster...', oninput: (e) => state.archetype = e.target.value })),
+    formField('Resource Specialty', h('input', { class: 'input', value: state.resourceSpecialty || '', placeholder: 'e.g. Military sway, Monetary wealth, Crew loyalty, Political capital...', oninput: (e) => state.resourceSpecialty = e.target.value })),
     formField('Description', expandableText({ placeholder: 'Brief overview of this character...', value: state.description || '', label: 'Description', oninput: (e) => state.description = e.target.value })),
     formField('Biography / Backstory', expandableText({ placeholder: 'Their history before the story begins...', value: state.biography || '', label: 'Biography', oninput: (e) => state.biography = e.target.value })),
     formField('Personality', expandableText({ placeholder: 'How they act, think, and feel...', value: state.personality || '', label: 'Personality', oninput: (e) => state.personality = e.target.value })),
@@ -231,6 +232,7 @@ function renderCharacterDetailContent(char) {
         h('div', { style: { display: 'flex', gap: '6px', marginTop: '6px' } },
           h('span', { class: 'tag tag--accent' }, char.status || 'active'),
           char.archetype ? h('span', { class: 'tag' }, char.archetype) : null,
+          char.resourceSpecialty ? h('span', { class: 'tag tag--warning' }, `💎 ${char.resourceSpecialty}`) : null,
         )
       )
     ),
