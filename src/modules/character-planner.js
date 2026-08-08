@@ -161,22 +161,40 @@ function createCharacterCard(char, factionColor) {
 }
 
 function openEditCharacterModal(char) {
-  const state = { name: char.name, role: char.role, faction: char.faction, description: char.description };
+  const state = { ...char };
   const factionOptions = [
     ...(window.__loreforge_factions || []).map(f => f.name),
     ...(window.__loreforge_factionData || []).map(f => f.name),
     ...new Set(demoCharacters.map(c => c.faction)),
     'Independent', 'Other'
-  ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+  ].filter((v, i, a) => a.indexOf(v) === i);
   const content = h('div', {},
-    formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
-    formField('Role', h('input', { class: 'input', value: state.role, oninput: (e) => state.role = e.target.value })),
+    formField('Name', h('input', { class: 'input', value: state.name || '', oninput: (e) => state.name = e.target.value })),
+    formField('Role', h('input', { class: 'input', value: state.role || '', oninput: (e) => state.role = e.target.value })),
     formField('Faction', h('select', { class: 'input', onchange: (e) => state.faction = e.target.value },
       ...factionOptions.map(f => h('option', { value: f, ...(f === state.faction ? { selected: 'selected' } : {}) }, f)))),
-    formField('Description', expandableText({ placeholder: 'Describe this character...', value: state.description, label: 'Character Description', oninput: (e) => state.description = e.target.value })),
+    formField('Archetype', h('input', { class: 'input', value: state.archetype || '', placeholder: 'e.g. The Mentor, Anti-Hero, Trickster...', oninput: (e) => state.archetype = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Brief overview of this character...', value: state.description || '', label: 'Description', oninput: (e) => state.description = e.target.value })),
+    formField('Biography / Backstory', expandableText({ placeholder: 'Their history before the story begins...', value: state.biography || '', label: 'Biography', oninput: (e) => state.biography = e.target.value })),
+    formField('Personality', expandableText({ placeholder: 'How they act, think, and feel...', value: state.personality || '', label: 'Personality', oninput: (e) => state.personality = e.target.value })),
+    formField('Traits & Strengths (comma-separated)', h('input', { class: 'input', value: state.traits || '', placeholder: 'Brave, Intelligent, Charismatic, Strategic...', oninput: (e) => state.traits = e.target.value })),
+    formField('Flaws & Weaknesses (comma-separated)', h('input', { class: 'input', value: state.flaws || '', placeholder: 'Arrogant, Impulsive, Distrustful...', oninput: (e) => state.flaws = e.target.value })),
+    formField('Fears', expandableText({ placeholder: 'What terrifies them? What do they avoid?', value: state.fears || '', label: 'Fears', oninput: (e) => state.fears = e.target.value })),
+    formField('Goals (What They Want)', expandableText({ placeholder: 'Their conscious desire — what drives external action...', value: state.goals || '', label: 'Goals', oninput: (e) => state.goals = e.target.value })),
+    formField('Needs (What They Actually Need)', expandableText({ placeholder: 'The unconscious need — what would truly fulfill them...', value: state.needs || '', label: 'Needs', oninput: (e) => state.needs = e.target.value })),
+    formField('Motivations', expandableText({ placeholder: 'Why do they pursue their goals? What pushes them?', value: state.motivations || '', label: 'Motivations', oninput: (e) => state.motivations = e.target.value })),
+    formField('Character Arc', expandableText({ placeholder: 'How they change from beginning to end...', value: state.arc || '', label: 'Character Arc', oninput: (e) => state.arc = e.target.value })),
+    formField('Secrets', expandableText({ placeholder: 'What are they hiding? Who knows?', value: state.secrets || '', label: 'Secrets', oninput: (e) => state.secrets = e.target.value })),
+    formField('Lies They Believe', expandableText({ placeholder: 'False beliefs that drive their behavior...', value: state.lies || '', label: 'Lies They Believe', oninput: (e) => state.lies = e.target.value })),
+    formField('Internal Conflict', expandableText({ placeholder: 'The war within themselves...', value: state.internalConflict || '', label: 'Internal Conflict', oninput: (e) => state.internalConflict = e.target.value })),
+    formField('Appearance', expandableText({ placeholder: 'Physical description, distinguishing features...', value: state.appearance || '', label: 'Appearance', oninput: (e) => state.appearance = e.target.value })),
+    formField('Speech & Mannerisms', expandableText({ placeholder: 'How they talk, move, their habits...', value: state.speech || '', label: 'Speech & Mannerisms', oninput: (e) => state.speech = e.target.value })),
+    formField('Skills & Abilities', expandableText({ placeholder: 'What can they do? Training, talents...', value: state.skills || '', label: 'Skills', oninput: (e) => state.skills = e.target.value })),
+    formField('Relationships', expandableText({ placeholder: 'Key relationships and dynamics...', value: state.relationships || '', label: 'Relationships', oninput: (e) => state.relationships = e.target.value })),
+    formField('Notes', expandableText({ placeholder: 'Any other notes...', value: state.notes || '', label: 'Notes', oninput: (e) => state.notes = e.target.value })),
   );
   showModal(`Edit: ${char.name}`, content, () => {
-    Object.assign(char, { name: state.name, role: state.role, faction: state.faction, description: state.description });
+    Object.assign(char, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
     saveData("characters", demoCharacters); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
@@ -198,51 +216,60 @@ function renderCharacterDetail(char) {
 }
 
 function renderCharacterDetailContent(char) {
+  const factionColors = {};
+  (window.__loreforge_factions || []).forEach(f => { factionColors[f.name] = f.color; });
+  (window.__loreforge_factionData || []).forEach(f => { factionColors[f.name] = f.color; });
+  const color = factionColors[char.faction] || char.color || '#6366f1';
+
   return h('div', {},
     // Header
     h('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' } },
-      h('div', { style: { width: '56px', height: '56px', borderRadius: '50%', background: char.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: '700', color: 'white' } }, char.name[0]),
+      h('div', { style: { width: '56px', height: '56px', borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: '700', color: 'white' } }, char.name[0]),
       h('div', {},
         h('h2', { style: { fontSize: '20px', fontWeight: '700', marginBottom: '2px' } }, char.name),
         h('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, `${char.role} • ${char.faction}`),
         h('div', { style: { display: 'flex', gap: '6px', marginTop: '6px' } },
-          h('span', { class: 'tag tag--accent' }, char.status),
-          h('span', { class: `tag ${char.momentum === 'rising' ? 'tag--success' : char.momentum === 'falling' ? 'tag--danger' : ''}` }, `${char.momentum === 'rising' ? '▲' : char.momentum === 'falling' ? '▼' : '■'} ${char.momentum}`),
+          h('span', { class: 'tag tag--accent' }, char.status || 'active'),
+          char.archetype ? h('span', { class: 'tag' }, char.archetype) : null,
         )
       )
     ),
-    
-    // Collapsible sections
-    createCollapsible('Overview', true,
-      h('div', {},
-        h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.description),
-      )
+
+    // Core Identity
+    createCollapsible('Description', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.description || 'Not yet defined.')),
+    createCollapsible('Biography / Backstory', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.biography || 'Not yet defined.')),
+
+    // Psychology
+    createCollapsible('Personality', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.personality || 'Not yet defined.')),
+    createCollapsible('Traits & Strengths', true,
+      char.traits ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } }, ...char.traits.split(',').map(t => t.trim()).filter(Boolean).map(t => h('span', { class: 'tag tag--success' }, t)))
+      : h('p', { style: { fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Not yet defined.')
     ),
-    createCollapsible('Strategic Position', true,
-      h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
-        createStatCard('Political', Math.floor(Math.random() * 100)),
-        createStatCard('Military', Math.floor(Math.random() * 100)),
-        createStatCard('Economic', Math.floor(Math.random() * 100)),
-        createStatCard('Knowledge', Math.floor(Math.random() * 100)),
-      )
+    createCollapsible('Flaws & Weaknesses', true,
+      char.flaws ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } }, ...char.flaws.split(',').map(t => t.trim()).filter(Boolean).map(t => h('span', { class: 'tag tag--danger' }, t)))
+      : h('p', { style: { fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Not yet defined.')
     ),
-    createCollapsible('Goals & Objectives', true,
-      h('div', {},
-        h('div', { class: 'intel-card', style: { marginBottom: '8px' } },
-          h('div', { class: 'intel-card__label' }, 'Public Goal'),
-          h('div', { class: 'intel-card__value' }, 'Control all Void Conduits'),
-        ),
-        h('div', { class: 'intel-card', style: { borderColor: 'rgba(168,85,247,0.3)' } },
-          h('div', { class: 'intel-card__label', style: { color: 'var(--faction-purple)' } }, '🤫 Hidden Goal'),
-          h('div', { class: 'intel-card__value' }, 'Reshape humanity through Void evolution'),
-        ),
-      )
-    ),
-    createCollapsible('Relationships', false, h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Click to manage relationships...')),
-    createCollapsible('Knowledge', false, h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Track what this character knows...')),
-    createCollapsible('Timeline', false, h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Key events in this character\'s story...')),
-    createCollapsible('Notes', false, h('div', {}, h('textarea', { class: 'input', placeholder: 'Add notes...', style: { minHeight: '100px' } }))),
-    createCollapsible('AI Summary', false, h('div', { class: 'ai-suggestion' }, '🧠 AI analysis will appear here based on the character\'s current position, relationships, and strategic context.')),
+    createCollapsible('Fears', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.fears || 'Not yet defined.')),
+
+    // Motivation
+    createCollapsible('Goals (What They Want)', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.goals || 'Not yet defined.')),
+    createCollapsible('Needs (What They Actually Need)', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.needs || 'Not yet defined.')),
+    createCollapsible('Motivations', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.motivations || 'Not yet defined.')),
+
+    // Narrative
+    createCollapsible('Character Arc', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.arc || 'Not yet defined.')),
+    createCollapsible('Secrets', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.secrets || 'Not yet defined.')),
+    createCollapsible('Lies They Believe', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.lies || 'Not yet defined.')),
+    createCollapsible('Internal Conflict', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.internalConflict || 'Not yet defined.')),
+
+    // Physical / External
+    createCollapsible('Appearance', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.appearance || 'Not yet defined.')),
+    createCollapsible('Speech & Mannerisms', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.speech || 'Not yet defined.')),
+    createCollapsible('Skills & Abilities', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.skills || 'Not yet defined.')),
+
+    // World
+    createCollapsible('Relationships', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.relationships || 'Not yet defined.')),
+    createCollapsible('Notes', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.notes || 'Not yet defined.')),
   );
 }
 
