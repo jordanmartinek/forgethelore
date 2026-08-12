@@ -159,6 +159,7 @@ function renderStep(step) {
 // ─── Scene Card Rendering ────────────────────────────────────────────────────
 
 function renderSceneCard(card, stepNum, index) {
+  const hasExtras = card.expectations || card.subversion || card.characterWants;
   return h('div', {
     style: { padding: '10px 12px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid var(--border-subtle)', cursor: 'grab', borderLeft: `3px solid ${card.color || 'var(--accent-primary)'}`, transition: 'all 0.1s ease' },
     draggable: 'true',
@@ -169,6 +170,11 @@ function renderSceneCard(card, stepNum, index) {
       h('div', { style: { flex: '1', minWidth: '0' } },
         h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '3px' } }, card.title),
         card.content ? h('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical' } }, card.content) : null,
+        hasExtras ? h('div', { style: { display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' } },
+          card.expectations ? h('span', { style: { fontSize: '9px', padding: '2px 5px', borderRadius: '4px', background: 'rgba(59,130,246,0.15)', color: '#3b82f6' } }, '👁️ Expectations') : null,
+          card.subversion ? h('span', { style: { fontSize: '9px', padding: '2px 5px', borderRadius: '4px', background: 'rgba(239,68,68,0.15)', color: '#ef4444' } }, '🔀 Subversion') : null,
+          card.characterWants ? h('span', { style: { fontSize: '9px', padding: '2px 5px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b' } }, '🎭 Wants') : null,
+        ) : null,
       ),
       h('div', { style: { display: 'flex', gap: '2px', flexShrink: '0' } },
         h('button', { class: 'btn btn--ghost btn--icon btn--sm', title: 'Edit', onclick: (e) => { e.stopPropagation(); openEditCardModal(card, stepNum); } }, '✏️'),
@@ -206,13 +212,16 @@ function handleDropOnStep(e, targetStepNum) {
 
 function openAddCardModal(stepNum) {
   const step = TRUBY_STEPS.find(s => s.num === stepNum);
-  const state = { title: '', content: '', color: step.color };
+  const state = { title: '', content: '', color: step.color, expectations: '', subversion: '', characterWants: '' };
 
   const CARD_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316'];
 
   const content = h('div', {},
     formField('Scene Title', h('input', { class: 'input', placeholder: 'e.g. "The Betrayal at the Senate"', oninput: (e) => state.title = e.target.value })),
     formField('Scene Content', expandableText({ placeholder: 'What happens in this scene? Key beats, dialogue notes, emotional tone...', label: `Scene Card — Step ${stepNum}: ${step.title}`, oninput: (e) => state.content = e.target.value })),
+    formField('👁️ Audience Expectations', expandableText({ placeholder: 'What does the audience expect to happen here? What assumptions have you built?', label: 'Audience Expectations', oninput: (e) => state.expectations = e.target.value })),
+    formField('🔀 How to Subvert Expectations', expandableText({ placeholder: 'How will you surprise the audience? What twist or reversal defies their prediction?', label: 'Subversion', oninput: (e) => state.subversion = e.target.value })),
+    formField('🎭 What Characters Want in This Scene', expandableText({ placeholder: 'List each character in the scene and what they want:\n• Aurelian: wants to secure the vote\n• Sera: wants to expose the corruption\n• Vex: wants to maintain control...', label: 'Character Wants', oninput: (e) => state.characterWants = e.target.value })),
     formField('Color Label', h('div', { style: { display: 'flex', gap: '6px' } },
       ...CARD_COLORS.map(c => h('div', {
         style: { width: '24px', height: '24px', borderRadius: '6px', background: c, cursor: 'pointer', border: c === state.color ? '2px solid white' : '2px solid transparent' },
@@ -224,7 +233,7 @@ function openAddCardModal(stepNum) {
   showModal(`Add Scene Card — Step ${stepNum}: ${step.title}`, content, () => {
     if (!state.title.trim()) return;
     if (!sceneCards[stepNum]) sceneCards[stepNum] = [];
-    sceneCards[stepNum].push({ id: generateId(), title: state.title, content: state.content, color: state.color });
+    sceneCards[stepNum].push({ id: generateId(), title: state.title, content: state.content, color: state.color, expectations: state.expectations, subversion: state.subversion, characterWants: state.characterWants });
     save();
     rerender();
   });
@@ -232,13 +241,16 @@ function openAddCardModal(stepNum) {
 
 function openEditCardModal(card, stepNum) {
   const step = TRUBY_STEPS.find(s => s.num === stepNum);
-  const state = { title: card.title, content: card.content, color: card.color };
+  const state = { title: card.title, content: card.content, color: card.color, expectations: card.expectations || '', subversion: card.subversion || '', characterWants: card.characterWants || '' };
 
   const CARD_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316'];
 
   const content = h('div', {},
     formField('Scene Title', h('input', { class: 'input', value: state.title, oninput: (e) => state.title = e.target.value })),
     formField('Scene Content', expandableText({ placeholder: 'What happens in this scene?', value: state.content, label: `Scene Card — Step ${stepNum}: ${step.title}`, oninput: (e) => state.content = e.target.value })),
+    formField('👁️ Audience Expectations', expandableText({ placeholder: 'What does the audience expect to happen here?', value: state.expectations, label: 'Audience Expectations', oninput: (e) => state.expectations = e.target.value })),
+    formField('🔀 How to Subvert Expectations', expandableText({ placeholder: 'How will you surprise them? What twist defies prediction?', value: state.subversion, label: 'Subversion', oninput: (e) => state.subversion = e.target.value })),
+    formField('🎭 What Characters Want in This Scene', expandableText({ placeholder: '• Character A: wants...\n• Character B: wants...', value: state.characterWants, label: 'Character Wants', oninput: (e) => state.characterWants = e.target.value })),
     formField('Color Label', h('div', { style: { display: 'flex', gap: '6px' } },
       ...CARD_COLORS.map(c => h('div', {
         style: { width: '24px', height: '24px', borderRadius: '6px', background: c, cursor: 'pointer', border: c === state.color ? '2px solid white' : '2px solid transparent' },
@@ -248,7 +260,7 @@ function openEditCardModal(card, stepNum) {
   );
 
   showModal(`Edit Scene Card`, content, () => {
-    Object.assign(card, { title: state.title, content: state.content, color: state.color });
+    Object.assign(card, { title: state.title, content: state.content, color: state.color, expectations: state.expectations, subversion: state.subversion, characterWants: state.characterWants });
     save();
     rerender();
   });
