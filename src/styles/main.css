@@ -1,58 +1,58 @@
-/* LoreForge Planner - Design System */
+/* LoreForge Planner - Design System: Arcane Edition */
 :root {
-  /* Core Colors */
-  --bg-primary: #0d0d12;
-  --bg-secondary: #13131a;
-  --bg-tertiary: #1a1a24;
-  --bg-elevated: #1e1e2a;
-  --bg-hover: #252535;
-  --bg-active: #2a2a3d;
+  /* Core Colors — deep parchment/candlelit tones */
+  --bg-primary: #1a1510;
+  --bg-secondary: #1e1914;
+  --bg-tertiary: #242019;
+  --bg-elevated: #2a2520;
+  --bg-hover: #33291f;
+  --bg-active: #3d3226;
 
-  /* Surface Colors */
-  --surface-1: #16161f;
-  --surface-2: #1c1c28;
-  --surface-3: #222230;
-  --surface-4: #2a2a3a;
+  /* Surface Colors — layered parchment */
+  --surface-1: #211c16;
+  --surface-2: #28231c;
+  --surface-3: #302a22;
+  --surface-4: #3a332a;
 
-  /* Text Colors */
-  --text-primary: #e8e8f0;
-  --text-secondary: #9898b0;
-  --text-tertiary: #6868808;
-  --text-muted: #4a4a60;
+  /* Text Colors — warm ivory to faded ink */
+  --text-primary: #f0e6d3;
+  --text-secondary: #b8a88e;
+  --text-tertiary: #8a7a62;
+  --text-muted: #6b5c48;
 
-  /* Accent Colors */
-  --accent-primary: #6366f1;
-  --accent-primary-hover: #7577f5;
-  --accent-secondary: #8b5cf6;
-  --accent-tertiary: #06b6d4;
+  /* Accent Colors — gold, amber, arcane purple */
+  --accent-primary: #c9a84c;
+  --accent-primary-hover: #dbb95e;
+  --accent-secondary: #9b6dd7;
+  --accent-tertiary: #4fb8a7;
 
-  /* Status Colors */
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --info: #3b82f6;
+  /* Status Colors — muted, rich jewel tones */
+  --success: #5a9e5a;
+  --warning: #c9873c;
+  --danger: #b84a4a;
+  --info: #5a7eb8;
 
   /* Conflict Board Colors */
-  --faction-red: #ef4444;
-  --faction-blue: #3b82f6;
-  --faction-green: #22c55e;
-  --faction-purple: #a855f7;
-  --faction-orange: #f97316;
-  --faction-cyan: #06b6d4;
-  --faction-pink: #ec4899;
-  --faction-yellow: #eab308;
+  --faction-red: #b84a4a;
+  --faction-blue: #5a7eb8;
+  --faction-green: #5a9e5a;
+  --faction-purple: #9b6dd7;
+  --faction-orange: #c9873c;
+  --faction-cyan: #4fb8a7;
+  --faction-pink: #b85a8a;
+  --faction-yellow: #c9a84c;
 
-  /* Borders */
-  --border-subtle: rgba(255,255,255,0.06);
-  --border-default: rgba(255,255,255,0.1);
-  --border-strong: rgba(255,255,255,0.15);
-  --border-accent: rgba(99,102,241,0.5);
+  /* Borders — warm gold tints */
+  --border-subtle: rgba(201,168,76,0.08);
+  --border-default: rgba(201,168,76,0.15);
+  --border-strong: rgba(201,168,76,0.25);
+  --border-accent: rgba(201,168,76,0.5);
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
-  --shadow-glow: 0 0 20px rgba(99,102,241,0.15);
+  /* Shadows — warm, deep, layered */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.3);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-glow: 0 0 20px rgba(201,168,76,0.15), 0 0 40px rgba(201,168,76,0.05);
 
   /* Spacing */
   --space-xs: 4px;
@@ -70,14 +70,16 @@
   --radius-xl: 16px;
   --radius-full: 9999px;
 
-  /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+  /* Typography — editorial serif + clean sans */
+  --font-sans: 'Georgia', 'Palatino Linotype', 'Book Antiqua', 'Palatino', serif;
+  --font-heading: 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 
-  /* Transitions */
-  --transition-fast: 0.1s ease;
-  --transition-normal: 0.2s ease;
-  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Transitions — smooth, elegant */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Z-index layers */
   --z-base: 0;
@@ -99,11 +101,15 @@
 html, body {
   height: 100%;
   overflow: hidden;
-  font-family: var(--font-sans);
+  font-family: var(--font-ui);
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-primary);
   background: var(--bg-primary);
+  background-image: 
+    radial-gradient(ellipse at 20% 50%, rgba(201,168,76,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(155,109,215,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(79,184,167,0.02) 0%, transparent 50%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -116,8 +122,8 @@ html, body {
 
 /* Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
@@ -125,17 +131,17 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--surface-4);
+  background: rgba(201,168,76,0.2);
   border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: rgba(201,168,76,0.4);
 }
 
 /* Selection */
 ::selection {
-  background: rgba(99,102,241,0.3);
+  background: rgba(201,168,76,0.25);
   color: var(--text-primary);
 }
 
@@ -166,17 +172,17 @@ html, body {
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
+  from { opacity: 0; transform: translateY(-12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
 }
 
@@ -186,8 +192,13 @@ html, body {
 }
 
 @keyframes glow {
-  0%, 100% { box-shadow: 0 0 5px rgba(99,102,241,0.3); }
-  50% { box-shadow: 0 0 20px rgba(99,102,241,0.6); }
+  0%, 100% { box-shadow: 0 0 8px rgba(201,168,76,0.2); }
+  50% { box-shadow: 0 0 24px rgba(201,168,76,0.4); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 .animate-fadeIn { animation: fadeIn var(--transition-smooth) forwards; }

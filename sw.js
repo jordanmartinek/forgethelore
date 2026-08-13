@@ -4,7 +4,7 @@
  * without any network connection after first load.
  */
 
-const CACHE_NAME = 'loreforge-v4';
+const CACHE_NAME = 'loreforge-v5';
 
 // Critical files that MUST be cached for the app to work offline
 const CRITICAL_FILES = [
