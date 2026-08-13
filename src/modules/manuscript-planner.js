@@ -169,7 +169,7 @@ function renderSceneCard(card, stepNum, index) {
     h('div', { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' } },
       h('div', { style: { flex: '1', minWidth: '0' } },
         h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '3px' } }, card.title),
-        card.content ? h('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical' } }, card.content) : null,
+        card.content ? h('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5', whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical' } }, card.content) : null,
         hasExtras ? h('div', { style: { display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' } },
           card.expectations ? h('span', { style: { fontSize: '9px', padding: '2px 5px', borderRadius: '4px', background: 'rgba(59,130,246,0.15)', color: '#3b82f6' } }, '👁️ Expectations') : null,
           card.subversion ? h('span', { style: { fontSize: '9px', padding: '2px 5px', borderRadius: '4px', background: 'rgba(239,68,68,0.15)', color: '#ef4444' } }, '🔀 Subversion') : null,

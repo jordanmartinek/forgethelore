@@ -87,7 +87,7 @@ function renderMilitaryDetailContent(mil) {
         h('div', { style: { display: 'flex', gap: '6px', marginTop: '6px' } }, h('span', { class: 'tag tag--accent' }, mil.status), h('span', { class: 'tag' }, mil.location)),
       ),
     ),
-    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, mil.description)),
+    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, mil.description)),
     col('Force Composition', true, h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
       sc('Commander', mil.commander), sc('Ships/Units', String(mil.ships || 'N/A')), sc('Personnel', mil.personnel), sc('Doctrine', mil.doctrine))),
     col('Combat Strength', true, h('div', {},

@@ -238,11 +238,11 @@ function renderCharacterDetailContent(char) {
     ),
 
     // Core Identity
-    createCollapsible('Description', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.description || 'Not yet defined.')),
-    createCollapsible('Biography / Backstory', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.biography || 'Not yet defined.')),
+    createCollapsible('Description', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.description || 'Not yet defined.')),
+    createCollapsible('Biography / Backstory', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.biography || 'Not yet defined.')),
 
     // Psychology
-    createCollapsible('Personality', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.personality || 'Not yet defined.')),
+    createCollapsible('Personality', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.personality || 'Not yet defined.')),
     createCollapsible('Traits & Strengths', true,
       char.traits ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } }, ...char.traits.split(',').map(t => t.trim()).filter(Boolean).map(t => h('span', { class: 'tag tag--success' }, t)))
       : h('p', { style: { fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Not yet defined.')
@@ -251,27 +251,27 @@ function renderCharacterDetailContent(char) {
       char.flaws ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } }, ...char.flaws.split(',').map(t => t.trim()).filter(Boolean).map(t => h('span', { class: 'tag tag--danger' }, t)))
       : h('p', { style: { fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Not yet defined.')
     ),
-    createCollapsible('Fears', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.fears || 'Not yet defined.')),
+    createCollapsible('Fears', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.fears || 'Not yet defined.')),
 
     // Motivation
-    createCollapsible('Goals (What They Want)', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.goals || 'Not yet defined.')),
-    createCollapsible('Needs (What They Actually Need)', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.needs || 'Not yet defined.')),
-    createCollapsible('Motivations', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.motivations || 'Not yet defined.')),
+    createCollapsible('Goals (What They Want)', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.goals || 'Not yet defined.')),
+    createCollapsible('Needs (What They Actually Need)', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.needs || 'Not yet defined.')),
+    createCollapsible('Motivations', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.motivations || 'Not yet defined.')),
 
     // Narrative
-    createCollapsible('Character Arc', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.arc || 'Not yet defined.')),
-    createCollapsible('Secrets', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.secrets || 'Not yet defined.')),
-    createCollapsible('Lies They Believe', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.lies || 'Not yet defined.')),
-    createCollapsible('Internal Conflict', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.internalConflict || 'Not yet defined.')),
+    createCollapsible('Character Arc', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.arc || 'Not yet defined.')),
+    createCollapsible('Secrets', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.secrets || 'Not yet defined.')),
+    createCollapsible('Lies They Believe', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.lies || 'Not yet defined.')),
+    createCollapsible('Internal Conflict', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.internalConflict || 'Not yet defined.')),
 
     // Physical / External
-    createCollapsible('Appearance', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.appearance || 'Not yet defined.')),
-    createCollapsible('Speech & Mannerisms', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.speech || 'Not yet defined.')),
-    createCollapsible('Skills & Abilities', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.skills || 'Not yet defined.')),
+    createCollapsible('Appearance', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.appearance || 'Not yet defined.')),
+    createCollapsible('Speech & Mannerisms', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.speech || 'Not yet defined.')),
+    createCollapsible('Skills & Abilities', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.skills || 'Not yet defined.')),
 
     // World
-    createCollapsible('Relationships', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.relationships || 'Not yet defined.')),
-    createCollapsible('Notes', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, char.notes || 'Not yet defined.')),
+    createCollapsible('Relationships', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.relationships || 'Not yet defined.')),
+    createCollapsible('Notes', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, char.notes || 'Not yet defined.')),
   );
 }
 

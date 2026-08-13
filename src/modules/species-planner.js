@@ -71,7 +71,7 @@ function renderSpeciesDetailContent(sp) {
         h('div', { style: { display: 'flex', gap: '6px', marginTop: '6px' } }, h('span', { class: 'tag tag--accent' }, sp.status), h('span', { class: 'tag' }, sp.population)),
       ),
     ),
-    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, sp.description)),
+    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, sp.description)),
     col('Biology', true, h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
       sc('Lifespan', sp.lifespan), sc('Intelligence', sp.intelligence), sc('Population', sp.population), sc('Origin', sp.origin))),
     col('Traits', true, h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } }, ...sp.traits.map(t => h('span', { class: 'tag tag--success' }, t)))),

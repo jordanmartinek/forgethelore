@@ -80,7 +80,7 @@ function renderTechDetailContent(tech) {
         h('div', { style: { display: 'flex', gap: '6px', marginTop: '6px' } }, h('span', { class: 'tag tag--accent' }, tech.status), h('span', { class: 'tag' }, tech.impact)),
       ),
     ),
-    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, tech.description)),
+    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, tech.description)),
     col('Properties', true, h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
       sc('Inventor', tech.inventor), sc('Faction', tech.faction), sc('Year', tech.year), sc('Impact', tech.impact))),
     col('Prerequisites', true, prereqs.length > 0

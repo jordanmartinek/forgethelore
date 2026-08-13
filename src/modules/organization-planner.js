@@ -69,7 +69,7 @@ function renderOrgDetailContent(org) {
       h('div', { style: { width: '56px', height: '56px', borderRadius: '12px', background: org.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' } }, '🏢'),
       h('div', {}, h('h2', { style: { fontSize: '20px', fontWeight: '700' } }, org.name), h('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, `${org.type} • ${org.faction}`)),
     ),
-    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, org.description)),
+    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, org.description)),
     col('Properties', true, h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
       sc('Leader', org.leader), sc('Members', org.members), sc('Purpose', org.purpose), sc('Secrecy', `${org.secrecy}%`), sc('Influence', `${org.influence}%`), sc('Status', org.status))),
     col('Internal Hierarchy', false, h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Define ranks, departments, and chains of command...')),

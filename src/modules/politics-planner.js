@@ -84,7 +84,7 @@ function renderPoliticsDetailContent(pe) {
       h('div', { style: { width: '56px', height: '56px', borderRadius: '12px', background: pe.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' } }, '🏛️'),
       h('div', {}, h('h2', { style: { fontSize: '20px', fontWeight: '700' } }, pe.name), h('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, `${pe.type} • ${pe.members} members`)),
     ),
-    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, pe.description)),
+    col('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, pe.description)),
     col('Metrics', true, h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' } },
       meter('Stability', pe.stability), meter('Legitimacy', pe.legitimacy), meter('Corruption', pe.corruption))),
     col('Key Laws & Policies', false, h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Define major laws...')),

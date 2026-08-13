@@ -94,7 +94,7 @@ function renderReligionDetailContent(rel) {
         ),
       ),
     ),
-    collapsible('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, rel.description)),
+    collapsible('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, rel.description)),
     collapsible('Core Tenets', true, h('div', {}, ...rel.tenets.map((t, i) => h('div', { style: { padding: '6px 0', borderBottom: '1px solid var(--border-subtle)', fontSize: '12px', color: 'var(--text-secondary)' } }, `${i + 1}. ${t}`)))),
     collapsible('Properties', true, h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
       stat('Deity/Focus', rel.deity), stat('Founder', rel.founder), stat('Followers', rel.followers), stat('Influence', `${rel.influence}%`),

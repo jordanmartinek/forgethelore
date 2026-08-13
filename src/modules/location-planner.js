@@ -117,7 +117,7 @@ function renderLocationDetailContent(loc) {
         ),
       ),
     ),
-    createCollapsible('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' } }, loc.description)),
+    createCollapsible('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, loc.description)),
     createCollapsible('Properties', true, h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
       statCard('Population', loc.population),
       statCard('Climate', loc.climate),
