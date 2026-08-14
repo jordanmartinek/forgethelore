@@ -17,7 +17,16 @@ import { generateId } from '../core/objects.js';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
-let sessions = loadData('brainstormSessions', []);
+let sessions = [];
+let activeSessionId = null;
+
+function loadSessions() {
+  sessions = loadData('brainstormSessions', []);
+  // Ensure activeSessionId points to a valid session
+  if (!sessions.find(s => s.id === activeSessionId)) {
+    activeSessionId = sessions.length > 0 ? sessions[0].id : null;
+  }
+}
 
 function save() {
   saveData('brainstormSessions', sessions);
@@ -25,11 +34,12 @@ function save() {
   setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
 }
 
-let activeSessionId = sessions.length > 0 ? sessions[0].id : null;
-
 // ─── Main Render ─────────────────────────────────────────────────────────────
 
 export function renderBrainstorm(container) {
+  // Always reload sessions from localStorage to ensure we have latest data
+  loadSessions();
+
   const wrapper = h('div', { style: { width: '100%', height: '100%', display: 'flex', overflow: 'hidden' } });
 
   // Session list (left)
@@ -389,7 +399,10 @@ function formatDate(ts) {
 
 function rerender() {
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderBrainstorm(container); }
+  if (container) {
+    container.innerHTML = '';
+    renderBrainstorm(container);
+  }
 }
 
 function updateBrainstormSidebar() {
