@@ -2,12 +2,9 @@
  * LoreForge Planner - Freeform Brainstorm
  * Write freely, tag content, then push sections to other modules.
  * 
- * Tags:
- *   @CharacterName — marks text as related to a character
- *   #LocationName  — marks text as related to a location
- *   !FactionName   — marks text as related to a faction
- *   ~mystery       — marks text as related to a mystery
- *   *tech          — marks text as related to technology
+ * Features:
+ *   - Topic tags for grouping/filtering sessions
+ *   - Content tags for pushing to modules (@character, #location, etc.)
  */
 
 import { h } from '../core/renderer.js';
@@ -19,9 +16,12 @@ import { generateId } from '../core/objects.js';
 
 let sessions = [];
 let activeSessionId = null;
+let activeTopicFilter = null; // null = show all, string = filter by topic
 
 function loadSessions() {
   sessions = loadData('brainstormSessions', []);
+  // Migrate: ensure all sessions have a topics array
+  sessions.forEach(s => { if (!s.topics) s.topics = []; });
   // Only reset activeSessionId if it doesn't match any session
   if (activeSessionId && !sessions.find(s => s.id === activeSessionId)) {
     activeSessionId = sessions.length > 0 ? sessions[0].id : null;
@@ -34,6 +34,21 @@ function save() {
   saveData('brainstormSessions', sessions);
   appStore.setState({ saveStatus: 'saving' });
   setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+}
+
+// Get all unique topics across all sessions
+function getAllTopics() {
+  const topicSet = new Set();
+  sessions.forEach(s => {
+    (s.topics || []).forEach(t => topicSet.add(t));
+  });
+  return Array.from(topicSet).sort();
+}
+
+// Get filtered sessions based on active topic filter
+function getFilteredSessions() {
+  if (!activeTopicFilter) return sessions;
+  return sessions.filter(s => (s.topics || []).includes(activeTopicFilter));
 }
 
 // ─── Main Render ─────────────────────────────────────────────────────────────
@@ -57,23 +72,55 @@ export function renderBrainstorm(container) {
 // ─── Session List ────────────────────────────────────────────────────────────
 
 function renderSessionList() {
-  const list = h('div', { style: { width: '240px', minWidth: '240px', borderRight: '1px solid var(--border-subtle)', background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+  const allTopics = getAllTopics();
+  const filteredSessions = getFilteredSessions();
+
+  const list = h('div', { style: { width: '260px', minWidth: '260px', borderRight: '1px solid var(--border-subtle)', background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+    // Header
     h('div', { style: { padding: '12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
       h('span', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Sessions'),
       h('button', { class: 'btn btn--primary btn--sm', onclick: createNewSession }, '+ New'),
     ),
+
+    // Topic filter bar
+    allTopics.length > 0
+      ? h('div', { style: { padding: '8px 8px 4px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', flexWrap: 'wrap', gap: '4px' } },
+          h('button', {
+            style: { fontSize: '10px', padding: '2px 8px', borderRadius: '10px', border: '1px solid var(--border-default)', background: !activeTopicFilter ? 'var(--accent-primary)' : 'transparent', color: !activeTopicFilter ? '#1a1510' : 'var(--text-muted)', cursor: 'pointer', fontWeight: '600', fontFamily: 'var(--font-ui)' },
+            onclick: () => { activeTopicFilter = null; rerender(); },
+          }, 'All'),
+          ...allTopics.map(topic =>
+            h('button', {
+              style: { fontSize: '10px', padding: '2px 8px', borderRadius: '10px', border: '1px solid var(--border-default)', background: activeTopicFilter === topic ? 'var(--accent-primary)' : 'transparent', color: activeTopicFilter === topic ? '#1a1510' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: '500', fontFamily: 'var(--font-ui)' },
+              onclick: () => { activeTopicFilter = topic; rerender(); },
+            }, topic)
+          ),
+        )
+      : null,
+
+    // Session list
     h('div', { style: { flex: '1', overflowY: 'auto', padding: '4px' } },
-      sessions.length === 0
-        ? h('div', { style: { padding: '16px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', fontStyle: 'italic' } }, 'No sessions yet. Click + New to start brainstorming.')
+      filteredSessions.length === 0
+        ? h('div', { style: { padding: '16px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', fontStyle: 'italic' } },
+            activeTopicFilter ? `No sessions tagged "${activeTopicFilter}"` : 'No sessions yet. Click + New to start brainstorming.'
+          )
         : null,
-      ...sessions.map(session =>
+      ...filteredSessions.map(session =>
         h('div', {
           style: { padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px', background: session.id === activeSessionId ? 'var(--bg-active)' : 'transparent', border: session.id === activeSessionId ? '1px solid var(--border-accent)' : '1px solid transparent' },
           onclick: () => { activeSessionId = session.id; rerender(); },
         },
           h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, session.title || 'Untitled Session'),
           h('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, formatDate(session.createdAt)),
-          session.content ? h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, session.content.slice(0, 60) + (session.content.length > 60 ? '...' : '')) : null,
+          // Topic tags on session card
+          (session.topics && session.topics.length > 0)
+            ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' } },
+                ...session.topics.map(topic =>
+                  h('span', { style: { fontSize: '9px', padding: '1px 5px', borderRadius: '6px', background: 'rgba(201,168,76,0.15)', color: 'var(--accent-primary)', fontWeight: '500' } }, topic)
+                )
+              )
+            : null,
+          session.content ? h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, session.content.slice(0, 60) + (session.content.length > 60 ? '...' : '')) : null,
         )
       ),
     ),
@@ -114,7 +161,24 @@ function renderEditor() {
       ),
     ),
 
-    // Tag legend
+    // Topic tags bar
+    h('div', { style: { padding: '8px 16px', background: 'var(--surface-1)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flexShrink: '0' } },
+      h('span', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' } }, '🏷️ Topics:'),
+      // Existing topics
+      ...(session.topics || []).map((topic, idx) =>
+        h('span', { style: { fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: 'rgba(201,168,76,0.15)', color: 'var(--accent-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '500' } },
+          topic,
+          h('span', {
+            style: { cursor: 'pointer', fontSize: '10px', opacity: '0.7', marginLeft: '2px' },
+            onclick: () => { session.topics.splice(idx, 1); save(); rerender(); },
+          }, '✕'),
+        )
+      ),
+      // Add topic input
+      createTopicInput(session),
+    ),
+
+    // Content tag legend
     h('div', { style: { padding: '6px 16px', background: 'var(--surface-1)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', gap: '8px', flexWrap: 'wrap', flexShrink: '0' } },
       h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: '#6366f1' } }, '@character'),
       h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: '#22c55e' } }, '#location'),
@@ -134,6 +198,98 @@ function renderEditor() {
       h('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, `Tags found: ${countTags(session.content || '')}`),
     ),
   );
+}
+
+// ─── Topic Tag Input ─────────────────────────────────────────────────────────
+
+function createTopicInput(session) {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:inline-flex;align-items:center;position:relative;';
+
+  const input = document.createElement('input');
+  input.style.cssText = 'font-size:11px;padding:2px 8px;border-radius:10px;border:1px dashed var(--border-default);background:transparent;color:var(--text-secondary);width:90px;outline:none;font-family:var(--font-ui);';
+  input.placeholder = '+ Add topic';
+
+  // Show suggestions dropdown
+  input.addEventListener('focus', () => showTopicSuggestions(input, session, wrapper));
+  input.addEventListener('input', () => showTopicSuggestions(input, session, wrapper));
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const topic = input.value.trim();
+      if (topic && !(session.topics || []).includes(topic)) {
+        if (!session.topics) session.topics = [];
+        session.topics.push(topic);
+        save();
+        rerender();
+      }
+    }
+    if (e.key === 'Escape') {
+      input.value = '';
+      input.blur();
+      removeSuggestions(wrapper);
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    // Delay to allow click on suggestions
+    setTimeout(() => removeSuggestions(wrapper), 150);
+  });
+
+  wrapper.appendChild(input);
+  return wrapper;
+}
+
+function showTopicSuggestions(input, session, wrapper) {
+  removeSuggestions(wrapper);
+
+  const query = input.value.trim().toLowerCase();
+  const existingTopics = session.topics || [];
+  const allTopics = getAllTopics();
+
+  // Filter: topics that exist but aren't on this session, matching query
+  let suggestions = allTopics.filter(t => !existingTopics.includes(t));
+  if (query) {
+    suggestions = suggestions.filter(t => t.toLowerCase().includes(query));
+    // Also offer to create the typed topic if it doesn't exist
+    if (!allTopics.some(t => t.toLowerCase() === query) && !existingTopics.some(t => t.toLowerCase() === query)) {
+      suggestions.unshift(`✨ Create "${input.value.trim()}"`);
+    }
+  }
+
+  if (suggestions.length === 0) return;
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'brainstorm-topic-suggestions';
+  dropdown.style.cssText = 'position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:8px;box-shadow:var(--shadow-md);padding:4px;z-index:100;min-width:140px;max-height:160px;overflow-y:auto;';
+
+  suggestions.slice(0, 8).forEach(suggestion => {
+    const isCreate = suggestion.startsWith('✨');
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:5px 10px;font-size:11px;border-radius:4px;cursor:pointer;color:var(--text-secondary);transition:background 0.1s;';
+    item.textContent = suggestion;
+    item.addEventListener('mouseenter', () => { item.style.background = 'var(--bg-hover)'; item.style.color = 'var(--text-primary)'; });
+    item.addEventListener('mouseleave', () => { item.style.background = 'transparent'; item.style.color = 'var(--text-secondary)'; });
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // Prevent blur
+      const topic = isCreate ? input.value.trim() : suggestion;
+      if (topic && !existingTopics.includes(topic)) {
+        if (!session.topics) session.topics = [];
+        session.topics.push(topic);
+        save();
+        rerender();
+      }
+    });
+    dropdown.appendChild(item);
+  });
+
+  wrapper.appendChild(dropdown);
+}
+
+function removeSuggestions(wrapper) {
+  const existing = wrapper.querySelector('.brainstorm-topic-suggestions');
+  if (existing) existing.remove();
 }
 
 // ─── Push to Modules ─────────────────────────────────────────────────────────
@@ -299,7 +455,6 @@ function parseTags(content) {
       if (match) {
         flushCurrent();
         currentTag = { type: pattern.type, name: match[1].trim() };
-        // If there's text after the tag on the same line
         const rest = trimmed.slice(match[0].length).trim();
         if (rest) currentText.push(rest);
         matched = true;
@@ -311,7 +466,6 @@ function parseTags(content) {
       if (currentTag) {
         currentText.push(line);
       }
-      // Lines without a tag and not under a tag are ignored for pushing
     }
   });
 
@@ -377,7 +531,7 @@ function createTextarea(session) {
 // ─── Session CRUD ────────────────────────────────────────────────────────────
 
 function createNewSession() {
-  const session = { id: generateId(), title: `Session — ${new Date().toLocaleDateString()}`, content: '', createdAt: Date.now() };
+  const session = { id: generateId(), title: `Session — ${new Date().toLocaleDateString()}`, content: '', topics: [], createdAt: Date.now() };
   sessions.unshift(session);
   activeSessionId = session.id;
   save();
