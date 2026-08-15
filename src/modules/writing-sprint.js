@@ -82,6 +82,9 @@ function renderSprintSetup() {
                 // Clear custom input
                 const customInput = document.getElementById('sprint-custom-duration');
                 if (customInput) customInput.value = '';
+                // Update start button text
+                const startBtn = document.getElementById('sprint-start-btn');
+                if (startBtn) startBtn.textContent = `🚀 Start ${mins}-Minute Sprint`;
               },
             }, `${mins}m`)
           ),
@@ -102,6 +105,9 @@ function renderSprintSetup() {
                 setupState.customDuration = val;
                 // Deselect presets
                 document.querySelectorAll('.sprint-setup__preset').forEach(b => b.classList.remove('sprint-setup__preset--active'));
+                // Update start button text
+                const startBtn = document.getElementById('sprint-start-btn');
+                if (startBtn) startBtn.textContent = `🚀 Start ${val}-Minute Sprint`;
               }
             }
           }),
@@ -133,6 +139,7 @@ function renderSprintSetup() {
       // Start button
       h('div', { style: { marginTop: '24px' } },
         h('button', {
+          id: 'sprint-start-btn',
           class: 'btn btn--primary',
           style: { width: '100%', padding: '12px', fontSize: '15px', fontWeight: '700' },
           onclick: () => startSprint(setupState),
