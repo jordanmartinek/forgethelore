@@ -22,9 +22,11 @@ let activeSessionId = null;
 
 function loadSessions() {
   sessions = loadData('brainstormSessions', []);
-  // Ensure activeSessionId points to a valid session
-  if (!sessions.find(s => s.id === activeSessionId)) {
+  // Only reset activeSessionId if it doesn't match any session
+  if (activeSessionId && !sessions.find(s => s.id === activeSessionId)) {
     activeSessionId = sessions.length > 0 ? sessions[0].id : null;
+  } else if (!activeSessionId && sessions.length > 0) {
+    activeSessionId = sessions[0].id;
   }
 }
 
@@ -40,7 +42,7 @@ export function renderBrainstorm(container) {
   // Always reload sessions from localStorage to ensure we have latest data
   loadSessions();
 
-  const wrapper = h('div', { style: { width: '100%', height: '100%', display: 'flex', overflow: 'hidden' } });
+  const wrapper = h('div', { style: { position: 'absolute', top: '0', left: '0', right: '0', bottom: '0', display: 'flex', overflow: 'hidden' } });
 
   // Session list (left)
   wrapper.appendChild(renderSessionList());
@@ -85,7 +87,7 @@ function renderEditor() {
   const session = sessions.find(s => s.id === activeSessionId);
 
   if (!session) {
-    return h('div', { style: { flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+    return h('div', { style: { flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '0', minHeight: '0' } },
       h('div', { style: { textAlign: 'center', color: 'var(--text-muted)', maxWidth: '400px' } },
         h('div', { style: { fontSize: '48px', marginBottom: '16px', opacity: '0.5' } }, '💭'),
         h('div', { style: { fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' } }, 'Freeform Brainstorm'),
@@ -102,7 +104,7 @@ function renderEditor() {
     );
   }
 
-  return h('div', { style: { flex: '1', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+  return h('div', { style: { flex: '1', display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: '0', minHeight: '0' } },
     // Toolbar
     h('div', { style: { padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: '0' } },
       h('input', { class: 'input', value: session.title, placeholder: 'Session title...', style: { fontSize: '14px', fontWeight: '600', border: 'none', background: 'transparent', padding: '0', maxWidth: '300px' }, oninput: (e) => { session.title = e.target.value; save(); } }),
@@ -122,13 +124,8 @@ function renderEditor() {
     ),
 
     // Textarea
-    h('div', { style: { flex: '1', padding: '16px', minHeight: '0' } },
-      h('textarea', {
-        style: { width: '100%', height: '100%', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', fontFamily: 'var(--font-sans)', lineHeight: '1.8', padding: '16px', resize: 'none', outline: 'none' },
-        placeholder: 'Start writing freely...\n\nUse @CharacterName to tag character notes\nUse #LocationName to tag location notes\nUse !FactionName to tag faction notes\n\nExample:\n@Sera is struggling with her identity after the betrayal. She needs to find a way to prove herself without relying on the Senate. Her arc should take her from a political idealist to a military pragmatist.\n\n#NexusHub is the only neutral ground left. All factions maintain embassies here. It should feel like Cold War Berlin.',
-        oninput: (e) => { session.content = e.target.value; save(); updateWordCount(e.target.value); },
-        value: session.content || '',
-      }),
+    h('div', { style: { flex: '1', padding: '16px', minHeight: '0', overflow: 'hidden' } },
+      createTextarea(session),
     ),
 
     // Footer
@@ -360,6 +357,21 @@ function getFieldOptions(type) {
     ];
     default: return [{ value: 'description', label: 'Description' }];
   }
+}
+
+// ─── Textarea Helper ─────────────────────────────────────────────────────────
+
+function createTextarea(session) {
+  const textarea = document.createElement('textarea');
+  textarea.style.cssText = 'width:100%;height:100%;background:var(--surface-2);border:1px solid var(--border-default);border-radius:8px;color:var(--text-primary);font-size:14px;font-family:var(--font-sans);line-height:1.8;padding:16px;resize:none;outline:none;display:block;';
+  textarea.placeholder = 'Start writing freely...\n\nUse @CharacterName to tag character notes\nUse #LocationName to tag location notes\nUse !FactionName to tag faction notes';
+  textarea.value = session.content || '';
+  textarea.addEventListener('input', (e) => {
+    session.content = e.target.value;
+    save();
+    updateWordCount(e.target.value);
+  });
+  return textarea;
 }
 
 // ─── Session CRUD ────────────────────────────────────────────────────────────
