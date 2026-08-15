@@ -445,3 +445,409 @@
 .knowledge-cell--suspects { background: rgba(245,158,11,0.15); }
 .knowledge-cell--false { background: rgba(239,68,68,0.15); }
 .knowledge-cell--unknown { background: transparent; }
+
+
+
+/* ─── Writing Sprint ───────────────────────────────────────────────────────── */
+
+/* Setup View */
+.sprint-setup {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+.sprint-setup__form {
+  flex: 1;
+  padding: var(--space-3xl);
+  overflow-y: auto;
+  max-width: 680px;
+}
+
+.sprint-setup__header {
+  margin-bottom: var(--space-2xl);
+}
+
+.sprint-setup__title {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.sprint-setup__subtitle {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+.sprint-setup__section {
+  margin-bottom: var(--space-2xl);
+}
+
+.sprint-setup__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--font-ui);
+}
+
+.sprint-setup__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sprint-setup__preset {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sprint-setup__preset:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.sprint-setup__preset--active {
+  background: rgba(201,168,76,0.15);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 0 8px rgba(201,168,76,0.15);
+}
+
+.sprint-setup__goals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-md);
+}
+
+/* History panel */
+.sprint-setup__history {
+  width: 300px;
+  min-width: 300px;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  padding: var(--space-xl);
+  overflow-y: auto;
+}
+
+.sprint-setup__history-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-lg);
+  font-family: var(--font-heading);
+}
+
+.sprint-setup__history-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-xl);
+}
+
+.sprint-setup__history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Goal items in setup */
+.sprint-goal-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.sprint-goal-item__text {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+/* ─── Active Sprint View ──────────────────────────────────────────────────── */
+
+.sprint-active {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+.sprint-active__editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sprint-active__timer-bar {
+  padding: 12px var(--space-xl);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.sprint-active__timer-display {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent-primary);
+  min-width: 100px;
+  letter-spacing: 1px;
+}
+
+.sprint-active__timer-display--urgent {
+  color: var(--danger);
+  animation: pulse 1s infinite;
+}
+
+.sprint-active__timer-progress {
+  flex: 1;
+  min-width: 120px;
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.sprint-active__timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), #e8c96a);
+  border-radius: var(--radius-full);
+  transition: width 1s linear;
+}
+
+.sprint-active__timer-meta {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sprint-active__timer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sprint-active__textarea {
+  flex: 1;
+  width: 100%;
+  padding: var(--space-xl) var(--space-2xl);
+  background: var(--bg-primary);
+  border: none;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-family: var(--font-sans);
+  line-height: 1.9;
+  resize: none;
+  outline: none;
+  min-height: 0;
+}
+
+.sprint-active__textarea::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Sidebar with goals */
+.sprint-active__sidebar {
+  width: 280px;
+  min-width: 280px;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sprint-active__sidebar-header {
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sprint-active__sidebar-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sprint-active__goals-progress {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: rgba(201,168,76,0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.sprint-active__goals {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sprint-active__add-goal {
+  padding: var(--space-md);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  gap: 6px;
+}
+
+.sprint-active__info {
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sprint-active__info-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Goal checkboxes */
+.sprint-goal-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+}
+
+.sprint-goal-check:hover {
+  background: var(--bg-hover);
+}
+
+.sprint-goal-check--done {
+  opacity: 0.6;
+  background: rgba(90,158,90,0.08);
+  border-color: rgba(90,158,90,0.2);
+}
+
+.sprint-goal-check--done .sprint-goal-check__text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.sprint-goal-check input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: var(--accent-primary);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.sprint-goal-check__text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+/* Sprint History Items */
+.sprint-history-item {
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.sprint-history-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.sprint-history-item__date {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sprint-history-item__status {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sprint-history-item__status--completed {
+  color: var(--success);
+}
+
+.sprint-history-item__status--running {
+  color: var(--warning);
+}
+
+.sprint-history-item__stats {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Sprint Completion Modal Stats */
+.sprint-complete__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.sprint-complete__stat {
+  text-align: center;
+  padding: var(--space-lg);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+}
+
+.sprint-complete__stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  font-family: var(--font-heading);
+}
+
+.sprint-complete__stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

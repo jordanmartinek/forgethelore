@@ -30,6 +30,7 @@ import { renderDailyPlanner } from '../modules/daily-planner.js';
 import { renderBrainstorm } from '../modules/brainstorm.js';
 import { renderLanguagePlanner } from '../modules/language-planner.js';
 import { renderResourcePlanner } from '../modules/resource-planner.js';
+import { renderWritingSprint } from '../modules/writing-sprint.js';
 import { renderExportImport } from '../ui/export-import.js';
 import { renderCommandPalette } from './command-palette.js';
 
@@ -44,6 +45,7 @@ const navGroups = [
       { id: 'manuscript', label: 'Manuscript' },
       { id: 'quick-log', label: 'Quick Log' },
       { id: 'brainstorm', label: 'Brainstorm' },
+      { id: 'writing-sprint', label: 'Writing Sprint' },
     ]
   },
   {
@@ -517,6 +519,9 @@ function renderActiveModule() {
       break;
     case 'brainstorm':
       renderBrainstorm(content);
+      break;
+    case 'writing-sprint':
+      renderWritingSprint(content);
       break;
     case 'conflict-board':
       renderConflictBoard(content);
