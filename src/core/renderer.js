@@ -19,6 +19,10 @@ export function createElement(tag, attrs = {}, ...children) {
       Object.entries(value).forEach(([k, v]) => el.dataset[k] = v);
     } else if (key === 'innerHTML') {
       el.innerHTML = value;
+    } else if (key === 'value') {
+      el.value = value;
+    } else if (key === 'checked' || key === 'disabled' || key === 'selected') {
+      el[key] = value;
     } else {
       el.setAttribute(key, value);
     }
