@@ -3,9 +3,9 @@
  * Investigation board style mystery tracking
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
-import { confirmDialog } from '../ui/modal.js';
+import { confirmDialog, showModal, formField } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
 
 let demoMysteries = [
@@ -226,16 +226,16 @@ function updateMysterySidebar() {
 function openEditMysteryModal(mystery) {
   const state = { title: mystery.title, question: mystery.question, truth: mystery.truth, importance: mystery.importance };
   const content = h('div', {},
-    ff('Title', h('input', { class: 'input', value: state.title, oninput: (e) => state.title = e.target.value })),
-    ff('Central Question', h('input', { class: 'input', value: state.question, oninput: (e) => state.question = e.target.value })),
-    ff('Actual Truth (Creator Only)', expandableText({ placeholder: 'The real answer...', label: 'Mystery Truth', value: state.truth, oninput: (e) => state.truth = e.target.value })),
-    ff('Importance', h('select', { class: 'input', onchange: (e) => state.importance = e.target.value },
+    formField('Title', h('input', { class: 'input', value: state.title, oninput: (e) => state.title = e.target.value })),
+    formField('Central Question', h('input', { class: 'input', value: state.question, oninput: (e) => state.question = e.target.value })),
+    formField('Actual Truth (Creator Only)', expandableText({ placeholder: 'The real answer...', label: 'Mystery Truth', value: state.truth, oninput: (e) => state.truth = e.target.value })),
+    formField('Importance', h('select', { class: 'input', onchange: (e) => state.importance = e.target.value },
       h('option', { value: 'critical', selected: state.importance === 'critical' ? 'selected' : undefined }, 'Critical'), h('option', { value: 'major', selected: state.importance === 'major' ? 'selected' : undefined }, 'Major'), h('option', { value: 'moderate', selected: state.importance === 'moderate' ? 'selected' : undefined }, 'Moderate'), h('option', { value: 'minor', selected: state.importance === 'minor' ? 'selected' : undefined }, 'Minor'))),
   );
-  modal('Edit: ' + mystery.title, content, () => {
+  showModal('Edit: ' + mystery.title, content, () => {
     Object.assign(mystery, state);
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderMysteryPlanner(container); });
     persistState("mysteries", demoMysteries);
   });
 }
@@ -246,7 +246,7 @@ async function deleteMystery(mystery) {
   const idx = demoMysteries.findIndex(i => i.id === mystery.id);
   if (idx !== -1) demoMysteries.splice(idx, 1);
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderMysteryPlanner(container); });
   persistState("mysteries", demoMysteries);
 }
 
@@ -254,26 +254,19 @@ async function deleteMystery(mystery) {
 function openAddMysteryModal() {
   const state = { title: '', question: '', truth: '', importance: 'moderate' };
   const content = h('div', {},
-    ff('Title', h('input', { class: 'input', placeholder: 'Mystery title', oninput: (e) => state.title = e.target.value })),
-    ff('Central Question', h('input', { class: 'input', placeholder: 'What is the question this mystery poses?', oninput: (e) => state.question = e.target.value })),
-    ff('Actual Truth (Creator Only)', expandableText({ placeholder: 'The real answer...', label: 'Mystery Truth', oninput: (e) => state.truth = e.target.value })),
-    ff('Importance', h('select', { class: 'input', onchange: (e) => state.importance = e.target.value },
+    formField('Title', h('input', { class: 'input', placeholder: 'Mystery title', oninput: (e) => state.title = e.target.value })),
+    formField('Central Question', h('input', { class: 'input', placeholder: 'What is the question this mystery poses?', oninput: (e) => state.question = e.target.value })),
+    formField('Actual Truth (Creator Only)', expandableText({ placeholder: 'The real answer...', label: 'Mystery Truth', oninput: (e) => state.truth = e.target.value })),
+    formField('Importance', h('select', { class: 'input', onchange: (e) => state.importance = e.target.value },
       h('option', { value: 'critical' }, 'Critical'), h('option', { value: 'major' }, 'Major'), h('option', { value: 'moderate', selected: 'selected' }, 'Moderate'), h('option', { value: 'minor' }, 'Minor'))),
   );
-  modal('Add New Mystery', content, () => {
+  showModal('Add New Mystery', content, () => {
     if (!state.title.trim()) return;
     demoMysteries.push({ id: `m${Date.now()}`, title: state.title, question: state.question, truth: state.truth, status: 'active', importance: state.importance, progress: 0, clues: 0, redHerrings: 0 });
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderMysteryPlanner(container); });
     persistState("mysteries", demoMysteries);
   });
 }
 
-function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
-function modal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
-  document.body.appendChild(overlay);
-}
+// modal + field now come from the shared, accessible ui/modal.js

@@ -38,7 +38,7 @@ export default [
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
-      globals: { process: 'readonly', console: 'readonly', globalThis: 'writable', setTimeout: 'readonly', Buffer: 'readonly' },
+      globals: { process: 'readonly', console: 'readonly', globalThis: 'writable', setTimeout: 'readonly', Buffer: 'readonly', URL: 'readonly', Promise: 'readonly' },
     },
     rules: commonRules,
   },

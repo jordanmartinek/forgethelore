@@ -4,7 +4,7 @@
  * Click into any node to explore its children.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 
 import { ObjectTypes, ObjectIcons, generateId } from '../core/objects.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
@@ -474,7 +474,7 @@ async function deleteNode(node) {
 
 function rerender() {
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderWorldBuilder(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderWorldBuilder(container); });
 }
 
 function updateWorldSidebar() {

@@ -3,7 +3,7 @@
  * Manage all named locations: planets, cities, buildings, regions, etc.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
@@ -144,7 +144,7 @@ function openAddLocationModal() {
     if (!state.name.trim()) return;
     locations.push({ id: generateId(), ...state, population: 'Unknown', status: 'active', climate: 'Unknown', resources: 'Unknown', strategicValue: 50, color: '#6366f1' });
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderLocationPlanner(container); });
     persistState("locations", locations);
   });
 }
@@ -161,7 +161,7 @@ function openEditLocationModal(loc) {
   showModal('Edit: ' + loc.name, content, () => {
     Object.assign(loc, state);
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderLocationPlanner(container); });
     persistState("locations", locations);
   });
 }
@@ -172,7 +172,7 @@ async function deleteLocation(loc) {
   const idx = locations.findIndex(i => i.id === loc.id);
   if (idx !== -1) locations.splice(idx, 1);
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderLocationPlanner(container); });
   persistState("locations", locations);
 }
 

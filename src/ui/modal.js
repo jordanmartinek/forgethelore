@@ -166,10 +166,19 @@ export function showModal(title, content, onSave) {
  */
 export function formField(label, inputEl) {
   const fieldId = nextId('field');
-  if (inputEl && !inputEl.id) inputEl.id = fieldId;
+  // Associate the <label> with the actual focusable control. Some helpers
+  // (e.g. expandableText) return a WRAPPER div containing the real input/
+  // textarea, so target that inner control rather than the wrapper — otherwise
+  // `for=` points at a non-labelable element and click-to-focus/AT association
+  // silently no-ops.
+  let target = inputEl;
+  if (inputEl && !['INPUT', 'TEXTAREA', 'SELECT'].includes(inputEl.tagName)) {
+    target = inputEl.querySelector('input, textarea, select') || inputEl;
+  }
+  if (target && !target.id) target.id = fieldId;
   return h('div', { class: 'form-field', style: { marginBottom: '12px' } },
     h('label', {
-      for: inputEl ? inputEl.id : fieldId,
+      for: target ? target.id : fieldId,
       style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' },
     }, label),
     inputEl,
