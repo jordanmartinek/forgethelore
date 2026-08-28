@@ -4,7 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
-import { appStore } from '../core/store.js';
+
 import { characterArcs, getArc, RELATIONSHIP_DIMENSIONS, getRelationshipsFor } from '../core/progression.js';
 
 function getPieces() { return window.__loreforge_pieces || []; }

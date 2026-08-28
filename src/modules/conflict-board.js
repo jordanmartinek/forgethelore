@@ -9,6 +9,7 @@ import { boardStore, appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { propagateSceneOutcome } from '../core/progression.js';
 import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { showModal, formField as createFormField, confirmDialog } from '../ui/modal.js';
 
 // ─── Board Data (loaded from localStorage or defaults) ───────────────────────
 
@@ -98,32 +99,7 @@ window.__loreforge_factions = factions;
 
 // ─── Modal System ────────────────────────────────────────────────────────────
 
-function showModal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay');
-  if (existing) existing.remove();
-
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' },
-      h('div', { class: 'modal__header' },
-        h('span', { class: 'modal__title' }, title),
-        h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕'),
-      ),
-      h('div', { class: 'modal__body', id: 'modal-body' }, content),
-      h('div', { class: 'modal__footer' },
-        h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'),
-        h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'),
-      )
-    )
-  );
-  document.body.appendChild(overlay);
-}
-
-function createFormField(label, inputEl) {
-  return h('div', { style: { marginBottom: '12px' } },
-    h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label),
-    inputEl
-  );
-}
+// showModal / formField now come from the shared, accessible ui/modal.js
 
 // ─── Faction CRUD ────────────────────────────────────────────────────────────
 
@@ -207,8 +183,9 @@ function openEditFactionModal(faction) {
   });
 }
 
-function removeFaction(faction) {
-  if (!confirm(`Remove faction "${faction.name}" and all its pieces from the board?`)) return;
+async function removeFaction(faction) {
+  const ok = await confirmDialog({ title: `Remove ${faction.name}`, message: `This will remove the faction "${faction.name}" and all of its pieces from the board.`, confirmLabel: 'Remove', danger: true });
+  if (!ok) return;
   // Remove pieces belonging to this faction
   const toRemove = pieces.filter(p => p.faction === faction.id).map(p => p.id);
   toRemove.forEach(pid => {
@@ -344,8 +321,9 @@ function openEditPieceModal(piece) {
   });
 }
 
-function removePiece(piece) {
-  if (!confirm(`Remove "${piece.name}" from the board?`)) return;
+async function removePiece(piece) {
+  const ok = await confirmDialog({ title: `Remove ${piece.name}`, message: `This will remove "${piece.name}" from the board.`, confirmLabel: 'Remove', danger: true });
+  if (!ok) return;
   const idx = pieces.findIndex(p => p.id === piece.id);
   if (idx !== -1) pieces.splice(idx, 1);
   // Remove conflict lines
@@ -364,12 +342,16 @@ function removePiece(piece) {
 
 function triggerSave() {
   appStore.setState({ saveStatus: 'saving' });
-  // Persist all board data to localStorage
-  saveData('factions', factions);
-  saveData('pieces', pieces);
-  saveData('conflictLines', conflictLines);
-  saveData('scenes', scenes);
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  // Persist all board data to localStorage and report the *real* result.
+  const ok = [
+    saveData('factions', factions),
+    saveData('pieces', pieces),
+    saveData('conflictLines', conflictLines),
+    saveData('scenes', scenes),
+  ].every(Boolean);
+  appStore.setState(ok
+    ? { saveStatus: 'saved', lastSaved: Date.now() }
+    : { saveStatus: 'offline' });
 }
 
 function rerenderBoard() {
@@ -409,8 +391,9 @@ function getRoleIcon(role) {
 // Antagonists & Henchmen → top rows (0-1)
 // Opponents → middle rows (2-5)
 
-function resetBoardPositions() {
-  if (!confirm('Reset all piece positions based on their roles?\n\nProtagonists & Allies → bottom (your side)\nAntagonists & Henchmen → top (opposing side)\nOpponents → middle (contested space)')) return;
+async function resetBoardPositions() {
+  const ok = await confirmDialog({ title: 'Reset piece positions?', message: 'Pieces will be repositioned based on their roles.', confirmLabel: 'Reset' });
+  if (!ok) return;
 
   const protagonists = pieces.filter(p => p.role === 'protagonist');
   const allies = pieces.filter(p => p.role === 'ally');
@@ -1181,8 +1164,9 @@ function getNextSceneSuggestion(scene) {
   return suggestions[scene.id] || 'Consider what each participant would logically do next based on this outcome.';
 }
 
-function removeScene(scene) {
-  if (!confirm(`Delete scene "${scene.title}"?`)) return;
+async function removeScene(scene) {
+  const ok = await confirmDialog({ title: `Delete scene "${scene.title}"?`, message: 'This scene will be permanently removed.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = scenes.findIndex(s => s.id === scene.id);
   if (idx !== -1) scenes.splice(idx, 1);
   // Re-number

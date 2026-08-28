@@ -1,147 +1,221 @@
 /**
  * LoreForge Planner - Command Palette
- * VS Code-style command palette for quick actions
+ * VS Code-style palette for quick actions AND global content search.
+ *
+ * Improvements over the original:
+ *   - Navigation commands are generated from the module registry (no drift).
+ *   - Typing searches your actual data (characters, scenes, factions, …) via
+ *     core/search.js, not just command names.
+ *   - Accessible: role="dialog"/listbox/option, aria-selected, aria-activedescendant.
+ *   - Uses the accessible promptDialog + toast instead of window.prompt.
  */
 
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
-import { ObjectTypes, ObjectIcons, createObject } from '../core/objects.js';
+import { ObjectTypes, createObject } from '../core/objects.js';
+import { MODULES, getModule } from '../core/registry.js';
+import { searchContent } from '../core/search.js';
+import { promptDialog } from './modal.js';
+import { toastSuccess } from './toast.js';
+import { exportProject } from './export-import.js';
 
-const commands = [
-  // Navigation
-  { id: 'nav-board', icon: '♟️', label: 'Go to Strategic Board', shortcut: 'Alt+1', action: () => appStore.setState({ activeModule: 'conflict-board' }) },
-  { id: 'nav-world', icon: '🌌', label: 'Go to World Builder', shortcut: 'Alt+2', action: () => appStore.setState({ activeModule: 'world-builder' }) },
-  { id: 'nav-chars', icon: '👤', label: 'Go to Characters', shortcut: 'Alt+3', action: () => appStore.setState({ activeModule: 'characters' }) },
-  { id: 'nav-factions', icon: '⚔️', label: 'Go to Factions', shortcut: 'Alt+4', action: () => appStore.setState({ activeModule: 'factions' }) },
-  { id: 'nav-mystery', icon: '🔍', label: 'Go to Mysteries', shortcut: 'Alt+5', action: () => appStore.setState({ activeModule: 'mysteries' }) },
-  { id: 'nav-timeline', icon: '⏳', label: 'Go to Timeline', shortcut: 'Alt+6', action: () => appStore.setState({ activeModule: 'timeline' }) },
-  { id: 'nav-tech', icon: '⚙️', label: 'Go to Technology', shortcut: 'Alt+7', action: () => appStore.setState({ activeModule: 'technology' }) },
-  { id: 'nav-graph', icon: '🕸️', label: 'Go to Knowledge Graph', shortcut: 'Alt+8', action: () => appStore.setState({ activeModule: 'knowledge-graph' }) },
-  { id: 'nav-analytics', icon: '📊', label: 'Go to Analytics', shortcut: 'Alt+9', action: () => appStore.setState({ activeModule: 'analytics' }) },
-  
-  // Create Objects
-  { id: 'create-character', icon: '👤', label: 'Create New Character', category: 'Create', action: () => promptCreate(ObjectTypes.CHARACTER) },
-  { id: 'create-faction', icon: '⚔️', label: 'Create New Faction', category: 'Create', action: () => promptCreate(ObjectTypes.FACTION) },
-  { id: 'create-planet', icon: '🪐', label: 'Create New Planet', category: 'Create', action: () => promptCreate(ObjectTypes.PLANET) },
-  { id: 'create-mystery', icon: '🔍', label: 'Create New Mystery', category: 'Create', action: () => promptCreate(ObjectTypes.MYSTERY) },
-  { id: 'create-war', icon: '🔥', label: 'Create New War/Conflict', category: 'Create', action: () => promptCreate(ObjectTypes.WAR) },
-  { id: 'create-tech', icon: '⚙️', label: 'Create New Technology', category: 'Create', action: () => promptCreate(ObjectTypes.TECHNOLOGY) },
-  { id: 'create-org', icon: '🏢', label: 'Create New Organization', category: 'Create', action: () => promptCreate(ObjectTypes.ORGANIZATION) },
-  { id: 'create-event', icon: '📅', label: 'Create New Event', category: 'Create', action: () => promptCreate(ObjectTypes.EVENT) },
-  { id: 'create-secret', icon: '🤫', label: 'Create New Secret', category: 'Create', action: () => promptCreate(ObjectTypes.SECRET) },
-  { id: 'create-objective', icon: '🎯', label: 'Create New Objective', category: 'Create', action: () => promptCreate(ObjectTypes.OBJECTIVE) },
-  
-  // Board Actions
-  { id: 'board-new', icon: '♟️', label: 'Create New Board', category: 'Board', action: () => {} },
-  { id: 'board-simulate', icon: '🧠', label: 'Run AI Simulation', category: 'Board', action: () => {} },
-  { id: 'board-heatmap', icon: '🔥', label: 'Toggle Heatmap', category: 'Board', action: () => {} },
-  
-  // Utility
-  { id: 'snapshot', icon: '📸', label: 'Create Snapshot', category: 'Utility', action: () => {} },
-  { id: 'export', icon: '📦', label: 'Export Project', category: 'Utility', action: () => {} },
+// Navigation commands generated from the registry.
+const navCommands = MODULES.map((m) => ({
+  id: `nav-${m.id}`,
+  icon: m.icon,
+  label: `Go to ${m.label}`,
+  category: 'Navigate',
+  action: () => appStore.setState({ activeModule: m.id }),
+}));
+
+// Object-creation commands (write to the IndexedDB object system).
+const createCommands = [
+  { type: ObjectTypes.CHARACTER, icon: '👤', label: 'Create New Character' },
+  { type: ObjectTypes.FACTION, icon: '⚔️', label: 'Create New Faction' },
+  { type: ObjectTypes.PLANET, icon: '🪐', label: 'Create New Planet' },
+  { type: ObjectTypes.MYSTERY, icon: '🔍', label: 'Create New Mystery' },
+  { type: ObjectTypes.WAR, icon: '🔥', label: 'Create New War/Conflict' },
+  { type: ObjectTypes.TECHNOLOGY, icon: '⚙️', label: 'Create New Technology' },
+  { type: ObjectTypes.ORGANIZATION, icon: '🏢', label: 'Create New Organization' },
+  { type: ObjectTypes.EVENT, icon: '📅', label: 'Create New Event' },
+].map((c) => ({
+  id: `create-${c.type}`,
+  icon: c.icon,
+  label: c.label,
+  category: 'Create',
+  action: () => promptCreate(c.type),
+}));
+
+const utilityCommands = [
+  { id: 'goto-dashboard', icon: '🏠', label: 'Go to Dashboard', category: 'Navigate', action: () => appStore.setState({ activeModule: 'dashboard' }) },
+  { id: 'export', icon: '📦', label: 'Export Project', category: 'Utility', action: () => exportProject() },
+  { id: 'import-panel', icon: '📥', label: 'Open Export / Import', category: 'Utility', action: () => appStore.setState({ activeModule: 'export-import' }) },
 ];
 
+const commands = [...utilityCommands, ...navCommands, ...createCommands];
+
 let selectedIndex = 0;
-let filteredCommands = [...commands];
+let currentResults = [];
 
 export function renderCommandPalette() {
-  // Remove existing
   const existing = document.querySelector('.command-palette');
   if (existing) existing.remove();
-  
+
   selectedIndex = 0;
-  filteredCommands = [...commands];
-  
-  const overlay = h('div', { 
+  const previouslyFocused = document.activeElement;
+
+  const input = h('input', {
+    class: 'command-palette__input',
+    type: 'text',
+    placeholder: 'Search your world, run a command, or create…',
+    role: 'combobox',
+    'aria-expanded': 'true',
+    'aria-controls': 'palette-results',
+    'aria-autocomplete': 'list',
+    oninput: (e) => { computeResults(e.target.value); renderResultsInto(); },
+    onkeydown: handlePaletteKeydown,
+  });
+
+  const overlay = h('div', {
     class: 'command-palette',
-    onclick: (e) => {
-      if (e.target === overlay) {
-        appStore.setState({ commandPaletteOpen: false });
-      }
-    }
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-label': 'Command palette',
+    onclick: (e) => { if (e.target === overlay) close(); },
   },
     h('div', { class: 'command-palette__dialog' },
       h('div', { class: 'command-palette__input-wrapper' },
         h('span', { class: 'command-palette__icon' }, '🔍'),
-        h('input', { 
-          class: 'command-palette__input',
-          type: 'text',
-          placeholder: 'Search commands, objects, or create new...',
-          autofocus: true,
-          oninput: (e) => filterCommands(e.target.value),
-          onkeydown: handlePaletteKeydown,
-        })
+        input,
       ),
-      h('div', { class: 'command-palette__results', id: 'palette-results' },
-        ...renderResults()
-      )
+      h('div', { class: 'command-palette__results', id: 'palette-results', role: 'listbox' }),
     )
   );
-  
+
   document.body.appendChild(overlay);
-  
-  // Focus input
-  setTimeout(() => {
-    overlay.querySelector('input')?.focus();
-  }, 50);
+
+  // Restore focus when the palette closes.
+  overlay._restoreFocus = previouslyFocused;
+
+  computeResults('');
+  renderResultsInto();
+
+  setTimeout(() => input.focus(), 30);
 }
 
-function renderResults() {
-  return filteredCommands.slice(0, 12).map((cmd, i) => 
-    h('div', {
-      class: `command-palette__item ${i === selectedIndex ? 'command-palette__item--selected' : ''}`,
-      onclick: () => executeCommand(cmd),
-    },
-      h('span', { class: 'command-palette__item-icon' }, cmd.icon),
-      h('span', { class: 'command-palette__item-label' }, cmd.label),
-      cmd.shortcut ? h('span', { class: 'command-palette__item-shortcut' }, cmd.shortcut) : null
-    )
-  );
+function close() {
+  appStore.setState({ commandPaletteOpen: false });
 }
 
-function filterCommands(query) {
-  const lower = query.toLowerCase();
-  filteredCommands = commands.filter(cmd => 
-    cmd.label.toLowerCase().includes(lower) ||
-    (cmd.category && cmd.category.toLowerCase().includes(lower))
-  );
+/**
+ * Build the result list for a query: content search hits first (when the query
+ * is a real search), then matching commands.
+ */
+function computeResults(query) {
+  const q = (query || '').trim();
+  const lower = q.toLowerCase();
+
+  const commandMatches = (q
+    ? commands.filter((c) =>
+        c.label.toLowerCase().includes(lower) ||
+        (c.category && c.category.toLowerCase().includes(lower)))
+    : commands
+  ).map((c) => ({ kind: 'command', ...c }));
+
+  const contentHits = q.length >= 2
+    ? searchContent(q, 8).map((hit) => ({
+        kind: 'content',
+        id: `content-${hit.module}-${hit.title}`,
+        icon: hit.icon,
+        label: hit.title,
+        sublabel: `${hit.typeLabel} · ${hit.snippet}`,
+        action: () => appStore.setState({ activeModule: hit.module }),
+      }))
+    : [];
+
+  // Content results lead when searching; commands fill the rest.
+  currentResults = [...contentHits, ...commandMatches].slice(0, 14);
   selectedIndex = 0;
-  updateResults();
 }
 
-function updateResults() {
+function renderResultsInto() {
   const results = document.getElementById('palette-results');
   if (!results) return;
   results.innerHTML = '';
-  renderResults().forEach(el => { if (el) results.appendChild(el); });
+
+  if (currentResults.length === 0) {
+    results.appendChild(h('div', { class: 'command-palette__empty', style: { padding: '16px', color: 'var(--text-muted)', fontSize: '13px' } }, 'No matches found.'));
+    return;
+  }
+
+  currentResults.forEach((item, i) => {
+    const optionId = `palette-option-${i}`;
+    results.appendChild(
+      h('div', {
+        class: `command-palette__item ${i === selectedIndex ? 'command-palette__item--selected' : ''}`,
+        id: optionId,
+        role: 'option',
+        'aria-selected': i === selectedIndex ? 'true' : 'false',
+        onclick: () => executeItem(item),
+        onmouseenter: () => { selectedIndex = i; syncSelection(); },
+      },
+        h('span', { class: 'command-palette__item-icon' }, item.icon),
+        h('span', { class: 'command-palette__item-label' }, item.label),
+        item.sublabel
+          ? h('span', { class: 'command-palette__item-sub', style: { marginLeft: '8px', fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.sublabel)
+          : (item.shortcut ? h('span', { class: 'command-palette__item-shortcut' }, item.shortcut) : null),
+      )
+    );
+  });
+
+  const input = document.querySelector('.command-palette__input');
+  if (input) input.setAttribute('aria-activedescendant', `palette-option-${selectedIndex}`);
+}
+
+function syncSelection() {
+  const results = document.getElementById('palette-results');
+  if (!results) return;
+  Array.from(results.children).forEach((el, i) => {
+    const sel = i === selectedIndex;
+    el.classList.toggle('command-palette__item--selected', sel);
+    el.setAttribute('aria-selected', sel ? 'true' : 'false');
+  });
+  const input = document.querySelector('.command-palette__input');
+  if (input) input.setAttribute('aria-activedescendant', `palette-option-${selectedIndex}`);
+  results.children[selectedIndex]?.scrollIntoView({ block: 'nearest' });
 }
 
 function handlePaletteKeydown(e) {
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    selectedIndex = Math.min(selectedIndex + 1, filteredCommands.length - 1);
-    updateResults();
+    selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
+    syncSelection();
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
     selectedIndex = Math.max(selectedIndex - 1, 0);
-    updateResults();
+    syncSelection();
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    if (filteredCommands[selectedIndex]) {
-      executeCommand(filteredCommands[selectedIndex]);
-    }
+    if (currentResults[selectedIndex]) executeItem(currentResults[selectedIndex]);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    close();
   }
 }
 
-function executeCommand(cmd) {
-  appStore.setState({ commandPaletteOpen: false });
-  cmd.action();
+function executeItem(item) {
+  close();
+  if (typeof item.action === 'function') item.action();
 }
 
-function promptCreate(type) {
-  const name = prompt(`Enter name for new ${type}:`);
+async function promptCreate(type) {
+  const name = await promptDialog({
+    title: `Create ${type}`,
+    label: 'Name',
+    placeholder: `Enter a name for the new ${type}…`,
+  });
   if (name) {
     createObject(type, name);
-    // TODO: Show toast notification
+    toastSuccess(`Created ${type}: ${name}`);
   }
 }

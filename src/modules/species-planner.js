@@ -4,9 +4,9 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
-import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
 let species = [
@@ -104,17 +104,18 @@ function openEditSpeciesModal(sp) {
     Object.assign(sp, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
-    saveData("species", species); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("species", species);
   });
 }
 
-function deleteSpecies(sp) {
-  if (!confirm(`Delete "${sp.name}"?`)) return;
+async function deleteSpecies(sp) {
+  const ok = await confirmDialog({ title: `Delete "${sp.name}"?`, message: 'This will permanently remove it.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = species.findIndex(i => i.id === sp.id);
   if (idx !== -1) species.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
-  saveData("species", species); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("species", species);
 }
 
 
@@ -132,7 +133,7 @@ function openAddSpeciesModal() {
     species.push({ id: `sp${Date.now()}`, name: state.name, type: state.type, origin: state.origin, population: 'Unknown', lifespan: 'Unknown', intelligence: 'Unknown', status: 'active', traits: [], weaknesses: [], description: state.description, color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
-    saveData("species", species); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("species", species);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

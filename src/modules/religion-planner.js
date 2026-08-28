@@ -4,8 +4,8 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
-import { appStore } from '../core/store.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
 
@@ -120,7 +120,7 @@ function openAddReligionModal() {
     religions.push({ id: generateId(), ...state, followers: 'Unknown', founder: 'Unknown', origin: 'Unknown', status: 'active', tenets: [], influence: 10, color: '#6366f1' });
     const c = document.querySelector('.main-content');
     if (c) { c.innerHTML = ''; renderReligionPlanner(c); }
-    saveData("religions", religions); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("religions", religions);
   });
 }
 
@@ -137,17 +137,18 @@ function openEditReligionModal(rel) {
     Object.assign(rel, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderReligionPlanner(container); }
-    saveData("religions", religions); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("religions", religions);
   });
 }
 
-function deleteReligion(rel) {
-  if (!confirm(`Delete "${rel.name}"?`)) return;
+async function deleteReligion(rel) {
+  const ok = await confirmDialog({ title: `Delete "${rel.name}"?`, message: 'This will permanently remove it.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = religions.findIndex(i => i.id === rel.id);
   if (idx !== -1) religions.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderReligionPlanner(container); }
-  saveData("religions", religions); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("religions", religions);
 }
 
 function collapsible(title, open, content) {

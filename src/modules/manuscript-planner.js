@@ -5,10 +5,11 @@
  */
 
 import { h } from '../core/renderer.js';
-import { appStore } from '../core/store.js';
+
 import { generateId } from '../core/objects.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
+import { showModal, formField, confirmDialog } from '../ui/modal.js';
 
 // ─── Truby's 22 Steps ───────────────────────────────────────────────────────
 
@@ -60,9 +61,7 @@ const DEFAULT_SCENE_CARDS = {
 let sceneCards = loadData('manuscriptScenes', _isDemo ? DEFAULT_SCENE_CARDS : {});
 
 function save() {
-  saveData('manuscriptScenes', sceneCards);
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  persistState('manuscriptScenes', sceneCards);
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -266,8 +265,9 @@ function openEditCardModal(card, stepNum) {
   });
 }
 
-function deleteCard(card, stepNum) {
-  if (!confirm(`Delete "${card.title}"?`)) return;
+async function deleteCard(card, stepNum) {
+  const ok = await confirmDialog({ title: `Delete ${card.title}`, message: `This will permanently remove the scene card "${card.title}".`, confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const cards = sceneCards[stepNum] || [];
   const idx = cards.findIndex(c => c.id === card.id);
   if (idx !== -1) cards.splice(idx, 1);
@@ -282,25 +282,7 @@ function rerender() {
   if (container) { container.innerHTML = ''; renderManuscriptPlanner(container); }
 }
 
-function formField(label, input) {
-  return h('div', { style: { marginBottom: '12px' } },
-    h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label),
-    input
-  );
-}
-
-function showModal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay');
-  if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' },
-      h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content),
-      h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save')),
-    )
-  );
-  document.body.appendChild(overlay);
-}
+// showModal / formField now come from the shared, accessible ui/modal.js
 
 function updateManuscriptSidebar() {
   const sidebar = document.getElementById('sidebar-content');

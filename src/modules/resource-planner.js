@@ -5,9 +5,10 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
-import { appStore } from '../core/store.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+
 import { generateId } from '../core/objects.js';
+import { showModal, formField, confirmDialog } from '../ui/modal.js';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -44,9 +45,7 @@ const DEFAULT_RESOURCES = [
 let resources = loadData('resources', _isDemo ? DEFAULT_RESOURCES : []);
 
 function save() {
-  saveData('resources', resources);
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  persistState('resources', resources);
 }
 
 // ─── Main Render ─────────────────────────────────────────────────────────────
@@ -297,8 +296,9 @@ function openAddHolderModal(res) {
   });
 }
 
-function deleteResource(res) {
-  if (!confirm(`Delete "${res.name}"?`)) return;
+async function deleteResource(res) {
+  const ok = await confirmDialog({ title: `Delete ${res.name}`, message: `This will permanently remove the resource "${res.name}".`, confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = resources.findIndex(r => r.id === res.id);
   if (idx !== -1) resources.splice(idx, 1);
   save(); rerender();
@@ -311,17 +311,7 @@ function rerender() {
   if (container) { container.innerHTML = ''; renderResourcePlanner(container); }
 }
 
-function formField(label, input) {
-  return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input);
-}
-
-function showModal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
-  document.body.appendChild(overlay);
-}
+// showModal / formField now come from the shared, accessible ui/modal.js
 
 function updateResourceSidebar() {
   const sidebar = document.getElementById('sidebar-content'); if (!sidebar) return; sidebar.innerHTML = '';

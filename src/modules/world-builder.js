@@ -5,9 +5,10 @@
  */
 
 import { h } from '../core/renderer.js';
-import { appStore } from '../core/store.js';
+
 import { ObjectTypes, ObjectIcons, generateId } from '../core/objects.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 
 // World object palette categories
 const paletteCategories = [
@@ -104,9 +105,7 @@ const DEFAULT_WORLD = {
 let worldData = loadData('worldBuilder', _isDemo ? DEFAULT_WORLD : { root: { nodes: [], connections: [] } });
 
 function saveWorld() {
-  saveData('worldBuilder', worldData);
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  persistState('worldBuilder', worldData);
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -457,8 +456,9 @@ function openEditNodeModal(node) {
   document.body.appendChild(overlay);
 }
 
-function deleteNode(node) {
-  if (!confirm(`Delete "${node.name}" and all its children?`)) return;
+async function deleteNode(node) {
+  const ok = await confirmDialog({ title: `Delete "${node.name}" and all its children?`, message: 'This node and everything nested under it will be permanently removed.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const level = getCurrentLevel();
   const idx = level.nodes.findIndex(n => n.id === node.id);
   if (idx !== -1) level.nodes.splice(idx, 1);

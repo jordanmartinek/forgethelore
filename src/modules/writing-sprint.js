@@ -11,8 +11,8 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData } from '../core/persist.js';
-import { appStore } from '../core/store.js';
+import { loadData, persistState } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 import { generateId } from '../core/objects.js';
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -28,9 +28,7 @@ function loadSprints() {
 }
 
 function saveSprints() {
-  saveData('writingSprints', sprints);
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  persistState('writingSprints', sprints);
 }
 
 // ─── Main Render ─────────────────────────────────────────────────────────────
@@ -399,8 +397,9 @@ function pauseSprint() {
   }
 }
 
-function endSprintEarly() {
-  if (!confirm('End this sprint early?')) return;
+async function endSprintEarly() {
+  const ok = await confirmDialog({ title: 'End this sprint early?', message: 'The sprint will be stopped and its results recorded now.', confirmLabel: 'End Sprint' });
+  if (!ok) return;
   completeSprint();
 }
 
@@ -408,7 +407,9 @@ function completeSprint() {
   clearInterval(timerInterval);
   timerInterval = null;
 
-  if (!currentSprint) return;
+  // Guard against double-completion: the (non-blocking) "end early" dialog can
+  // be open while the countdown timer fires, so both paths may call this.
+  if (!currentSprint || currentSprint.status === 'completed') return;
 
   currentSprint.status = 'completed';
   currentSprint.endedAt = Date.now();

@@ -7,95 +7,16 @@
 import { h, render } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { db } from '../core/database.js';
-import { renderConflictBoard } from '../modules/conflict-board.js';
-import { renderWorldBuilder } from '../modules/world-builder.js';
-import { renderCharacterPlanner } from '../modules/character-planner.js';
-import { renderMysteryPlanner } from '../modules/mystery-planner.js';
-import { renderTimeline } from '../modules/timeline.js';
-import { renderKnowledgeGraph } from '../modules/knowledge-graph.js';
-import { renderAnalytics } from '../modules/analytics.js';
-import { renderLocationPlanner } from '../modules/location-planner.js';
-import { renderReligionPlanner } from '../modules/religion-planner.js';
-import { renderPoliticsPlanner } from '../modules/politics-planner.js';
-import { renderOrganizationPlanner } from '../modules/organization-planner.js';
-import { renderSpeciesPlanner } from '../modules/species-planner.js';
-import { renderTechnologyPlanner } from '../modules/technology-planner.js';
-import { renderMilitaryPlanner } from '../modules/military-planner.js';
-import { renderFactionPlanner } from '../modules/faction-planner.js';
-import { renderRelationshipPlanner } from '../modules/relationship-planner.js';
-import { renderCharacterArc } from '../modules/character-arc.js';
-import { renderQuickSceneLog } from '../modules/quick-scene-log.js';
-import { renderManuscriptPlanner } from '../modules/manuscript-planner.js';
-import { renderDailyPlanner } from '../modules/daily-planner.js';
-import { renderBrainstorm } from '../modules/brainstorm.js';
-import { renderLanguagePlanner } from '../modules/language-planner.js';
-import { renderResourcePlanner } from '../modules/resource-planner.js';
-import { renderWritingSprint } from '../modules/writing-sprint.js';
-import { renderExportImport } from '../ui/export-import.js';
+import { getNavGroups, getModuleLabel, renderModuleById } from '../core/registry.js';
+import { APP_NAME, APP_VERSION } from '../core/version.js';
+import { timeAgo, formatNumber, countWords } from '../core/format.js';
 import { renderCommandPalette } from './command-palette.js';
 
 // ─── Navigation Structure ────────────────────────────────────────────────────
-// Grouped sidebar items matching Campfire Writing architecture
+// Sidebar groups are derived from the single module registry (core/registry.js)
+// so nav labels, the module dispatcher, and the command palette never drift.
 
-const navGroups = [
-  {
-    id: 'write',
-    label: 'Write',
-    items: [
-      { id: 'manuscript', label: 'Manuscript' },
-      { id: 'quick-log', label: 'Quick Log' },
-      { id: 'brainstorm', label: 'Brainstorm' },
-      { id: 'writing-sprint', label: 'Writing Sprint' },
-    ]
-  },
-  {
-    id: 'plan',
-    label: 'Plan',
-    items: [
-      { id: 'conflict-board', label: 'Strategic Board' },
-      { id: 'daily-planner', label: 'Daily Planner' },
-      { id: 'timeline', label: 'Timeline' },
-      { id: 'mysteries', label: 'Conflict' },
-    ]
-  },
-  {
-    id: 'world',
-    label: 'World',
-    items: [
-      { id: 'characters', label: 'Characters' },
-      { id: 'factions', label: 'Factions' },
-      { id: 'locations', label: 'Locations' },
-      { id: 'species', label: 'Species' },
-      { id: 'languages', label: 'Languages' },
-      { id: 'religions', label: 'Religions' },
-      { id: 'organizations', label: 'Organizations' },
-      { id: 'military', label: 'Military' },
-      { id: 'technology', label: 'Technology' },
-      { id: 'resources', label: 'Resources' },
-    ]
-  },
-  {
-    id: 'analysis',
-    label: 'Analysis',
-    items: [
-      { id: 'knowledge-graph', label: 'Knowledge Graph' },
-      { id: 'relationships', label: 'Relationships' },
-      { id: 'knowledge-matrix', label: 'Character Arcs' },
-      { id: 'analytics', label: 'Analytics' },
-      { id: 'export-import', label: 'Export / Import' },
-    ]
-  },
-];
-
-// Flat lookup for module label
-function getModuleLabel(moduleId) {
-  if (moduleId === 'dashboard') return 'Dashboard';
-  for (const group of navGroups) {
-    const item = group.items.find(i => i.id === moduleId);
-    if (item) return item.label;
-  }
-  return moduleId;
-}
+const navGroups = getNavGroups();
 
 // ─── App Shell Init ──────────────────────────────────────────────────────────
 
@@ -323,7 +244,7 @@ function createMainContent() {
 function createStatusBar() {
   return h('footer', { class: 'statusbar' },
     h('div', { class: 'statusbar__left' },
-      h('span', {}, 'LoreForge Planner v0.2.0'),
+      h('span', {}, `${APP_NAME} v${APP_VERSION}`),
       h('span', { id: 'status-objects' }, '0 objects'),
     ),
     h('div', { class: 'statusbar__right' },
@@ -472,28 +393,7 @@ function createRecentItem(item) {
   );
 }
 
-function countWords(text) {
-  if (!text || typeof text !== 'string') return 0;
-  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
-}
-
-function formatNumber(num) {
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-  return String(num);
-}
-
-function timeAgo(timestamp) {
-  const diff = Date.now() - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
-}
+// countWords, formatNumber, timeAgo now come from core/format.js
 
 // ─── Module Rendering ────────────────────────────────────────────────────────
 
@@ -504,87 +404,11 @@ function renderActiveModule() {
   const state = appStore.getState();
   content.innerHTML = '';
 
-  switch (state.activeModule) {
-    case 'dashboard':
-      renderDashboard(content);
-      break;
-    case 'quick-log':
-      renderQuickSceneLog(content);
-      break;
-    case 'manuscript':
-      renderManuscriptPlanner(content);
-      break;
-    case 'daily-planner':
-      renderDailyPlanner(content);
-      break;
-    case 'brainstorm':
-      renderBrainstorm(content);
-      break;
-    case 'writing-sprint':
-      renderWritingSprint(content);
-      break;
-    case 'conflict-board':
-      renderConflictBoard(content);
-      break;
-    case 'world-builder':
-      renderWorldBuilder(content);
-      break;
-    case 'characters':
-      renderCharacterPlanner(content, state.activeModule);
-      break;
-    case 'factions':
-      renderFactionPlanner(content);
-      break;
-    case 'locations':
-      renderLocationPlanner(content);
-      break;
-    case 'species':
-      renderSpeciesPlanner(content);
-      break;
-    case 'languages':
-      renderLanguagePlanner(content);
-      break;
-    case 'resources':
-      renderResourcePlanner(content);
-      break;
-    case 'organizations':
-      renderOrganizationPlanner(content);
-      break;
-    case 'religions':
-      renderReligionPlanner(content);
-      break;
-    case 'politics':
-      renderPoliticsPlanner(content);
-      break;
-    case 'military':
-      renderMilitaryPlanner(content);
-      break;
-    case 'technology':
-      renderTechnologyPlanner(content);
-      break;
-    case 'mysteries':
-      renderMysteryPlanner(content);
-      break;
-    case 'timeline':
-      renderTimeline(content);
-      break;
-    case 'knowledge-graph':
-      renderKnowledgeGraph(content);
-      break;
-    case 'relationships':
-      renderRelationshipPlanner(content);
-      break;
-    case 'knowledge-matrix':
-      renderCharacterArc(content);
-      break;
-    case 'analytics':
-      renderAnalytics(content);
-      break;
-    case 'export-import':
-      renderExportImport(content);
-      break;
-    default:
-      renderPlaceholderModule(content, state.activeModule);
+  // Dispatch through the registry; unknown ids fall back to a placeholder.
+  if (state.activeModule === 'dashboard') {
+    renderDashboard(content);
+  } else if (!renderModuleById(state.activeModule, content)) {
+    renderPlaceholderModule(content, state.activeModule);
   }
 
   // Update status bar

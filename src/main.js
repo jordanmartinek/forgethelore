@@ -13,8 +13,9 @@
 import { db } from './core/database.js';
 import { appStore } from './core/store.js';
 import { events, Events } from './core/events.js';
+import { wirePersistStatus } from './core/persist.js';
 import { initAppShell } from './ui/app-shell.js';
-import { initToasts, toastSuccess, toastInfo } from './ui/toast.js';
+import { initToasts, toastSuccess, toastInfo, toastError } from './ui/toast.js';
 
 async function init() {
   try {
@@ -42,6 +43,10 @@ async function init() {
     
     // Initialize toast notifications
     initToasts();
+
+    // Wire the honest save indicator: persistState() now reports real
+    // write success/failure through the app store (and toasts on failure).
+    wirePersistStatus({ appStore, toastError });
     
     // Set up cross-module event listeners
     initCrossModuleUpdates();
@@ -134,9 +139,8 @@ function initCrossModuleUpdates() {
   // When an object is updated, propagate to all related views
   events.on(Events.OBJECT_UPDATED, ({ id, changes }) => {
     console.log(`[LoreForge] Object ${id} updated, propagating changes...`);
-    // Trigger save
-    appStore.setState({ saveStatus: 'saving' });
-    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 400);
+    // Real save status is driven by db.onStatusChange (IndexedDB) and
+    // persistState() (localStorage); nothing to fake here.
   });
   
   // When a relationship changes, update both related objects
@@ -144,11 +148,9 @@ function initCrossModuleUpdates() {
     console.log(`[LoreForge] Relationship updated between ${sourceId} and ${targetId}`);
   });
   
-  // Board piece movement triggers save
-  events.on(Events.PIECE_MOVED, ({ pieceId, newPosition }) => {
-    appStore.setState({ saveStatus: 'saving' });
-    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 400);
-  });
+  // Board piece movement is persisted (and status-reported) by the board's
+  // own persistState() call; no fake status flip needed here.
+  events.on(Events.PIECE_MOVED, () => {});
   
   // Module navigation tracking
   events.on(Events.MODULE_CHANGED, ({ module }) => {

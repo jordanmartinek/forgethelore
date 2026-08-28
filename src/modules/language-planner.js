@@ -5,9 +5,11 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
-import { appStore } from '../core/store.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+
 import { generateId } from '../core/objects.js';
+import { showModal, formField, confirmDialog } from '../ui/modal.js';
+import { toastError } from '../ui/toast.js';
 import { expandableText } from '../ui/expandable-text.js';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -64,9 +66,7 @@ const DEFAULT_LANGUAGES = [
 let languages = loadData('languages', _isDemo ? DEFAULT_LANGUAGES : []);
 
 function save() {
-  saveData('languages', languages);
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  persistState('languages', languages);
 }
 
 // ─── Main Render ─────────────────────────────────────────────────────────────
@@ -243,8 +243,9 @@ function openEditLanguageModal(lang) {
   });
 }
 
-function deleteLanguage(lang) {
-  if (!confirm(`Delete "${lang.name}"?`)) return;
+async function deleteLanguage(lang) {
+  const ok = await confirmDialog({ title: `Delete ${lang.name}`, message: `This will permanently remove the language "${lang.name}".`, confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = languages.findIndex(l => l.id === lang.id);
   if (idx !== -1) languages.splice(idx, 1);
   save();
@@ -302,7 +303,7 @@ function openConnectFactionModal(lang) {
   const existing = lang.connectedFactions || [];
   const available = allFactions.filter(f => !existing.includes(f.name));
 
-  if (available.length === 0) { alert('No more factions to connect. Create new factions in the Factions module.'); return; }
+  if (available.length === 0) { toastError('No more factions to connect. Create new factions in the Factions module.'); return; }
 
   const state = { selected: available[0]?.name || '' };
   const content = h('div', {},
@@ -325,7 +326,7 @@ function openConnectCharacterModal(lang) {
   const existing = lang.connectedCharacters || [];
   const available = allPieces.filter(p => !existing.includes(p.name));
 
-  if (available.length === 0) { alert('No more characters to connect. Create characters on the Strategic Board or Characters module.'); return; }
+  if (available.length === 0) { toastError('No more characters to connect. Create characters on the Strategic Board or Characters module.'); return; }
 
   const state = { selected: available[0]?.name || '' };
   const content = h('div', {},
@@ -360,25 +361,7 @@ function collapsible(title, open, content) {
   );
 }
 
-function formField(label, input) {
-  return h('div', { style: { marginBottom: '12px' } },
-    h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label),
-    input
-  );
-}
-
-function showModal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay');
-  if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' },
-      h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content),
-      h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save')),
-    )
-  );
-  document.body.appendChild(overlay);
-}
+// showModal / formField now come from the shared, accessible ui/modal.js
 
 function updateLanguageSidebar() {
   const sidebar = document.getElementById('sidebar-content');
