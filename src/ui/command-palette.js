@@ -15,9 +15,11 @@ import { appStore } from '../core/store.js';
 import { ObjectTypes, createObject } from '../core/objects.js';
 import { MODULES, getModule } from '../core/registry.js';
 import { searchContent } from '../core/search.js';
-import { promptDialog } from './modal.js';
-import { toastSuccess } from './toast.js';
+import { promptDialog, openModal } from './modal.js';
+import { toastSuccess, toastInfo } from './toast.js';
 import { exportProject } from './export-import.js';
+import { openAISettings } from './ai-settings-panel.js';
+import { getInsights } from '../core/ai.js';
 
 // Navigation commands generated from the registry.
 const navCommands = MODULES.map((m) => ({
@@ -48,6 +50,8 @@ const createCommands = [
 
 const utilityCommands = [
   { id: 'goto-dashboard', icon: '🏠', label: 'Go to Dashboard', category: 'Navigate', action: () => appStore.setState({ activeModule: 'dashboard' }) },
+  { id: 'ai-settings', icon: '🧠', label: 'AI Settings (Bring Your Own Key)', category: 'Utility', action: () => openAISettings() },
+  { id: 'analyze', icon: '🔍', label: 'Analyze Story for Issues', category: 'Utility', action: () => runAnalysis() },
   { id: 'export', icon: '📦', label: 'Export Project', category: 'Utility', action: () => exportProject() },
   { id: 'import-panel', icon: '📥', label: 'Open Export / Import', category: 'Utility', action: () => appStore.setState({ activeModule: 'export-import' }) },
 ];
@@ -206,6 +210,37 @@ function handlePaletteKeydown(e) {
 function executeItem(item) {
   close();
   if (typeof item.action === 'function') item.action();
+}
+
+async function runAnalysis() {
+  toastInfo('Analyzing your story…');
+  const { insights, usedAI } = await getInsights();
+  const issues = insights.filter((i) => i.kind === 'issue');
+  const suggestions = insights.filter((i) => i.kind !== 'issue');
+
+  const section = (heading, items, emptyMsg) => h('div', { style: { marginBottom: '16px' } },
+    h('div', { style: { fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginBottom: '8px' } }, heading),
+    items.length
+      ? h('div', {}, ...items.map((i) =>
+          h('div', { style: { display: 'flex', gap: '8px', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' } },
+            h('span', {}, i.icon),
+            h('div', {},
+              h('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' } }, i.title),
+              i.detail ? h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' } }, i.detail) : null,
+            ),
+          )))
+      : h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, emptyMsg),
+  );
+
+  openModal({
+    title: usedAI ? '🧠 AI Story Analysis' : '🔍 Story Analysis (offline)',
+    content: h('div', {},
+      section(`Consistency Issues (${issues.length})`, issues, 'No consistency issues found.'),
+      section(`Strategic Suggestions (${suggestions.length})`, suggestions, 'No suggestions right now.'),
+      !usedAI ? h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' } }, 'Tip: add an API key in AI Settings for richer, model-generated analysis.') : null,
+    ),
+    actions: [{ label: 'Close', variant: 'primary' }],
+  });
 }
 
 async function promptCreate(type) {

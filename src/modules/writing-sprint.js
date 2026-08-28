@@ -31,6 +31,48 @@ function saveSprints() {
   persistState('writingSprints', sprints);
 }
 
+/**
+ * Compute writing stats from completed sprints: lifetime words, words today,
+ * and a consecutive-day writing streak. Powers the goals/streak banner (#19).
+ */
+function computeSprintStats() {
+  const completed = sprints.filter((s) => s.status === 'completed' && s.endedAt);
+  const totalWords = completed.reduce((sum, s) => sum + (s.wordsWritten || 0), 0);
+
+  const dayKey = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+  const todayKey = dayKey(Date.now());
+  const wordsToday = completed.filter((s) => dayKey(s.endedAt) === todayKey)
+    .reduce((sum, s) => sum + (s.wordsWritten || 0), 0);
+
+  // Streak: count back day-by-day from today while a sprint exists that day.
+  const days = new Set(completed.map((s) => dayKey(s.endedAt)));
+  let streak = 0;
+  const cursor = new Date();
+  // If nothing today, the streak can still be "yesterday-anchored"; start there.
+  if (!days.has(dayKey(cursor.getTime()))) cursor.setDate(cursor.getDate() - 1);
+  while (days.has(dayKey(cursor.getTime()))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return { totalWords, wordsToday, streak, sessions: completed.length };
+}
+
+function renderSprintStatsBanner() {
+  const { totalWords, wordsToday, streak, sessions } = computeSprintStats();
+  const stat = (label, value, icon) => h('div', { style: { flex: '1', textAlign: 'center', padding: '8px' } },
+    h('div', { style: { fontSize: '20px' } }, icon),
+    h('div', { style: { fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' } }, String(value)),
+    h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, label),
+  );
+  return h('div', { style: { display: 'flex', gap: '8px', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '8px', marginBottom: '16px' } },
+    stat('Day Streak', streak, '🔥'),
+    stat('Words Today', wordsToday, '✍️'),
+    stat('Total Words', totalWords, '📚'),
+    stat('Sessions', sessions, '⏱️'),
+  );
+}
+
 // ─── Main Render ─────────────────────────────────────────────────────────────
 
 export function renderWritingSprint(container) {
@@ -64,6 +106,9 @@ function renderSprintSetup() {
         h('h1', { class: 'sprint-setup__title' }, '⏱️ Writing Sprint'),
         h('p', { class: 'sprint-setup__subtitle' }, 'Set your timer, define your goals, and write with focus.'),
       ),
+
+      // Word-count goals & streak banner
+      renderSprintStatsBanner(),
 
       // Timer selection
       h('div', { class: 'sprint-setup__section' },

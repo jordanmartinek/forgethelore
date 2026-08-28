@@ -79,8 +79,15 @@ const modules = [
   '../src/core/renderer.js',
   '../src/core/progression.js',
   '../src/core/search.js',
+  '../src/core/repo.js',
+  '../src/core/entities.js',
+  '../src/core/analysis.js',
+  '../src/core/ai-settings.js',
+  '../src/core/ai.js',
+  '../src/core/templates.js',
   '../src/ui/toast.js',
   '../src/ui/modal.js',
+  '../src/ui/ai-settings-panel.js',
   '../src/ui/expandable-text.js',
   '../src/ui/export-import.js',
   '../src/core/registry.js',
@@ -114,6 +121,21 @@ try {
 } catch (e) {
   failed = true;
   console.error('FAIL  registry checks:', e.message);
+}
+
+// Export-schema migration: a legacy v1 payload (version:'1.0', no indexeddb)
+// must migrate forward to the current schema with an indexeddb section.
+try {
+  const { migrateExportPayload } = await import('../src/ui/export-import.js');
+  const legacy = { _meta: { version: '1.0', projectName: 'Old' }, data: { characters: [] } };
+  const migrated = migrateExportPayload(legacy);
+  if (typeof migrated._meta.schemaVersion !== 'number') throw new Error('schemaVersion not set');
+  if (!migrated.indexeddb) throw new Error('indexeddb section not added');
+  if (migrated.data !== legacy.data) { /* ok: shallow copy keeps data ref */ }
+  console.log('OK    export migration: v1 -> current schema');
+} catch (e) {
+  failed = true;
+  console.error('FAIL  export migration:', e.message);
 }
 
 console.log(failed ? '\n❌ SMOKE TEST FAILED' : '\n✅ SMOKE TEST PASSED');
