@@ -10,10 +10,9 @@ import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { propagateSceneOutcome, relationships, characterArcs, createRelationship, saveProgressionData } from '../core/progression.js';
 import { toastError } from '../ui/toast.js';
-
-function getPieces() { return window.__loreforge_pieces || []; }
-function getScenes() { return window.__loreforge_scenes || []; }
-function getFactions() { return window.__loreforge_factions || []; }
+// Cross-module data now comes from the ID-addressable entity layer, which reads
+// live from the repository (no dependence on global publish order).
+import { getPieces, getScenes, getBoardFactions as getFactions } from '../core/entities.js';
 
 export function renderQuickSceneLog(container) {
   const wrapper = h('div', { style: { width: '100%', height: '100%', overflowY: 'auto', padding: 'var(--space-xl)', display: 'flex', justifyContent: 'center' } });

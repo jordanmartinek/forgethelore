@@ -9,6 +9,7 @@ import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 
 import { generateId } from '../core/objects.js';
 import { showModal, formField, confirmDialog } from '../ui/modal.js';
+import { getPieces, getBoardFactions, getFactionData } from '../core/entities.js';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -272,8 +273,8 @@ function openEditResourceModal(res) {
 }
 
 function openAddHolderModal(res) {
-  const pieces = window.__loreforge_pieces || [];
-  const factions = [...(window.__loreforge_factions || []), ...(window.__loreforge_factionData || [])];
+  const pieces = getPieces();
+  const factions = [...getBoardFactions(), ...getFactionData()];
   const allNames = [...pieces.map(p => p.name), ...factions.map(f => f.name), 'Other'];
   const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#64748b'];
 

@@ -6,9 +6,7 @@
 import { h } from '../core/renderer.js';
 
 import { characterArcs, getArc, RELATIONSHIP_DIMENSIONS, getRelationshipsFor } from '../core/progression.js';
-
-function getPieces() { return window.__loreforge_pieces || []; }
-function getScenes() { return window.__loreforge_scenes || []; }
+import { getPieces, getScenes } from '../core/entities.js';
 
 export function renderCharacterArc(container, characterId) {
   const pcs = getPieces();

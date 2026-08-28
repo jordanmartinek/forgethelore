@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node scripts/smoke-import.mjs"
+    "test": "node scripts/smoke-import.mjs && node scripts/test-data-layer.mjs"
   },
   "keywords": [
     "worldbuilding",
