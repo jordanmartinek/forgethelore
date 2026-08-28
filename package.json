@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node scripts/smoke-import.mjs && node scripts/test-data-layer.mjs"
+    "test": "node scripts/smoke-import.mjs && node scripts/test-data-layer.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint ."
   },
   "keywords": [
     "worldbuilding",

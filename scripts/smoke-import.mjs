@@ -138,5 +138,33 @@ try {
   console.error('FAIL  export migration:', e.message);
 }
 
+// Service worker must be self-maintaining: no hand-written full file list that
+// drifts out of sync (the old CRITICAL_FILES hazard). Assert the shell is tiny.
+try {
+  const { readFileSync } = await import('node:fs');
+  const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  const shellMatch = sw.match(/APP_SHELL\s*=\s*\[([\s\S]*?)\]/);
+  if (!shellMatch) throw new Error('APP_SHELL not found');
+  const entries = (shellMatch[1].match(/'[^']+'/g) || []).length;
+  if (entries > 5) throw new Error(`APP_SHELL has ${entries} entries — should be a minimal shell, not a full file list`);
+  // Behavioral checks (not comment-text): runtime caching + HTML-poison guard.
+  if (!/cache\.put\(/.test(sw)) throw new Error('SW missing runtime cache.put (cache-on-fetch)');
+  if (!/text\/html/.test(sw)) throw new Error('SW missing HTML-body cache guard (SPA-fallback poisoning protection)');
+  console.log(`OK    service worker: minimal shell (${entries} entries) + runtime cache-on-fetch + poison guard`);
+} catch (e) {
+  failed = true;
+  console.error('FAIL  service worker check:', e.message);
+}
+
+// renderPreservingScroll must be exported for opt-in scroll-preserving re-renders.
+try {
+  const r = await import('../src/core/renderer.js');
+  if (typeof r.renderPreservingScroll !== 'function') throw new Error('renderPreservingScroll not exported');
+  console.log('OK    renderer: renderPreservingScroll available');
+} catch (e) {
+  failed = true;
+  console.error('FAIL  renderer check:', e.message);
+}
+
 console.log(failed ? '\n❌ SMOKE TEST FAILED' : '\n✅ SMOKE TEST PASSED');
 process.exit(failed ? 1 : 0);

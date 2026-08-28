@@ -53,6 +53,51 @@ export function render(container, element) {
   }
 }
 
+/**
+ * Re-render a container while preserving scroll positions.
+ *
+ * The app's modules re-render by clearing `innerHTML` and rebuilding, which
+ * resets scroll position — jarring during long editing sessions. This opt-in
+ * helper captures the scroll offsets of the container and any scrollable
+ * descendants that carry a stable `id` or `data-scroll-key`, runs the caller's
+ * rebuild, then restores those offsets after paint.
+ *
+ * Usage:
+ *   renderPreservingScroll(container, () => { container.innerHTML=''; renderX(container); });
+ *
+ * @param {HTMLElement} container
+ * @param {() => void} rebuild
+ */
+export function renderPreservingScroll(container, rebuild) {
+  if (!container) { rebuild(); return; }
+
+  // Capture scroll state keyed by a stable identifier.
+  const saved = new Map();
+  const record = (el) => {
+    const key = el.id || el.getAttribute('data-scroll-key');
+    if (key && (el.scrollTop || el.scrollLeft)) saved.set(key, { top: el.scrollTop, left: el.scrollLeft });
+  };
+  record(container);
+  container.querySelectorAll('[id], [data-scroll-key]').forEach(record);
+  const containerTop = container.scrollTop;
+  const containerLeft = container.scrollLeft;
+
+  rebuild();
+
+  // Restore after the new DOM is in place.
+  const restore = () => {
+    container.scrollTop = containerTop;
+    container.scrollLeft = containerLeft;
+    saved.forEach((pos, key) => {
+      const el = container.querySelector(`#${CSS && CSS.escape ? CSS.escape(key) : key}, [data-scroll-key="${key}"]`);
+      if (el) { el.scrollTop = pos.top; el.scrollLeft = pos.left; }
+    });
+  };
+  // rAF so layout has settled; fall back to sync if rAF is unavailable.
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(restore);
+  else restore();
+}
+
 // Fragment helper
 export function fragment(...children) {
   const frag = document.createDocumentFragment();

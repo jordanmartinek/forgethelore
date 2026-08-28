@@ -55,8 +55,12 @@ export const LIST_COLLECTIONS = Object.values(Collections).filter((k) => k !== C
  * Read a collection as an array. Returns a fresh array (never shares a
  * reference with the caller's previous read) so accidental mutation of stale
  * data can't corrupt storage silently.
+ *
+ * Records are dynamically-shaped user data, so they are typed as `any` — this
+ * keeps checkJs useful for real bugs without demanding a full schema for every
+ * module's evolving record shape.
  * @param {string} collection
- * @returns {Array<object>}
+ * @returns {any[]}
  */
 export function list(collection) {
   const data = loadData(collection, []);

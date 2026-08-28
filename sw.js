@@ -1,53 +1,30 @@
 /**
  * LoreForge Planner - Service Worker
- * Full offline support — caches all app files so the app works
- * without any network connection after first load.
+ *
+ * Offline support with a SELF-MAINTAINING cache. The previous version kept a
+ * hand-written CRITICAL_FILES list that had to be updated for every new module
+ * — and since `cache.addAll` fails atomically, a single missing/renamed file
+ * silently broke the entire offline install. That list had already drifted out
+ * of sync with the codebase.
+ *
+ * New strategy: precache only the minimal app shell (the entry points that are
+ * guaranteed to exist), then cache every other same-origin GET response the
+ * moment it's fetched (runtime "cache on fetch"). Combined with the existing
+ * stale-while-revalidate serving, the cache fills itself on first load and
+ * stays correct as files are added or renamed — no manual list to maintain.
  */
 
-const CACHE_NAME = 'loreforge-v5';
+const CACHE_NAME = 'loreforge-v6';
 
-// Critical files that MUST be cached for the app to work offline
-const CRITICAL_FILES = [
+// Minimal shell: only files we are certain exist. Everything else is cached at
+// runtime as it's requested, so this list never needs updating for new modules.
+const APP_SHELL = [
   '/',
   '/index.html',
   '/src/main.js',
-  '/src/core/database.js',
-  '/src/core/events.js',
-  '/src/core/objects.js',
-  '/src/core/persist.js',
-  '/src/core/progression.js',
-  '/src/core/renderer.js',
-  '/src/core/store.js',
-  '/src/ui/app-shell.js',
-  '/src/ui/command-palette.js',
-  '/src/ui/expandable-text.js',
-  '/src/ui/toast.js',
-  '/src/modules/analytics.js',
-  '/src/modules/character-arc.js',
-  '/src/modules/character-planner.js',
-  '/src/modules/conflict-board.js',
-  '/src/modules/faction-planner.js',
-  '/src/modules/knowledge-graph.js',
-  '/src/modules/location-planner.js',
-  '/src/modules/military-planner.js',
-  '/src/modules/mystery-planner.js',
-  '/src/modules/organization-planner.js',
-  '/src/modules/politics-planner.js',
-  '/src/modules/quick-scene-log.js',
-  '/src/modules/relationship-planner.js',
-  '/src/modules/religion-planner.js',
-  '/src/modules/species-planner.js',
-  '/src/modules/technology-planner.js',
-  '/src/modules/timeline.js',
-  '/src/modules/world-builder.js',
-  '/src/styles/main.css',
-  '/src/styles/components.css',
-  '/src/styles/conflict-board.css',
-  '/src/styles/world-builder.css',
-  '/src/styles/modules.css',
 ];
 
-// Optional files — nice to have but won't break the app if missing
+// Optional extras — cached individually so a missing one can't break install.
 const OPTIONAL_FILES = [
   '/public/manifest.json',
   '/public/icons/icon.svg',
@@ -55,74 +32,100 @@ const OPTIONAL_FILES = [
   '/public/icons/icon-512.png',
 ];
 
-// Install: cache critical files (fail gracefully on optional)
+// Install: cache the shell (individually, so one 404 can't fail the whole SW).
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Cache critical files — if any fail, the whole install fails
-      await cache.addAll(CRITICAL_FILES);
-      console.log('[SW] Critical files cached');
-
-      // Try optional files individually — don't fail install if they're missing
-      for (const file of OPTIONAL_FILES) {
-        try {
-          await cache.add(file);
-        } catch (e) {
-          console.warn('[SW] Optional file not cached:', file);
-        }
-      }
-      console.log('[SW] Install complete — app ready for offline');
+      await cacheEachSafely(cache, APP_SHELL);
+      await cacheEachSafely(cache, OPTIONAL_FILES);
+      console.log('[SW] Install complete — shell cached, other files cache on first use');
     })
   );
   self.skipWaiting();
 });
 
-// Activate: delete old caches
+// Add each URL individually; a failure on one never aborts the others. This is
+// the key difference from cache.addAll (which is all-or-nothing).
+async function cacheEachSafely(cache, urls) {
+  for (const url of urls) {
+    try {
+      await cache.add(url);
+    } catch (e) {
+      console.warn('[SW] Could not cache (will retry at runtime):', url);
+    }
+  }
+}
+
+// Activate: delete old caches.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((names) => {
-      return Promise.all(
-        names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
-      );
-    })
+    caches.keys().then((names) =>
+      Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name)))
+    )
   );
   self.clients.claim();
 });
 
-// Fetch: cache-first, then network, with offline fallback
+/**
+ * Decide whether a response may be cached.
+ *
+ * Critical guard against SPA-fallback cache poisoning: both the dev server and
+ * vercel.json serve `200 index.html` for ANY unmatched path (including a
+ * renamed/deleted /src/.../foo.js). If we cached that HTML body under the .js
+ * URL, the app would import HTML as a module forever, and stale-while-revalidate
+ * would keep re-caching the same poison. So: never cache an HTML body for a
+ * request that expects a script/style/other sub-resource. Navigations may cache
+ * HTML (that's the whole point of the shell).
+ */
+function isCacheable(request, url, response) {
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return false;
+  if (!response || !response.ok) return false;
+
+  const contentType = response.headers.get('content-type') || '';
+  const isHtml = contentType.includes('text/html');
+  const isNavigation = request.mode === 'navigate' || request.destination === 'document';
+
+  // Reject HTML served under a non-navigation request (the poisoning case).
+  if (isHtml && !isNavigation) return false;
+  return true;
+}
+
+// Fetch: stale-while-revalidate for cached files; cache-on-fetch for new ones.
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  // Don't touch cross-origin requests (e.g. the user's AI provider) — just pass through.
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Serve from cache immediately — update in background
+        // Serve from cache immediately; refresh in the background.
         event.waitUntil(
-          fetch(event.request).then((networkResponse) => {
-            if (networkResponse && networkResponse.ok) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse);
-              });
+          fetch(request).then((networkResponse) => {
+            if (isCacheable(request, url, networkResponse)) {
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse.clone()));
             }
           }).catch(() => {})
         );
         return cachedResponse;
       }
 
-      // Not in cache — try network
-      return fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.ok) {
+      // Not cached yet — fetch and cache it on the way through (self-maintaining).
+      return fetch(request).then((networkResponse) => {
+        if (isCacheable(request, url, networkResponse)) {
           const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return networkResponse;
       }).catch(() => {
-        // Offline and not cached — serve index.html for navigation requests
-        if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+        // Offline and not cached — serve the app shell for navigations.
+        if (request.mode === 'navigate' || request.destination === 'document') {
           return caches.match('/index.html');
         }
-        // For other requests, return empty response
-        return new Response('', { status: 503 });
+        return new Response('', { status: 503, statusText: 'Offline' });
       });
     })
   );

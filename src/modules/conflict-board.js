@@ -4,7 +4,7 @@
  * Supports creating, editing, and removing factions and character pieces.
  */
 
-import { h, createSVGElement } from '../core/renderer.js';
+import { h, createSVGElement, renderPreservingScroll } from '../core/renderer.js';
 import { boardStore, appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { propagateSceneOutcome } from '../core/progression.js';
@@ -376,8 +376,12 @@ function triggerSave() {
 function rerenderBoard() {
   const container = document.querySelector('.main-content');
   if (container) {
-    container.innerHTML = '';
-    renderConflictBoard(container);
+    // Preserve scroll position across the full re-render so editing the board
+    // doesn't jump the user back to the top.
+    renderPreservingScroll(container, () => {
+      container.innerHTML = '';
+      renderConflictBoard(container);
+    });
   }
 }
 

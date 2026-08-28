@@ -115,6 +115,7 @@ export const TEMPLATES = {
 export function applyTemplate(projectId, templateId) {
   const tpl = TEMPLATES[templateId];
   if (!tpl) return;
+  /** @type {{factions?: any[], pieces?: any[], conflictLines?: any[]}} */
   const seed = tpl.build();
   const prefix = `loreforge_${projectId}_`;
   try {
