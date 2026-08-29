@@ -472,10 +472,29 @@ function openNewBoardModal() {
 // ─── Render: Main Export ─────────────────────────────────────────────────────
 
 export function renderConflictBoard(container) {
+  // Reconcile with storage so scenes added by OTHER modules in this session
+  // (e.g. the Confrontations resolver's "Add as Board Scene") appear without a
+  // full page reload. We only ADD scenes present in storage but missing from
+  // our in-memory array, preserving any unsaved in-memory ordering/edits.
+  syncScenesFromStorage();
   if (activeView === 'macro') {
     renderMacroBoard(container);
   } else {
     renderMicroBoard(container);
+  }
+}
+
+function syncScenesFromStorage() {
+  const stored = loadData('scenes', null);
+  if (!Array.isArray(stored)) return;
+  const known = new Set(scenes.map((s) => s.id));
+  let added = false;
+  for (const s of stored) {
+    if (s && s.id && !known.has(s.id)) { scenes.push(s); added = true; }
+  }
+  if (added) {
+    scenes.sort((a, b) => (a.order || 0) - (b.order || 0));
+    window.__loreforge_scenes = scenes;
   }
 }
 

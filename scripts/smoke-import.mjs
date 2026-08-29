@@ -85,6 +85,8 @@ const modules = [
   '../src/core/ai-settings.js',
   '../src/core/ai.js',
   '../src/core/templates.js',
+  '../src/core/confrontation.js',
+  '../src/modules/confrontations.js',
   '../src/core/project-data.js',
   '../src/core/sync/backend.js',
   '../src/core/sync/sync-settings.js',

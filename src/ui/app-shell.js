@@ -11,7 +11,7 @@ import { getNavGroups, getModuleLabel, renderModuleById } from '../core/registry
 import { APP_NAME, APP_VERSION } from '../core/version.js';
 import { timeAgo, formatNumber, countWords } from '../core/format.js';
 import { openAISettings } from './ai-settings-panel.js';
-import { TEMPLATES, applyTemplate } from '../core/templates.js';
+import { TEMPLATES, applyTemplate, applyGeneratedWorld } from '../core/templates.js';
 import { renderCommandPalette } from './command-palette.js';
 
 // ─── Navigation Structure ────────────────────────────────────────────────────
@@ -560,13 +560,19 @@ function openNewProjectModal() {
   const PROJECT_ICONS = ['📖', '🌌', '⚔️', '🌃', '🏰', '🚀', '🐉', '🔮', '🌍', '💫', '🎭', '🕸️', '🌊', '⚡', '👑', '🗡️', '🛸', '🌑', '🔥', '🧬'];
 
   // Genre starter templates seed a new project with a small scaffold.
+  // Genre templates + a procedural "Surprise Me" that generates a coherent
+  // random starter world (opposing factions, characters, a central mystery).
+  const templateChoices = [
+    ...Object.entries(TEMPLATES).map(([id, tpl]) => ({ id, ...tpl })),
+    { id: '__generate', icon: '🎲', label: 'Surprise Me', description: 'Generate a coherent random world — factions, characters, a mystery.' },
+  ];
   const templateGrid = h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' } },
-    ...Object.entries(TEMPLATES).map(([id, tpl]) => h('button', {
+    ...templateChoices.map((tpl) => h('button', {
       class: 'btn',
       type: 'button',
-      style: { textAlign: 'left', padding: '8px 10px', border: id === state.template ? '1px solid var(--border-accent)' : '1px solid var(--border-subtle)', background: id === state.template ? 'var(--bg-active)' : 'transparent' },
+      style: { textAlign: 'left', padding: '8px 10px', border: tpl.id === state.template ? '1px solid var(--border-accent)' : '1px solid var(--border-subtle)', background: tpl.id === state.template ? 'var(--bg-active)' : 'transparent' },
       onclick: (e) => {
-        state.template = id;
+        state.template = tpl.id;
         e.currentTarget.parentElement.querySelectorAll('button').forEach(b => { b.style.border = '1px solid var(--border-subtle)'; b.style.background = 'transparent'; });
         e.currentTarget.style.border = '1px solid var(--border-accent)';
         e.currentTarget.style.background = 'var(--bg-active)';
@@ -616,8 +622,9 @@ function openNewProjectModal() {
           const newId = `proj_${Date.now()}`;
           const appState = appStore.getState();
           appState.projects.push({ id: newId, name: state.name, icon: state.icon, lastOpened: Date.now(), description: state.description });
-          // Seed the new project with the chosen genre template before switching.
-          if (state.template && state.template !== 'blank') applyTemplate(newId, state.template);
+          // Seed the new project: a genre template, a procedural world, or nothing.
+          if (state.template === '__generate') applyGeneratedWorld(newId, { factions: 3, charsPerFaction: 2 });
+          else if (state.template && state.template !== 'blank') applyTemplate(newId, state.template);
           switchProject(newId);
           overlay.remove();
         } }, 'Create Project'),
