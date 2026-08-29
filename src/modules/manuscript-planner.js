@@ -73,6 +73,11 @@ let dragFromStep = null;
 // ─── Main Render ─────────────────────────────────────────────────────────────
 
 export function renderManuscriptPlanner(container) {
+  // Re-read from storage on every mount so edits made elsewhere (e.g. Focus
+  // Mode, which writes the same `manuscriptScenes` key) are not clobbered by a
+  // stale in-memory snapshot the next time this planner persists.
+  sceneCards = loadData('manuscriptScenes', _isDemo ? DEFAULT_SCENE_CARDS : {}) || (_isDemo ? DEFAULT_SCENE_CARDS : {});
+
   const planner = h('div', { style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
     renderHeader(),
     renderBody(),

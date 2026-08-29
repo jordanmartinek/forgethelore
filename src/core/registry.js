@@ -45,6 +45,9 @@ import { renderLanguagePlanner } from '../modules/language-planner.js';
 import { renderResourcePlanner } from '../modules/resource-planner.js';
 import { renderWritingSprint } from '../modules/writing-sprint.js';
 import { renderExportImport } from '../ui/export-import.js';
+import { renderFocusMode } from '../modules/focus-mode.js';
+import { renderWorldMap } from '../modules/world-map.js';
+import { renderPovAnalytics } from '../modules/pov-analytics.js';
 
 /**
  * @typedef {Object} ModuleDef
@@ -60,6 +63,7 @@ import { renderExportImport } from '../ui/export-import.js';
 export const MODULES = [
   // ── Write ──────────────────────────────────────────────────────────────
   { id: 'manuscript',      label: 'Manuscript',      icon: '📖', group: 'write',    render: renderManuscriptPlanner },
+  { id: 'focus-mode',      label: 'Focus Mode',      icon: '✍️', group: 'write',    render: renderFocusMode },
   { id: 'quick-log',       label: 'Quick Log',       icon: '⚡', group: 'write',    render: renderQuickSceneLog },
   { id: 'brainstorm',      label: 'Brainstorm',      icon: '💭', group: 'write',    render: renderBrainstorm },
   { id: 'character-interview', label: 'Interview Character', icon: '💬', group: 'write', render: renderCharacterInterview },
@@ -77,6 +81,7 @@ export const MODULES = [
   { id: 'characters',      label: 'Characters',      icon: '👤', group: 'world',    render: renderCharacterPlanner },
   { id: 'factions',        label: 'Factions',        icon: '⚔️', group: 'world',    render: renderFactionPlanner },
   { id: 'locations',       label: 'Locations',       icon: '📍', group: 'world',    render: renderLocationPlanner },
+  { id: 'world-map',       label: 'Interactive Map', icon: '🗺️', group: 'world',    render: renderWorldMap },
   { id: 'species',         label: 'Species',         icon: '🧬', group: 'world',    render: renderSpeciesPlanner },
   { id: 'languages',       label: 'Languages',       icon: '🗣️', group: 'world',    render: renderLanguagePlanner },
   { id: 'religions',       label: 'Religions',       icon: '🕯️', group: 'world',    render: renderReligionPlanner },
@@ -94,6 +99,7 @@ export const MODULES = [
   { id: 'secrets-matrix',  label: 'Knowledge & Setups', icon: '🕵️', group: 'analysis', render: renderKnowledgeMatrix },
   { id: 'family-tree',     label: 'Family Trees',    icon: '🌳', group: 'analysis', render: renderFamilyTree },
   { id: 'analytics',       label: 'Analytics',       icon: '📊', group: 'analysis', render: renderAnalytics },
+  { id: 'pov-analytics',   label: 'Word & POV',      icon: '🎭', group: 'analysis', render: renderPovAnalytics },
   { id: 'export-import',   label: 'Export / Import', icon: '💾', group: 'analysis', render: renderExportImport },
 ];
 

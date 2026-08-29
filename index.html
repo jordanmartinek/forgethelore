@@ -22,8 +22,17 @@
   <meta name="application-name" content="LoreForge Planner">
   <meta name="description" content="Creative Planning Operating System — Mission control for fictional universes">
 
+  <!-- Apply saved theme before first paint to avoid a flash of the default palette -->
+  <script>
+    try {
+      var t = localStorage.getItem('loreforge_theme');
+      if (t && t !== 'parchment') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  </script>
+
   <!-- Styles -->
   <link rel="stylesheet" href="src/styles/main.css">
+  <link rel="stylesheet" href="src/styles/themes.css">
   <link rel="stylesheet" href="src/styles/components.css">
   <link rel="stylesheet" href="src/styles/conflict-board.css">
   <link rel="stylesheet" href="src/styles/world-builder.css">

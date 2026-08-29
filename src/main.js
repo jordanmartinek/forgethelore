@@ -18,9 +18,15 @@ import { initAppShell } from './ui/app-shell.js';
 import { initToasts, toastSuccess, toastInfo, toastError } from './ui/toast.js';
 import { initSync, wireSyncListeners, setConflictResolver } from './core/sync/sync-init.js';
 import { promptConflict } from './ui/sync-settings-panel.js';
+import { applyTheme } from './core/theme.js';
 
 async function init() {
   try {
+    // Apply the persisted UI theme as early as possible (index.html also sets
+    // the data-theme attr pre-paint; this keeps the runtime source of truth in
+    // one place and stays correct if the pre-paint script was skipped).
+    applyTheme();
+
     // Initialize IndexedDB
     await db.init();
     console.log('[LoreForge] Database initialized');

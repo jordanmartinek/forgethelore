@@ -13,6 +13,7 @@ import { timeAgo, formatNumber, countWords } from '../core/format.js';
 import { openAISettings } from './ai-settings-panel.js';
 import { TEMPLATES, applyTemplate, applyGeneratedWorld } from '../core/templates.js';
 import { renderCommandPalette } from './command-palette.js';
+import { THEMES, getTheme, setTheme } from '../core/theme.js';
 
 // ─── Navigation Structure ────────────────────────────────────────────────────
 // Sidebar groups are derived from the single module registry (core/registry.js)
@@ -108,9 +109,77 @@ function createTopBar() {
     h('div', { class: 'topbar__right' },
       createSaveIndicator(),
       createSyncIndicator(),
+      h('button', { class: 'btn btn--ghost btn--icon', title: 'Theme', 'aria-label': 'Change theme', id: 'theme-btn', onclick: toggleThemeMenu }, '🎨'),
       h('button', { class: 'btn btn--ghost btn--icon', title: 'AI Settings', 'aria-label': 'AI Settings', onclick: () => openAISettings() }, '⚙'),
     )
   );
+}
+
+// ─── Theme Picker ────────────────────────────────────────────────────────────
+// A small dropdown of the available palettes (#37). Selecting one applies it
+// live via core/theme.js (which swaps CSS variables on <html data-theme>) and
+// persists it globally across projects.
+
+function toggleThemeMenu() {
+  const existing = document.getElementById('theme-menu');
+  if (existing) { existing._close ? existing._close() : existing.remove(); return; }
+
+  const btn = document.getElementById('theme-btn');
+  const rect = btn ? btn.getBoundingClientRect() : { right: 320, bottom: 44 };
+  const current = getTheme();
+
+  // Single close routine so the document listener is always torn down, no matter
+  // how the menu is dismissed (outside click, toggle button, or selection).
+  let closeHandler = null;
+  const closeMenu = () => {
+    if (closeHandler) document.removeEventListener('click', closeHandler);
+    menu.remove();
+  };
+
+  const menu = h('div', {
+    id: 'theme-menu',
+    style: {
+      position: 'fixed', top: `${rect.bottom + 4}px`,
+      right: `${Math.max(8, window.innerWidth - rect.right)}px`,
+      width: '220px', background: 'var(--bg-elevated)',
+      border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)',
+      boxShadow: 'var(--shadow-lg)', zIndex: 'var(--z-dropdown)',
+      padding: 'var(--space-sm)', animation: 'scaleIn 0.15s ease',
+    },
+  },
+    h('div', { style: { padding: '4px 8px 8px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)', marginBottom: '4px' } }, 'Theme'),
+    ...THEMES.map((theme) =>
+      h('div', {
+        role: 'button',
+        tabindex: '0',
+        style: {
+          display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
+          borderRadius: '8px', cursor: 'pointer',
+          background: theme.id === current ? 'var(--bg-active)' : 'transparent',
+          border: theme.id === current ? '1px solid var(--border-accent)' : '1px solid transparent',
+        },
+        onmouseenter: (e) => { if (theme.id !== current) e.currentTarget.style.background = 'var(--bg-hover)'; },
+        onmouseleave: (e) => { if (theme.id !== current) e.currentTarget.style.background = 'transparent'; },
+        onclick: () => { setTheme(theme.id); closeMenu(); },
+      },
+        h('span', { style: { width: '18px', height: '18px', borderRadius: '50%', background: theme.swatch, flexShrink: '0', border: '1px solid rgba(0,0,0,0.2)' } }),
+        h('span', { style: { flex: '1', fontSize: '13px', color: 'var(--text-primary)' } }, theme.label),
+        theme.id === current ? h('span', { style: { fontSize: '11px', color: 'var(--accent-primary)' } }, '●') : null,
+      )
+    ),
+  );
+
+  menu._close = closeMenu;
+  document.body.appendChild(menu);
+
+  setTimeout(() => {
+    closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== btn && (!btn || !btn.contains(e.target))) {
+        closeMenu();
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 10);
 }
 
 function createSaveIndicator() {
