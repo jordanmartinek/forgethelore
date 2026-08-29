@@ -16,6 +16,7 @@
  */
 
 import { renderConflictBoard } from '../modules/conflict-board.js';
+import { renderConfrontations } from '../modules/confrontations.js';
 import { renderWorldBuilder } from '../modules/world-builder.js';
 import { renderCharacterPlanner } from '../modules/character-planner.js';
 import { renderMysteryPlanner } from '../modules/mystery-planner.js';
@@ -64,6 +65,7 @@ export const MODULES = [
 
   // ── Plan ───────────────────────────────────────────────────────────────
   { id: 'conflict-board',  label: 'Strategic Board', icon: '♟️', group: 'plan',     render: renderConflictBoard },
+  { id: 'confrontations',  label: 'Confrontations',  icon: '⚔️', group: 'plan',     render: renderConfrontations },
   { id: 'daily-planner',   label: 'Daily Planner',   icon: '📅', group: 'plan',     render: renderDailyPlanner },
   { id: 'timeline',        label: 'Timeline',        icon: '⏳', group: 'plan',     render: renderTimeline },
   { id: 'mysteries',       label: 'Conflicts & Mysteries', icon: '🔍', group: 'plan', render: renderMysteryPlanner },

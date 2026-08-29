@@ -88,6 +88,8 @@ const modules = [
   '../src/core/knowledge.js',
   '../src/modules/knowledge-matrix.js',
   '../src/modules/family-tree.js',
+  '../src/core/confrontation.js',
+  '../src/modules/confrontations.js',
   '../src/core/project-data.js',
   '../src/core/charts.js',
   '../src/core/timeline-state.js',
