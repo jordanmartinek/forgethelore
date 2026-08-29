@@ -13,7 +13,7 @@
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { ObjectTypes, createObject } from '../core/objects.js';
-import { MODULES, getModule } from '../core/registry.js';
+import { MODULES } from '../core/registry.js';
 import { searchContent } from '../core/search.js';
 import { promptDialog, openModal } from './modal.js';
 import { toastSuccess, toastInfo } from './toast.js';

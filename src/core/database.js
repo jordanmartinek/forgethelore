@@ -26,8 +26,8 @@ class LoreForgeDB {
         resolve(this.db);
       };
 
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
+      request.onupgradeneeded = () => {
+        const db = request.result;
         
         // Planning Objects store
         if (!db.objectStoreNames.contains('objects')) {
@@ -107,6 +107,7 @@ class LoreForgeDB {
     });
   }
 
+  /** @returns {Promise<void>} */
   async delete(storeName, id) {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(storeName, 'readwrite');
@@ -117,6 +118,7 @@ class LoreForgeDB {
     });
   }
 
+  /** @returns {Promise<void>} */
   async clear(storeName) {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(storeName, 'readwrite');
