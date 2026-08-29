@@ -10,6 +10,7 @@ import { db } from '../core/database.js';
 import { toast, toastSuccess, toastError } from './toast.js';
 import { confirmDialog } from './modal.js';
 import { APP_NAME, EXPORT_SCHEMA_VERSION } from '../core/version.js';
+import { generateBibleHTML } from '../core/story-bible.js';
 
 /**
  * Gather the full export payload for the active project: the namespaced
@@ -54,6 +55,38 @@ async function gatherExportData() {
     indexeddb,
   };
   return { payload, projectName };
+}
+
+/** Build the story-bible HTML for the active project. */
+function currentBibleHTML() {
+  const state = appStore.getState();
+  const project = state.projects.find((p) => p.id === state.activeProjectId) || { name: 'Untitled Project' };
+  return { html: generateBibleHTML(project), project };
+}
+
+/** #7: open the story bible in a new tab. */
+export function openStoryBible() {
+  const { html } = currentBibleHTML();
+  const w = window.open('', '_blank');
+  if (!w) { toastError('Popup blocked — allow popups, or use Download instead.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+/** #7: download the story bible as a standalone .html file. */
+export function downloadStoryBible() {
+  const { html, project } = currentBibleHTML();
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(project.name || 'story').replace(/[^a-z0-9]/gi, '-').toLowerCase()}-bible.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toastSuccess('Story bible downloaded.');
 }
 
 /**
@@ -207,6 +240,21 @@ export function renderExportImport(container) {
           ),
         ),
         h('button', { class: 'btn btn--primary', style: { width: '100%' }, onclick: exportProject }, '⬇️ Download Project File'),
+      ),
+
+      // Story Bible section (#7)
+      h('div', { style: { padding: '20px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '16px' } },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' } },
+          h('span', { style: { fontSize: '24px' } }, '📖'),
+          h('div', {},
+            h('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' } }, 'Story Bible'),
+            h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'A navigable HTML compendium of your world — open, share, or print to PDF.'),
+          ),
+        ),
+        h('div', { style: { display: 'flex', gap: '8px' } },
+          h('button', { class: 'btn', style: { flex: '1' }, onclick: () => openStoryBible() }, '📖 Open Bible'),
+          h('button', { class: 'btn', style: { flex: '1' }, onclick: () => downloadStoryBible() }, '⬇️ Download .html'),
+        ),
       ),
 
       // Import section

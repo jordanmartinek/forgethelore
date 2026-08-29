@@ -40,6 +40,7 @@ import { renderQuickSceneLog } from '../modules/quick-scene-log.js';
 import { renderManuscriptPlanner } from '../modules/manuscript-planner.js';
 import { renderDailyPlanner } from '../modules/daily-planner.js';
 import { renderBrainstorm } from '../modules/brainstorm.js';
+import { renderCharacterInterview } from '../modules/character-interview.js';
 import { renderLanguagePlanner } from '../modules/language-planner.js';
 import { renderResourcePlanner } from '../modules/resource-planner.js';
 import { renderWritingSprint } from '../modules/writing-sprint.js';
@@ -61,6 +62,7 @@ export const MODULES = [
   { id: 'manuscript',      label: 'Manuscript',      icon: '📖', group: 'write',    render: renderManuscriptPlanner },
   { id: 'quick-log',       label: 'Quick Log',       icon: '⚡', group: 'write',    render: renderQuickSceneLog },
   { id: 'brainstorm',      label: 'Brainstorm',      icon: '💭', group: 'write',    render: renderBrainstorm },
+  { id: 'character-interview', label: 'Interview Character', icon: '💬', group: 'write', render: renderCharacterInterview },
   { id: 'writing-sprint',  label: 'Writing Sprint',  icon: '⏱️', group: 'write',    render: renderWritingSprint },
 
   // ── Plan ───────────────────────────────────────────────────────────────
