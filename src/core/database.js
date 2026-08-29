@@ -283,6 +283,35 @@ class LoreForgeDB {
     return count;
   }
 
+  /**
+   * REPLACE object stores from an exportAll() dump, preserving ids verbatim.
+   *
+   * Unlike importAll (which is additive with fresh ids, for user file import),
+   * this is for the SYNC path: the incoming snapshot IS the authoritative state
+   * for this project, so we clear the content stores and write the records
+   * as-is. This keeps sync idempotent — pulling the same revision twice yields
+   * the same store contents instead of duplicating everything.
+   *
+   * `appState` is left untouched (it is global, never part of a snapshot).
+   * @param {Record<string, any[]>} dump
+   * @returns {Promise<number>} number of records written
+   */
+  async replaceAll(dump) {
+    if (!this.db || !dump || typeof dump !== 'object') return 0;
+    let count = 0;
+    for (const name of ['objects', 'relationships', 'boards']) {
+      if (!this.db.objectStoreNames.contains(name)) continue;
+      try { await this.clear(name); } catch (_) { /* ignore */ }
+      const records = dump[name];
+      if (!Array.isArray(records)) continue;
+      for (const rec of records) {
+        if (!rec || typeof rec !== 'object') continue;
+        try { await this.put(name, rec); count++; } catch (_) { /* skip bad record */ }
+      }
+    }
+    return count;
+  }
+
   // Listeners for save status
   onStatusChange(listener) {
     this.listeners.add(listener);
