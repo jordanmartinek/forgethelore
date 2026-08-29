@@ -17,7 +17,7 @@ import { MODULES } from '../core/registry.js';
 import { searchContent } from '../core/search.js';
 import { promptDialog, openModal } from './modal.js';
 import { toastSuccess, toastInfo } from './toast.js';
-import { exportProject } from './export-import.js';
+import { exportProject, openStoryBible } from './export-import.js';
 import { openAISettings } from './ai-settings-panel.js';
 import { openSyncSettings } from './sync-settings-panel.js';
 import { syncNow } from '../core/sync/sync-init.js';
@@ -58,6 +58,7 @@ const utilityCommands = [
   { id: 'sync-now', icon: '🔄', label: 'Sync Now', category: 'Utility', action: () => { if (isSyncConfigured()) { syncNow(); toastInfo('Syncing…'); } else { openSyncSettings(); } } },
   { id: 'analyze', icon: '🔍', label: 'Analyze Story for Issues', category: 'Utility', action: () => runAnalysis() },
   { id: 'export', icon: '📦', label: 'Export Project', category: 'Utility', action: () => exportProject() },
+  { id: 'story-bible', icon: '📖', label: 'Open Story Bible', category: 'Utility', action: () => openStoryBible() },
   { id: 'import-panel', icon: '📥', label: 'Open Export / Import', category: 'Utility', action: () => appStore.setState({ activeModule: 'export-import' }) },
 ];
 
