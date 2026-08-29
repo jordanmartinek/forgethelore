@@ -851,3 +851,23 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+
+/* ─── Story Analytics (temporal charts) ─────────────────────────────────── */
+
+.lf-chart {
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  overflow: visible;
+}
+
+.lf-sparkline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.lf-analytics-body .intel-section {
+  margin-bottom: 20px;
+}
