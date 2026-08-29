@@ -4,7 +4,7 @@
  * what's missing, incomplete, or imbalanced.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 
 
@@ -277,7 +277,7 @@ function renderTaskSection(title, subtitle, tasks, color) {
 
 function rerender() {
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderDailyPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderDailyPlanner(container); });
 }
 
 function updateDailyPlannerSidebar(tasks) {

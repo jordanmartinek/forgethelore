@@ -3,9 +3,9 @@
  * Manage belief systems, cults, philosophies, and spiritual movements.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
-import { confirmDialog } from '../ui/modal.js';
+import { confirmDialog, showModal, formField } from '../ui/modal.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
 
@@ -109,17 +109,17 @@ function renderReligionDetailContent(rel) {
 function openAddReligionModal() {
   const state = { name: '', type: 'Religion', description: '', deity: '' };
   const content = h('div', {},
-    field('Name', h('input', { class: 'input', placeholder: 'Religion name', oninput: (e) => state.name = e.target.value })),
-    field('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+    formField('Name', h('input', { class: 'input', placeholder: 'Religion name', oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Religion', 'Cult', 'Philosophy', 'State Religion', 'Techno-Religion', 'Mystical Order', 'Folk Religion', 'Other'].map(t => h('option', { value: t }, t)))),
-    field('Deity/Focus', h('input', { class: 'input', placeholder: 'Central figure or concept', oninput: (e) => state.deity = e.target.value })),
-    field('Description', expandableText({ placeholder: 'Describe this belief system...', label: 'Religion Description', oninput: (e) => state.description = e.target.value })),
+    formField('Deity/Focus', h('input', { class: 'input', placeholder: 'Central figure or concept', oninput: (e) => state.deity = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this belief system...', label: 'Religion Description', oninput: (e) => state.description = e.target.value })),
   );
-  modal('Add New Religion', content, () => {
+  showModal('Add New Religion', content, () => {
     if (!state.name.trim()) return;
     religions.push({ id: generateId(), ...state, followers: 'Unknown', founder: 'Unknown', origin: 'Unknown', status: 'active', tenets: [], influence: 10, color: '#6366f1' });
     const c = document.querySelector('.main-content');
-    if (c) { c.innerHTML = ''; renderReligionPlanner(c); }
+    if (c) renderPreservingScroll(c, () => { c.innerHTML = ''; renderReligionPlanner(c); });
     persistState("religions", religions);
   });
 }
@@ -127,16 +127,16 @@ function openAddReligionModal() {
 function openEditReligionModal(rel) {
   const state = { name: rel.name, type: rel.type, deity: rel.deity, description: rel.description };
   const content = h('div', {},
-    field('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
-    field('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+    formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Religion', 'Cult', 'Philosophy', 'State Religion', 'Techno-Religion', 'Mystical Order', 'Folk Religion', 'Other'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
-    field('Deity/Focus', h('input', { class: 'input', value: state.deity, oninput: (e) => state.deity = e.target.value })),
-    field('Description', expandableText({ placeholder: 'Describe this belief system...', label: 'Religion Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+    formField('Deity/Focus', h('input', { class: 'input', value: state.deity, oninput: (e) => state.deity = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this belief system...', label: 'Religion Description', value: state.description, oninput: (e) => state.description = e.target.value })),
   );
-  modal('Edit: ' + rel.name, content, () => {
+  showModal('Edit: ' + rel.name, content, () => {
     Object.assign(rel, state);
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderReligionPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderReligionPlanner(container); });
     persistState("religions", religions);
   });
 }
@@ -147,7 +147,7 @@ async function deleteReligion(rel) {
   const idx = religions.findIndex(i => i.id === rel.id);
   if (idx !== -1) religions.splice(idx, 1);
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderReligionPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderReligionPlanner(container); });
   persistState("religions", religions);
 }
 
@@ -157,14 +157,7 @@ function collapsible(title, open, content) {
     h('div', { class: 'collapsible__body' }, h('div', { class: 'collapsible__content' }, content)));
 }
 function stat(label, value) { return h('div', { class: 'intel-card' }, h('div', { class: 'intel-card__label' }, label), h('div', { class: 'intel-card__value' }, value)); }
-function field(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
-function modal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
-  document.body.appendChild(overlay);
-}
+// modal + field now come from the shared, accessible ui/modal.js
 function updateReligionSidebar() {
   const sidebar = document.getElementById('sidebar-content'); if (!sidebar) return; sidebar.innerHTML = '';
   religions.forEach(r => sidebar.appendChild(h('div', { class: 'sidebar-item' }, h('span', { class: 'sidebar-item__icon' }, '🕯️'), h('span', { class: 'sidebar-item__label' }, r.name), h('span', { class: 'sidebar-item__count' }, r.status))));

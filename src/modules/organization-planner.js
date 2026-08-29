@@ -3,9 +3,9 @@
  * Manage organizations, guilds, companies, secret societies, agencies.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
-import { confirmDialog } from '../ui/modal.js';
+import { confirmDialog, showModal, formField } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { generateId } from '../core/objects.js';
 
@@ -90,17 +90,17 @@ function updateOrgSidebar() {
 function openEditOrgModal(org) {
   const state = { name: org.name, type: org.type, faction: org.faction, leader: org.leader, description: org.description };
   const content = h('div', {},
-    ff('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
-    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+    formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Intelligence Agency', 'Research Organization', 'Secret Society', 'Trade Guild', 'Military Order', 'Criminal Syndicate', 'Religious Order', 'Corporation', 'Other'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
-    ff('Faction', h('input', { class: 'input', value: state.faction, oninput: (e) => state.faction = e.target.value })),
-    ff('Leader', h('input', { class: 'input', value: state.leader, oninput: (e) => state.leader = e.target.value })),
-    ff('Description', expandableText({ placeholder: 'Describe this organization...', label: 'Organization Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+    formField('Faction', h('input', { class: 'input', value: state.faction, oninput: (e) => state.faction = e.target.value })),
+    formField('Leader', h('input', { class: 'input', value: state.leader, oninput: (e) => state.leader = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this organization...', label: 'Organization Description', value: state.description, oninput: (e) => state.description = e.target.value })),
   );
-  modal2('Edit: ' + org.name, content, () => {
+  showModal('Edit: ' + org.name, content, () => {
     Object.assign(org, state);
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderOrganizationPlanner(container); });
     persistState("organizations", organizations);
   });
 }
@@ -111,7 +111,7 @@ async function deleteOrg(org) {
   const idx = organizations.findIndex(i => i.id === org.id);
   if (idx !== -1) organizations.splice(idx, 1);
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderOrganizationPlanner(container); });
   persistState("organizations", organizations);
 }
 
@@ -119,26 +119,19 @@ async function deleteOrg(org) {
 function openAddOrgModal() {
   const state = { name: '', type: 'Organization', faction: '', leader: '', description: '' };
   const content = h('div', {},
-    ff('Name', h('input', { class: 'input', placeholder: 'Organization name', oninput: (e) => state.name = e.target.value })),
-    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+    formField('Name', h('input', { class: 'input', placeholder: 'Organization name', oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Intelligence Agency', 'Research Organization', 'Secret Society', 'Trade Guild', 'Military Order', 'Criminal Syndicate', 'Religious Order', 'Corporation', 'Other'].map(t => h('option', { value: t }, t)))),
-    ff('Faction', h('input', { class: 'input', placeholder: 'Affiliated faction', oninput: (e) => state.faction = e.target.value })),
-    ff('Leader', h('input', { class: 'input', placeholder: 'Leader name', oninput: (e) => state.leader = e.target.value })),
-    ff('Description', expandableText({ placeholder: 'Describe this organization...', label: 'Organization Description', oninput: (e) => state.description = e.target.value })),
+    formField('Faction', h('input', { class: 'input', placeholder: 'Affiliated faction', oninput: (e) => state.faction = e.target.value })),
+    formField('Leader', h('input', { class: 'input', placeholder: 'Leader name', oninput: (e) => state.leader = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this organization...', label: 'Organization Description', oninput: (e) => state.description = e.target.value })),
   );
-  modal2('Add New Organization', content, () => {
+  showModal('Add New Organization', content, () => {
     if (!state.name.trim()) return;
     organizations.push({ id: `org${Date.now()}`, name: state.name, type: state.type, faction: state.faction, leader: state.leader, members: 'Unknown', purpose: '', secrecy: 50, influence: 30, status: 'active', color: '#6366f1', description: state.description });
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderOrganizationPlanner(container); });
     persistState("organizations", organizations);
   });
 }
-function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
-function modal2(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
-  document.body.appendChild(overlay);
-}
+// modal + field now come from the shared, accessible ui/modal.js

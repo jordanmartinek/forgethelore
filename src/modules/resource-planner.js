@@ -4,7 +4,7 @@
  * what percentage each character holds. Includes pie chart visualization.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 
 import { generateId } from '../core/objects.js';
@@ -309,7 +309,7 @@ async function deleteResource(res) {
 
 function rerender() {
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderResourcePlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderResourcePlanner(container); });
 }
 
 // showModal / formField now come from the shared, accessible ui/modal.js

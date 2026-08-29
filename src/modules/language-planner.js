@@ -4,7 +4,7 @@
  * grammar, writing systems, and linguistic relationships.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 
 import { generateId } from '../core/objects.js';
@@ -351,7 +351,7 @@ function openConnectCharacterModal(lang) {
 
 function rerender() {
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderLanguagePlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderLanguagePlanner(container); });
 }
 
 function collapsible(title, open, content) {

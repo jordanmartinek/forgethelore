@@ -4,7 +4,7 @@
  * Each step contains draggable scene cards that can be added, edited, moved, deleted.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 
 import { generateId } from '../core/objects.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
@@ -279,7 +279,7 @@ async function deleteCard(card, stepNum) {
 
 function rerender() {
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderManuscriptPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderManuscriptPlanner(container); });
 }
 
 // showModal / formField now come from the shared, accessible ui/modal.js

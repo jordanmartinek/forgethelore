@@ -3,7 +3,7 @@
  * View, create, and edit relationships between characters with history timeline.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { relationships, RELATIONSHIP_TYPES, RELATIONSHIP_DIMENSIONS, getRelationshipsFor, createRelationship, saveProgressionData } from '../core/progression.js';
@@ -199,7 +199,7 @@ function addManualEvent(rel) {
 
   // Re-render
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderRelationshipPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderRelationshipPlanner(container); });
   reportSave(ok);
 }
 
@@ -210,7 +210,7 @@ async function deleteRelationship(rel) {
   if (idx !== -1) relationships.splice(idx, 1);
   const saved = saveProgressionData();
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderRelationshipPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderRelationshipPlanner(container); });
   reportSave(saved);
 }
 
@@ -235,7 +235,7 @@ function openAddRelationshipModal() {
     createRelationship(state.sourceId, state.targetId, state.type);
     const ok = saveProgressionData();
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderRelationshipPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderRelationshipPlanner(container); });
     reportSave(ok);
   });
 }

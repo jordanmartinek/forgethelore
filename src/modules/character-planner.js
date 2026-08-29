@@ -2,7 +2,7 @@
  * LoreForge Planner - Character & Faction Planner
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, saveData, persistState, getActiveProjectId } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { showModal, formField, confirmDialog } from '../ui/modal.js';
@@ -212,7 +212,7 @@ function openEditCharacterModal(char) {
   showModal(`Edit: ${char.name}`, content, () => {
     Object.assign(char, state);
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); });
     persistState("characters", demoCharacters);
   });
 }
@@ -223,7 +223,7 @@ async function deleteCharacter(char) {
   const idx = demoCharacters.findIndex(c => c.id === char.id);
   if (idx !== -1) demoCharacters.splice(idx, 1);
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); });
   persistState("characters", demoCharacters);
 }
 
@@ -363,7 +363,7 @@ function openAddCharacterModal() {
     if (!state.name.trim()) return;
     demoCharacters.push({ id: `c${Date.now()}`, name: state.name, role: state.role, faction: state.faction, color: '#6366f1', momentum: 'stable', status: 'active', description: state.description });
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); });
     persistState("characters", demoCharacters);
   });
 }

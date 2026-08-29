@@ -3,7 +3,7 @@
  * Dedicated module for managing factions as first-class planning objects.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, saveData, persistState, getActiveProjectId } from '../core/persist.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
@@ -170,7 +170,7 @@ function openAddFactionModal() {
     if (!state.name.trim()) return;
     factionData.push({ id: generateId(), name: state.name, color: state.color, icon: state.icon, goal: state.goal, type: state.type, leader: state.leader, territory: state.territory, population: 'Unknown', militaryStrength: 50, politicalPower: 50, economicPower: 50, status: 'active', description: state.description });
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderFactionPlanner(container); });
     persistState("factionData", factionData);
   });
 }
@@ -238,7 +238,7 @@ function openEditFactionItemModal(fac) {
   showModal(`Edit: ${fac.name}`, content, () => {
     Object.assign(fac, state);
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderFactionPlanner(container); });
     persistState("factionData", factionData);
   });
 }
@@ -249,6 +249,6 @@ async function deleteFaction(fac) {
   const idx = factionData.findIndex(f => f.id === fac.id);
   if (idx !== -1) factionData.splice(idx, 1);
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderFactionPlanner(container); });
   persistState("factionData", factionData);
 }

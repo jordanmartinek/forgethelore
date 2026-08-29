@@ -3,9 +3,9 @@
  * Manage species, races, alien civilizations, biological groups.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
-import { confirmDialog } from '../ui/modal.js';
+import { confirmDialog, showModal, formField } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { generateId } from '../core/objects.js';
 
@@ -94,16 +94,16 @@ function updateSpeciesSidebar() {
 function openEditSpeciesModal(sp) {
   const state = { name: sp.name, type: sp.type, origin: sp.origin, description: sp.description };
   const content = h('div', {},
-    ff('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
-    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+    formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Organic', 'Synthetic', 'Bio-Collective', 'Hybrid', 'Energy', 'Other'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
-    ff('Origin', h('input', { class: 'input', value: state.origin, oninput: (e) => state.origin = e.target.value })),
-    ff('Description', expandableText({ placeholder: 'Describe this species...', label: 'Species Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+    formField('Origin', h('input', { class: 'input', value: state.origin, oninput: (e) => state.origin = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this species...', label: 'Species Description', value: state.description, oninput: (e) => state.description = e.target.value })),
   );
-  modal3('Edit: ' + sp.name, content, () => {
+  showModal('Edit: ' + sp.name, content, () => {
     Object.assign(sp, state);
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderSpeciesPlanner(container); });
     persistState("species", species);
   });
 }
@@ -114,7 +114,7 @@ async function deleteSpecies(sp) {
   const idx = species.findIndex(i => i.id === sp.id);
   if (idx !== -1) species.splice(idx, 1);
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderSpeciesPlanner(container); });
   persistState("species", species);
 }
 
@@ -122,25 +122,18 @@ async function deleteSpecies(sp) {
 function openAddSpeciesModal() {
   const state = { name: '', type: 'Organic', origin: '', description: '' };
   const content = h('div', {},
-    ff('Name', h('input', { class: 'input', placeholder: 'Species name', oninput: (e) => state.name = e.target.value })),
-    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+    formField('Name', h('input', { class: 'input', placeholder: 'Species name', oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Organic', 'Synthetic', 'Bio-Collective', 'Hybrid', 'Energy', 'Other'].map(t => h('option', { value: t }, t)))),
-    ff('Origin', h('input', { class: 'input', placeholder: 'Where did they come from?', oninput: (e) => state.origin = e.target.value })),
-    ff('Description', expandableText({ placeholder: 'Describe this species...', label: 'Species Description', oninput: (e) => state.description = e.target.value })),
+    formField('Origin', h('input', { class: 'input', placeholder: 'Where did they come from?', oninput: (e) => state.origin = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this species...', label: 'Species Description', oninput: (e) => state.description = e.target.value })),
   );
-  modal3('Add New Species', content, () => {
+  showModal('Add New Species', content, () => {
     if (!state.name.trim()) return;
     species.push({ id: `sp${Date.now()}`, name: state.name, type: state.type, origin: state.origin, population: 'Unknown', lifespan: 'Unknown', intelligence: 'Unknown', status: 'active', traits: [], weaknesses: [], description: state.description, color: '#6366f1' });
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderSpeciesPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderSpeciesPlanner(container); });
     persistState("species", species);
   });
 }
-function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
-function modal3(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
-  document.body.appendChild(overlay);
-}
+// modal + field now come from the shared, accessible ui/modal.js

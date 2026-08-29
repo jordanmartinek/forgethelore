@@ -3,9 +3,9 @@
  * Manage fleets, armies, units, campaigns, doctrines, and military assets.
  */
 
-import { h } from '../core/renderer.js';
+import { h, renderPreservingScroll } from '../core/renderer.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
-import { confirmDialog } from '../ui/modal.js';
+import { confirmDialog, showModal, formField } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { generateId } from '../core/objects.js';
 
@@ -115,17 +115,17 @@ function updateMilitarySidebar() {
 function openEditMilitaryModal(mil) {
   const state = { name: mil.name, type: mil.type, faction: mil.faction, commander: mil.commander, description: mil.description };
   const content = h('div', {},
-    ff('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
-    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+    formField('Name', h('input', { class: 'input', value: state.name, oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Space Fleet', 'Ground Army', 'AI Strike Force', 'Bio-Fleet', 'Militia', 'Special Forces', 'Defense Force'].map(t => h('option', { value: t, selected: t === state.type ? 'selected' : undefined }, t)))),
-    ff('Faction', h('input', { class: 'input', value: state.faction, oninput: (e) => state.faction = e.target.value })),
-    ff('Commander', h('input', { class: 'input', value: state.commander, oninput: (e) => state.commander = e.target.value })),
-    ff('Description', expandableText({ placeholder: 'Describe this force...', label: 'Military Description', value: state.description, oninput: (e) => state.description = e.target.value })),
+    formField('Faction', h('input', { class: 'input', value: state.faction, oninput: (e) => state.faction = e.target.value })),
+    formField('Commander', h('input', { class: 'input', value: state.commander, oninput: (e) => state.commander = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this force...', label: 'Military Description', value: state.description, oninput: (e) => state.description = e.target.value })),
   );
-  modal('Edit: ' + mil.name, content, () => {
+  showModal('Edit: ' + mil.name, content, () => {
     Object.assign(mil, state);
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderMilitaryPlanner(container); });
     persistState("militaryForces", militaryForces);
   });
 }
@@ -136,7 +136,7 @@ async function deleteMilitary(mil) {
   const idx = militaryForces.findIndex(i => i.id === mil.id);
   if (idx !== -1) militaryForces.splice(idx, 1);
   const container = document.querySelector('.main-content');
-  if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
+  if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderMilitaryPlanner(container); });
   persistState("militaryForces", militaryForces);
 }
 
@@ -144,26 +144,19 @@ async function deleteMilitary(mil) {
 function openAddMilitaryModal() {
   const state = { name: '', type: 'Space Fleet', faction: '', commander: '', description: '' };
   const content = h('div', {},
-    ff('Name', h('input', { class: 'input', placeholder: 'Force name', oninput: (e) => state.name = e.target.value })),
-    ff('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
+    formField('Name', h('input', { class: 'input', placeholder: 'Force name', oninput: (e) => state.name = e.target.value })),
+    formField('Type', h('select', { class: 'input', onchange: (e) => state.type = e.target.value },
       ...['Space Fleet', 'Ground Army', 'AI Strike Force', 'Bio-Fleet', 'Militia', 'Special Forces', 'Defense Force'].map(t => h('option', { value: t }, t)))),
-    ff('Faction', h('input', { class: 'input', placeholder: 'Faction', oninput: (e) => state.faction = e.target.value })),
-    ff('Commander', h('input', { class: 'input', placeholder: 'Commanding officer', oninput: (e) => state.commander = e.target.value })),
-    ff('Description', expandableText({ placeholder: 'Describe this force...', label: 'Military Description', oninput: (e) => state.description = e.target.value })),
+    formField('Faction', h('input', { class: 'input', placeholder: 'Faction', oninput: (e) => state.faction = e.target.value })),
+    formField('Commander', h('input', { class: 'input', placeholder: 'Commanding officer', oninput: (e) => state.commander = e.target.value })),
+    formField('Description', expandableText({ placeholder: 'Describe this force...', label: 'Military Description', oninput: (e) => state.description = e.target.value })),
   );
-  modal('Add New Military Force', content, () => {
+  showModal('Add New Military Force', content, () => {
     if (!state.name.trim()) return;
     militaryForces.push({ id: `mil${Date.now()}`, name: state.name, type: state.type, faction: state.faction, commander: state.commander, strength: 50, ships: 0, personnel: 'Unknown', status: 'active', doctrine: 'Unknown', location: 'Unknown', description: state.description, color: '#6366f1' });
     const container = document.querySelector('.main-content');
-    if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
+    if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderMilitaryPlanner(container); });
     persistState("militaryForces", militaryForces);
   });
 }
-function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }
-function modal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay'); if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' }, h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content), h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save'))));
-  document.body.appendChild(overlay);
-}
+// modal + field now come from the shared, accessible ui/modal.js
