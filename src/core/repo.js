@@ -42,6 +42,8 @@ export const Collections = {
   BRAINSTORM: 'brainstormSessions',
   TIMELINE: 'timelineEvents',
   TIMELINE_TRACKS: 'timelineTracks',
+  KNOWLEDGE: 'knowledgeItems',
+  FAMILY_LINKS: 'familyLinks',
   WORLD: 'worldBuilder',
   RELATIONSHIPS: 'relationships',
   ARCS: 'characterArcs',
