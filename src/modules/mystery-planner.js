@@ -4,9 +4,9 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
-import { appStore } from '../core/store.js';
 
 let demoMysteries = [
   { id: 'm1', title: 'The Void Conduit Origin', question: 'Who created the Void Conduits and why?', truth: 'An ancient civilization built them as escape routes from a dying universe', status: 'active', importance: 'critical', progress: 30, clues: 4, redHerrings: 2 },
@@ -236,17 +236,18 @@ function openEditMysteryModal(mystery) {
     Object.assign(mystery, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
-    saveData("mysteries", demoMysteries); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("mysteries", demoMysteries);
   });
 }
 
-function deleteMystery(mystery) {
-  if (!confirm(`Delete "${mystery.title}"?`)) return;
+async function deleteMystery(mystery) {
+  const ok = await confirmDialog({ title: `Delete "${mystery.title}"?`, message: 'This will permanently remove it.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = demoMysteries.findIndex(i => i.id === mystery.id);
   if (idx !== -1) demoMysteries.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
-  saveData("mysteries", demoMysteries); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("mysteries", demoMysteries);
 }
 
 
@@ -264,7 +265,7 @@ function openAddMysteryModal() {
     demoMysteries.push({ id: `m${Date.now()}`, title: state.title, question: state.question, truth: state.truth, status: 'active', importance: state.importance, progress: 0, clues: 0, redHerrings: 0 });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderMysteryPlanner(container); }
-    saveData("mysteries", demoMysteries); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("mysteries", demoMysteries);
   });
 }
 

@@ -4,10 +4,10 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
-import { appStore } from '../core/store.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
+import { showModal, formField, confirmDialog } from '../ui/modal.js';
 
 const FACTION_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#64748b'];
 const FACTION_ICONS = ['🦅', '🤖', '🐛', '🌟', '⚔️', '🛡️', '🔥', '🌀', '👑', '💀', '🐉', '🕷️', '🦊', '🐺', '🦁', '🏴', '⚡', '🌑', '☀️', '🎭'];
@@ -165,7 +165,7 @@ function openAddFactionModal() {
     factionData.push({ id: generateId(), name: state.name, color: state.color, icon: state.icon, goal: state.goal, type: state.type, leader: state.leader, territory: state.territory, population: 'Unknown', militaryStrength: 50, politicalPower: 50, economicPower: 50, status: 'active', description: state.description });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
-    saveData("factionData", factionData); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("factionData", factionData);
   });
 }
 
@@ -197,25 +197,7 @@ function collapsible(title, open, content) {
   );
 }
 
-function formField(label, input) {
-  return h('div', { style: { marginBottom: '12px' } },
-    h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label),
-    input
-  );
-}
-
-function showModal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay');
-  if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' },
-      h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content),
-      h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save')),
-    )
-  );
-  document.body.appendChild(overlay);
-}
+// showModal / formField now come from the shared, accessible ui/modal.js
 
 function updateFactionSidebar() {
   const sidebar = document.getElementById('sidebar-content');
@@ -251,15 +233,16 @@ function openEditFactionItemModal(fac) {
     Object.assign(fac, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
-    saveData("factionData", factionData); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("factionData", factionData);
   });
 }
 
-function deleteFaction(fac) {
-  if (!confirm(`Delete faction "${fac.name}"?`)) return;
+async function deleteFaction(fac) {
+  const ok = await confirmDialog({ title: `Delete ${fac.name}`, message: `This will permanently remove the faction "${fac.name}".`, confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = factionData.findIndex(f => f.id === fac.id);
   if (idx !== -1) factionData.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderFactionPlanner(container); }
-  saveData("factionData", factionData); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("factionData", factionData);
 }

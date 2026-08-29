@@ -6,6 +6,9 @@
 
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
+import { toast, toastSuccess, toastError } from './toast.js';
+import { confirmDialog } from './modal.js';
+import { APP_NAME, EXPORT_SCHEMA_VERSION } from '../core/version.js';
 
 /**
  * Export the current project's data as a downloadable JSON file
@@ -35,8 +38,8 @@ export function exportProject() {
   // Include project metadata
   const exportPayload = {
     _meta: {
-      appName: 'LoreForge Planner',
-      version: '1.0',
+      appName: APP_NAME,
+      schemaVersion: EXPORT_SCHEMA_VERSION,
       exportDate: new Date().toISOString(),
       projectId,
       projectName: project?.name || 'Unknown',
@@ -59,8 +62,7 @@ export function exportProject() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  // Toast
-  showToast(`✅ "${projectName}" exported successfully`);
+  toastSuccess(`"${projectName}" exported successfully`);
 }
 
 /**
@@ -77,23 +79,25 @@ export function importProject() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const payload = JSON.parse(event.target.result);
         
         if (!payload._meta || !payload.data) {
-          alert('Invalid file format. Please select a valid LoreForge export file.');
+          toastError('Invalid file format. Please select a valid LoreForge export file.');
           return;
         }
 
         const meta = payload._meta;
-        const importMode = confirm(
-          `Import "${meta.projectName}"?\n\n` +
-          `Exported: ${new Date(meta.exportDate).toLocaleString()}\n` +
-          `Data keys: ${Object.keys(payload.data).length}\n\n` +
-          `OK = Create as new project\n` +
-          `Cancel = Abort import`
-        );
+        const importMode = await confirmDialog({
+          title: `Import "${meta.projectName}"?`,
+          message:
+            `Exported: ${new Date(meta.exportDate).toLocaleString()}\n` +
+            `Data keys: ${Object.keys(payload.data).length}\n\n` +
+            `This will be created as a new project so it never overwrites your existing data.`,
+          confirmLabel: 'Import as New Project',
+          cancelLabel: 'Cancel',
+        });
 
         if (!importMode) return;
 
@@ -120,13 +124,13 @@ export function importProject() {
         // Switch to the imported project
         localStorage.setItem('loreforge_activeProjectId', newProjectId);
         
-        showToast(`✅ "${meta.projectName}" imported! Reloading...`);
+        toastSuccess(`"${meta.projectName}" imported! Reloading...`);
         
         // Reload to pick up the new project
         setTimeout(() => window.location.reload(), 1000);
         
       } catch (err) {
-        alert('Failed to import: ' + err.message);
+        toastError('Failed to import: ' + err.message);
       }
     };
     reader.readAsText(file);
@@ -250,7 +254,7 @@ function chooseDifferentFolder() {
 
 async function exportToFolder() {
   if (!('showDirectoryPicker' in window)) {
-    alert('Your browser does not support folder access. Please use Chrome or Edge.');
+    toastError('Your browser does not support folder access. Please use Chrome or Edge.');
     return;
   }
 
@@ -280,8 +284,8 @@ async function exportToFolder() {
 
     const exportPayload = {
       _meta: {
-        appName: 'LoreForge Planner',
-        version: '1.0',
+        appName: APP_NAME,
+        schemaVersion: EXPORT_SCHEMA_VERSION,
         exportDate: new Date().toISOString(),
         projectId,
         projectName: project?.name || 'Unknown',
@@ -298,7 +302,7 @@ async function exportToFolder() {
     await writable.write(JSON.stringify(exportPayload, null, 2));
     await writable.close();
 
-    showToast(`✅ Saved to 📂 ${savedDirectoryHandle.name}/${fileName}`);
+    toast(`Saved to 📂 ${savedDirectoryHandle.name}/${fileName}`, 'success');
 
     // Re-render to show the folder name
     const container = document.querySelector('.main-content');
@@ -307,15 +311,9 @@ async function exportToFolder() {
   } catch (err) {
     if (err.name === 'AbortError') return; // User cancelled picker
     console.error('[LoreForge] Folder export failed:', err);
-    alert('Export failed: ' + err.message);
+    toastError('Export failed: ' + err.message);
     // Reset handle in case permissions were revoked
     savedDirectoryHandle = null;
     localStorage.removeItem('loreforge_exportFolderName');
   }
-}
-
-function showToast(message) {
-  const toast = h('div', { style: { position: 'fixed', bottom: '20px', right: '20px', padding: '12px 20px', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: '8px', boxShadow: 'var(--shadow-lg)', zIndex: '9999', fontSize: '13px', color: 'var(--text-primary)', animation: 'slideUp 0.3s ease' } }, message);
-  document.body.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 3000);
 }

@@ -44,6 +44,17 @@ export function showToast({ message, type = 'info', duration = 3000 }) {
   }, duration);
 }
 
+/**
+ * Direct toast helper — works whether or not the event bus is wired up.
+ * Prefer this in UI code so we no longer need per-module toast implementations.
+ * @param {string} message
+ * @param {'info'|'success'|'warning'|'error'} [type]
+ * @param {number} [duration]
+ */
+export function toast(message, type = 'info', duration = 3000) {
+  showToast({ message, type, duration });
+}
+
 // Convenience functions
 export function toastSuccess(message) {
   showToast({ message, type: 'success' });

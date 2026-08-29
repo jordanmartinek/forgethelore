@@ -9,6 +9,7 @@ import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { propagateSceneOutcome, relationships, characterArcs, createRelationship, saveProgressionData } from '../core/progression.js';
+import { toastError } from '../ui/toast.js';
 
 function getPieces() { return window.__loreforge_pieces || []; }
 function getScenes() { return window.__loreforge_scenes || []; }
@@ -183,7 +184,7 @@ function addRelChange(container, state, pieces) {
 
 function submitSceneLog(state) {
   if (!state.title.trim()) {
-    alert('Please enter a scene title.');
+    toastError('Please enter a scene title.');
     return;
   }
 
@@ -261,10 +262,9 @@ function submitSceneLog(state) {
     else if (rel.dimensions.rivalry > 70) rel.type = 'rivalry';
   });
 
-  // Show success and re-render
-  saveProgressionData();
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  // Persist progression data and report the real save status.
+  const _saveOk = saveProgressionData();
+  appStore.setState(_saveOk ? { saveStatus: 'saved', lastSaved: Date.now() } : { saveStatus: 'offline' });
 
   const container = document.querySelector('.main-content');
   if (container) {

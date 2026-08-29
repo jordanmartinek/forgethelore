@@ -4,9 +4,9 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
-import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
 let organizations = [
@@ -101,17 +101,18 @@ function openEditOrgModal(org) {
     Object.assign(org, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
-    saveData("organizations", organizations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("organizations", organizations);
   });
 }
 
-function deleteOrg(org) {
-  if (!confirm(`Delete "${org.name}"?`)) return;
+async function deleteOrg(org) {
+  const ok = await confirmDialog({ title: `Delete "${org.name}"?`, message: 'This will permanently remove it.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = organizations.findIndex(i => i.id === org.id);
   if (idx !== -1) organizations.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
-  saveData("organizations", organizations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("organizations", organizations);
 }
 
 
@@ -130,7 +131,7 @@ function openAddOrgModal() {
     organizations.push({ id: `org${Date.now()}`, name: state.name, type: state.type, faction: state.faction, leader: state.leader, members: 'Unknown', purpose: '', secrecy: 50, influence: 30, status: 'active', color: '#6366f1', description: state.description });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderOrganizationPlanner(container); }
-    saveData("organizations", organizations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("organizations", organizations);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

@@ -4,9 +4,9 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
-import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
 let politicalEntities = [
@@ -107,17 +107,18 @@ function openEditPoliticsModal(pe) {
     Object.assign(pe, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
-    saveData("politicalEntities", politicalEntities); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("politicalEntities", politicalEntities);
   });
 }
 
-function deletePolitics(pe) {
-  if (!confirm(`Delete "${pe.name}"?`)) return;
+async function deletePolitics(pe) {
+  const ok = await confirmDialog({ title: `Delete "${pe.name}"?`, message: 'This will permanently remove it.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = politicalEntities.findIndex(i => i.id === pe.id);
   if (idx !== -1) politicalEntities.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
-  saveData("politicalEntities", politicalEntities); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("politicalEntities", politicalEntities);
 }
 
 function meter(label, val) {
@@ -147,7 +148,7 @@ function openAddPoliticsModal() {
     politicalEntities.push({ id: `pol${Date.now()}`, name: state.name, type: state.type, leader: state.leader, members: 0, description: state.description, stability: 50, legitimacy: 50, corruption: 25, color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderPoliticsPlanner(container); }
-    saveData("politicalEntities", politicalEntities); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("politicalEntities", politicalEntities);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

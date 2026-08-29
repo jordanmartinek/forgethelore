@@ -162,9 +162,14 @@ const _isProgDemo = getActiveProjectId() === 'proj1';
 export let relationships = loadData('relationships', _isProgDemo ? DEFAULT_RELATIONSHIPS : []);
 export let characterArcs = loadData('characterArcs', _isProgDemo ? DEFAULT_ARCS : []);
 
+/**
+ * Persist relationship + arc data.
+ * @returns {boolean} true only if BOTH writes succeeded.
+ */
 export function saveProgressionData() {
-  saveData('relationships', relationships);
-  saveData('characterArcs', characterArcs);
+  const a = saveData('relationships', relationships);
+  const b = saveData('characterArcs', characterArcs);
+  return a && b;
 }
 
 // ─── Engine Functions ────────────────────────────────────────────────────────

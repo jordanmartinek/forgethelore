@@ -4,9 +4,9 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
-import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
 let militaryForces = [
@@ -126,17 +126,18 @@ function openEditMilitaryModal(mil) {
     Object.assign(mil, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
-    saveData("militaryForces", militaryForces); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("militaryForces", militaryForces);
   });
 }
 
-function deleteMilitary(mil) {
-  if (!confirm(`Delete "${mil.name}"?`)) return;
+async function deleteMilitary(mil) {
+  const ok = await confirmDialog({ title: `Delete "${mil.name}"?`, message: 'This will permanently remove it.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = militaryForces.findIndex(i => i.id === mil.id);
   if (idx !== -1) militaryForces.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
-  saveData("militaryForces", militaryForces); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("militaryForces", militaryForces);
 }
 
 
@@ -155,7 +156,7 @@ function openAddMilitaryModal() {
     militaryForces.push({ id: `mil${Date.now()}`, name: state.name, type: state.type, faction: state.faction, commander: state.commander, strength: 50, ships: 0, personnel: 'Unknown', status: 'active', doctrine: 'Unknown', location: 'Unknown', description: state.description, color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderMilitaryPlanner(container); }
-    saveData("militaryForces", militaryForces); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("militaryForces", militaryForces);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

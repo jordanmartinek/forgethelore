@@ -4,10 +4,10 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
-import { appStore } from '../core/store.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
+import { showModal, formField, confirmDialog } from '../ui/modal.js';
 
 let locations = [
   { id: 'loc1', name: 'Citadel Prime', type: 'Space Station', region: 'Core Systems', faction: 'The Dominion', population: '2.4 million', status: 'active', description: 'The political and military heart of the Dominion. A massive orbital station serving as the seat of government.', climate: 'Controlled', resources: 'High', strategicValue: 90, color: '#ef4444' },
@@ -145,7 +145,7 @@ function openAddLocationModal() {
     locations.push({ id: generateId(), ...state, population: 'Unknown', status: 'active', climate: 'Unknown', resources: 'Unknown', strategicValue: 50, color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
-    saveData("locations", locations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("locations", locations);
   });
 }
 
@@ -162,17 +162,18 @@ function openEditLocationModal(loc) {
     Object.assign(loc, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
-    saveData("locations", locations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("locations", locations);
   });
 }
 
-function deleteLocation(loc) {
-  if (!confirm(`Delete "${loc.name}"?`)) return;
+async function deleteLocation(loc) {
+  const ok = await confirmDialog({ title: `Delete ${loc.name}`, message: `This will permanently remove the location "${loc.name}".`, confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = locations.findIndex(i => i.id === loc.id);
   if (idx !== -1) locations.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderLocationPlanner(container); }
-  saveData("locations", locations); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("locations", locations);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -191,22 +192,7 @@ function statCard(label, value) {
   return h('div', { class: 'intel-card' }, h('div', { class: 'intel-card__label' }, label), h('div', { class: 'intel-card__value' }, value));
 }
 
-function formField(label, input) {
-  return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input);
-}
-
-function showModal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay');
-  if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' },
-      h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content),
-      h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save')),
-    )
-  );
-  document.body.appendChild(overlay);
-}
+// showModal / formField now come from the shared, accessible ui/modal.js
 
 function updateLocationSidebar() {
   const sidebar = document.getElementById('sidebar-content');

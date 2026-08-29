@@ -4,9 +4,9 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { confirmDialog } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
-import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 
 let technologies = [
@@ -122,17 +122,18 @@ function openEditTechModal(tech) {
     Object.assign(tech, state);
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
-    saveData("technologies", technologies); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("technologies", technologies);
   });
 }
 
-function deleteTech(tech) {
-  if (!confirm(`Delete "${tech.name}"?`)) return;
+async function deleteTech(tech) {
+  const ok = await confirmDialog({ title: `Delete "${tech.name}"?`, message: 'This will permanently remove it.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = technologies.findIndex(i => i.id === tech.id);
   if (idx !== -1) technologies.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
-  saveData("technologies", technologies); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+  persistState("technologies", technologies);
 }
 
 
@@ -153,7 +154,7 @@ function openAddTechModal() {
     technologies.push({ id: `tech${Date.now()}`, name: state.name, category: state.category, era: state.era, inventor: state.inventor, faction: state.faction, prerequisites: [], dependents: [], status: 'theoretical', description: state.description, impact: 'Unknown', year: 'Pending', color: '#6366f1' });
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderTechnologyPlanner(container); }
-    saveData("technologies", technologies); appStore.setState({ saveStatus: "saving" }); setTimeout(() => appStore.setState({ saveStatus: "saved" }), 300);
+    persistState("technologies", technologies);
   });
 }
 function ff(label, input) { return h('div', { style: { marginBottom: '12px' } }, h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label), input); }

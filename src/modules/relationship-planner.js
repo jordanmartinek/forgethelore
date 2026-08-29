@@ -6,7 +6,15 @@
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
-import { relationships, RELATIONSHIP_TYPES, RELATIONSHIP_DIMENSIONS, getRelationshipsFor, createRelationship } from '../core/progression.js';
+import { relationships, RELATIONSHIP_TYPES, RELATIONSHIP_DIMENSIONS, getRelationshipsFor, createRelationship, saveProgressionData } from '../core/progression.js';
+import { showModal, formField, confirmDialog } from '../ui/modal.js';
+import { toastError } from '../ui/toast.js';
+
+/** Reflect the real progression-data write result in the save indicator. */
+function reportSave(ok) {
+  appStore.setState(ok ? { saveStatus: 'saved', lastSaved: Date.now() } : { saveStatus: 'offline' });
+  if (!ok) toastError('Could not save — storage may be full. Export your project to avoid losing work.');
+}
 
 // Reference to pieces from conflict board (shared data)
 function getPieces() {
@@ -187,22 +195,23 @@ function addManualEvent(rel) {
     rel.dimensions[key] = Math.max(0, Math.min(100, (rel.dimensions[key] || 0) + delta));
   }
   rel.history.push({ sceneId: null, event: eventText, changes });
+  const ok = saveProgressionData();
 
   // Re-render
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderRelationshipPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  reportSave(ok);
 }
 
-function deleteRelationship(rel) {
-  if (!confirm('Delete this relationship?')) return;
+async function deleteRelationship(rel) {
+  const ok = await confirmDialog({ title: 'Delete relationship?', message: 'This relationship will be permanently removed.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = relationships.findIndex(r => r.id === rel.id);
   if (idx !== -1) relationships.splice(idx, 1);
+  const saved = saveProgressionData();
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderRelationshipPlanner(container); }
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+  reportSave(saved);
 }
 
 function openAddRelationshipModal() {
@@ -224,10 +233,10 @@ function openAddRelationshipModal() {
   showModal('Create Relationship', content, () => {
     if (state.sourceId === state.targetId) return;
     createRelationship(state.sourceId, state.targetId, state.type);
+    const ok = saveProgressionData();
     const container = document.querySelector('.main-content');
     if (container) { container.innerHTML = ''; renderRelationshipPlanner(container); }
-    appStore.setState({ saveStatus: 'saving' });
-    setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 500);
+    reportSave(ok);
   });
 }
 
@@ -248,25 +257,7 @@ function collapsible(title, open, content) {
   );
 }
 
-function formField(label, input) {
-  return h('div', { style: { marginBottom: '12px' } },
-    h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, label),
-    input
-  );
-}
-
-function showModal(title, content, onSave) {
-  const existing = document.querySelector('.modal-overlay');
-  if (existing) existing.remove();
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
-    h('div', { class: 'modal' },
-      h('div', { class: 'modal__header' }, h('span', { class: 'modal__title' }, title), h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕')),
-      h('div', { class: 'modal__body' }, content),
-      h('div', { class: 'modal__footer' }, h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Cancel'), h('button', { class: 'btn btn--primary', onclick: () => { onSave(); overlay.remove(); } }, 'Save')),
-    )
-  );
-  document.body.appendChild(overlay);
-}
+// showModal / formField now come from the shared, accessible ui/modal.js
 
 function updateRelationshipSidebar() {
   const sidebar = document.getElementById('sidebar-content');

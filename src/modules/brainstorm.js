@@ -11,9 +11,11 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
+import { loadData, saveData, persistState, getActiveProjectId } from '../core/persist.js';
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
+import { toastSuccess, toastWarning, toastError } from '../ui/toast.js';
+import { confirmDialog } from '../ui/modal.js';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -31,9 +33,7 @@ function loadSessions() {
 }
 
 function save() {
-  saveData('brainstormSessions', sessions);
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  persistState('brainstormSessions', sessions);
 }
 
 // ─── Main Render ─────────────────────────────────────────────────────────────
@@ -140,13 +140,13 @@ function renderEditor() {
 
 function openPushModal(session) {
   const content = session.content || '';
-  if (!content.trim()) { alert('Nothing to push — write some notes first.'); return; }
+  if (!content.trim()) { toastWarning('Nothing to push — write some notes first.'); return; }
 
   // Parse tags from content
   const pushItems = parseTags(content);
 
   if (pushItems.length === 0) {
-    alert('No tags found in your notes.\n\nUse tags like:\n@CharacterName — for characters\n#LocationName — for locations\n!FactionName — for factions\n~MysteryName — for mysteries\n*TechName — for technology');
+    toastWarning('No tags found in your notes. Use tags like @Character, #Location, !Faction, ~Mystery, *Tech.');
     return;
   }
 
@@ -192,6 +192,7 @@ function openPushModal(session) {
 
 function executePush(items) {
   let pushed = 0;
+  let saveOk = true;
 
   items.forEach(item => {
     const field = item.field || getFieldOptions(item.type)[0]?.value || 'description';
@@ -204,7 +205,7 @@ function executePush(items) {
         chars.push(char);
       }
       char[field] = ((char[field] || '') + '\n\n' + item.text).trim();
-      saveData('characters', chars);
+      saveOk = saveData('characters', chars) && saveOk;
       pushed++;
     }
     else if (item.type === 'location') {
@@ -215,7 +216,7 @@ function executePush(items) {
         locs.push(loc);
       }
       loc[field] = ((loc[field] || '') + '\n\n' + item.text).trim();
-      saveData('locations', locs);
+      saveOk = saveData('locations', locs) && saveOk;
       pushed++;
     }
     else if (item.type === 'faction') {
@@ -226,7 +227,7 @@ function executePush(items) {
         facs.push(fac);
       }
       fac[field] = ((fac[field] || '') + '\n\n' + item.text).trim();
-      saveData('factionData', facs);
+      saveOk = saveData('factionData', facs) && saveOk;
       pushed++;
     }
     else if (item.type === 'mystery') {
@@ -237,7 +238,7 @@ function executePush(items) {
         mysteries.push(mys);
       }
       mys[field] = ((mys[field] || '') + '\n\n' + item.text).trim();
-      saveData('mysteries', mysteries);
+      saveOk = saveData('mysteries', mysteries) && saveOk;
       pushed++;
     }
     else if (item.type === 'technology') {
@@ -248,21 +249,21 @@ function executePush(items) {
         techs.push(tech);
       }
       tech[field] = ((tech[field] || '') + '\n\n' + item.text).trim();
-      saveData('technologies', techs);
+      saveOk = saveData('technologies', techs) && saveOk;
       pushed++;
     }
   });
 
-  appStore.setState({ saveStatus: 'saving' });
-  setTimeout(() => appStore.setState({ saveStatus: 'saved' }), 300);
+  // Reflect the real write result in the save indicator.
+  appStore.setState(saveOk
+    ? { saveStatus: 'saved', lastSaved: Date.now() }
+    : { saveStatus: 'offline' });
 
-  // Toast
-  const toast = h('div', { style: { position: 'fixed', top: '60px', right: '20px', padding: '16px 24px', background: 'var(--bg-elevated)', border: '1px solid var(--success)', borderRadius: '12px', boxShadow: 'var(--shadow-lg)', zIndex: '9999', animation: 'slideUp 0.3s ease' } },
-    h('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' } }, `✅ Pushed ${pushed} item(s) to modules`),
-    h('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, 'Content has been added to the relevant modules. Open them to review.'),
-  );
-  document.body.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 4000);
+  if (saveOk) {
+    toastSuccess(`Pushed ${pushed} item(s) to modules — open them to review.`);
+  } else {
+    toastError('Some items could not be saved — storage may be full.');
+  }
 }
 
 // ─── Tag Parsing ─────────────────────────────────────────────────────────────
@@ -384,8 +385,9 @@ function createNewSession() {
   rerender();
 }
 
-function deleteSession(session) {
-  if (!confirm(`Delete "${session.title}"?`)) return;
+async function deleteSession(session) {
+  const ok = await confirmDialog({ title: `Delete "${session.title}"?`, message: 'This session will be permanently removed.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const idx = sessions.findIndex(s => s.id === session.id);
   if (idx !== -1) sessions.splice(idx, 1);
   activeSessionId = sessions.length > 0 ? sessions[0].id : null;

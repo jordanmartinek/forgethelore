@@ -6,7 +6,7 @@
 
 import { h } from '../core/renderer.js';
 import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
-import { appStore } from '../core/store.js';
+
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
