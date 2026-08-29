@@ -5,7 +5,7 @@
 
 import { h } from '../core/renderer.js';
 
-import { characterArcs, getArc, RELATIONSHIP_DIMENSIONS, getRelationshipsFor } from '../core/progression.js';
+import { characterArcs, getArc, RELATIONSHIP_DIMENSIONS, getRelationshipsFor, getStateAtScene } from '../core/progression.js';
 import { getPieces, getScenes } from '../core/entities.js';
 
 export function renderCharacterArc(container, characterId) {
@@ -95,6 +95,10 @@ function renderArcDetailContent(piece) {
       )
     ),
 
+    // State-at-Scene scrubber: replay how this character's resources stood at
+    // any point in the story, powered by progression.getStateAtScene.
+    renderStateAtSceneScrubber(piece, scenes),
+
     // Arc Timeline (visual progression)
     createCollapsible('Progression Timeline', true,
       arc && arc.events.length > 0
@@ -181,4 +185,70 @@ function createCollapsible(title, open, content) {
     ),
     h('div', { class: 'collapsible__body' }, h('div', { class: 'collapsible__content' }, content))
   );
+}
+
+/**
+ * "State at Scene X" scrubber. Uses progression.getStateAtScene to replay the
+ * character's resource levels at any scene, so the author can see exactly how a
+ * character stood at any moment in the story — a genuinely unique view that was
+ * previously only available as raw math with no UI.
+ */
+function renderStateAtSceneScrubber(piece, scenes) {
+  const ordered = [...scenes].sort((a, b) => (a.order || 0) - (b.order || 0));
+  if (ordered.length === 0) {
+    return createCollapsible('State at Scene', false,
+      h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '8px 0' } },
+        'Add scenes to the Strategic Board to scrub through this character\'s state over time.'));
+  }
+
+  // Without recorded arc events, getStateAtScene returns the same values for
+  // every scene, so the scrubber would look broken. Show a hint instead.
+  const arc = getArc(piece.id);
+  if (!arc || !arc.events || arc.events.length === 0) {
+    return createCollapsible('State at Scene', false,
+      h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '8px 0' } },
+        `No progression recorded for ${piece.name} yet. Log scene outcomes involving them (Quick Log) to replay how their resources change over time.`));
+  }
+
+  const bars = h('div', { style: { display: 'grid', gap: '8px', marginTop: '12px' } });
+  const caption = h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' } });
+
+  function paint(sceneId) {
+    const scene = ordered.find((s) => s.id === sceneId) || ordered[ordered.length - 1];
+    const state = getStateAtScene(piece.id, scene.id, ordered, getPieces());
+    const resources = (state && state.resources) ? state.resources : (piece.resources || {});
+    const momentum = (state && state.momentum) || piece.momentum;
+    caption.textContent = `At Scene ${scene.order}: ${scene.title || 'Untitled'} — momentum ${momentum}`;
+    bars.innerHTML = '';
+    Object.entries(resources).forEach(([key, value]) => {
+      const color = value > 70 ? 'var(--success)' : value > 40 ? 'var(--warning)' : 'var(--danger)';
+      bars.appendChild(h('div', {},
+        h('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '3px' } },
+          h('span', { style: { fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'capitalize' } }, key),
+          h('span', { style: { fontSize: '12px', fontWeight: '700', color } }, `${value}%`),
+        ),
+        h('div', { class: 'progress' }, h('div', { class: 'progress__bar', style: { width: `${value}%`, background: color } })),
+      ));
+    });
+  }
+
+  const slider = h('input', {
+    type: 'range', min: '0', max: String(ordered.length - 1), value: String(ordered.length - 1),
+    step: '1', style: { width: '100%' },
+    'aria-label': 'Scrub to scene',
+    oninput: (e) => paint(ordered[Number(e.target.value)].id),
+  });
+
+  paint(ordered[ordered.length - 1].id);
+
+  return createCollapsible('State at Scene (replay)', false,
+    h('div', {},
+      caption,
+      slider,
+      h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } },
+        h('span', {}, `Scene ${ordered[0].order}`),
+        h('span', {}, `Scene ${ordered[ordered.length - 1].order}`),
+      ),
+      bars,
+    ));
 }

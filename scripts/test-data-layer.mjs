@@ -87,5 +87,54 @@ const voss = searchContent('void researcher');
 assert(voss.some((hMatch) => hMatch.title === 'Dr. Orin Voss'), 'search matches on description text');
 assert(searchContent('a').length === 0, 'search ignores <2 char queries');
 
+// ── analysis engine (deterministic AI fallback) ─────────────────────────────
+const { analyzeProject, checkConsistencyOnly } = await import('../src/core/analysis.js');
+
+// Add a protagonist with no opposition and an isolated character to trigger rules.
+repo.upsert(Collections.PIECES, { id: 'p4', name: 'Lone Hero', faction: 'f2', role: 'protagonist' });
+// A scene referencing a non-existent participant -> dangling reference issue.
+repo.upsert(Collections.SCENES, { id: 's2', title: 'Ghost Meeting', order: 2, participants: ['p1', 'ghost99'] });
+
+const insights = analyzeProject();
+assert(Array.isArray(insights) && insights.length > 0, 'analyzeProject returns insights');
+assert(insights.some((i) => i.kind === 'suggestion' && /no meaningful opposition/i.test(i.title)),
+  'flags protagonist with no opposition');
+const issues = checkConsistencyOnly();
+assert(issues.some((i) => /missing character/i.test(i.title)),
+  'flags scene referencing a missing character');
+assert(insights.every((i) => i.kind === 'issue' || i.kind === 'suggestion'), 'insights are well-formed kinds');
+
+// ── AI parse (defensive JSON extraction) ─────────────────────────────────────
+const { parseInsights } = await import('../src/core/ai.js');
+assert(parseInsights('{"insights":[{"kind":"issue","title":"X","detail":"Y","icon":"⚠️"}]}').length === 1,
+  'parseInsights parses clean JSON');
+assert(parseInsights('Here you go:\n```json\n{"insights":[{"kind":"suggestion","title":"Z"}]}\n```').length === 1,
+  'parseInsights extracts JSON from surrounding prose/fences');
+assert(parseInsights('not json at all').length === 0, 'parseInsights tolerates garbage');
+
+// ── genre templates ─────────────────────────────────────────────────────────
+const { TEMPLATES, applyTemplate } = await import('../src/core/templates.js');
+assert(Object.keys(TEMPLATES).length >= 3, 'multiple genre templates exist');
+applyTemplate('projTpl', 'fantasy');
+const seededFactions = JSON.parse(store.get('loreforge_projTpl_factions') || '[]');
+const seededPieces = JSON.parse(store.get('loreforge_projTpl_pieces') || '[]');
+const seededLines = JSON.parse(store.get('loreforge_projTpl_conflictLines') || '[]');
+assert(seededFactions.length >= 2 && seededPieces.length >= 2, 'applyTemplate(fantasy) seeds factions + pieces');
+assert(seededPieces.every((p) => seededFactions.some((f) => f.id === p.faction)), 'template pieces reference real faction ids');
+assert(seededLines.length >= 1, 'template seeds conflict lines so protagonists have opposition');
+const proto = seededPieces.find((p) => p.role === 'protagonist');
+assert(proto && seededLines.some((l) => (l.from === proto.id || l.to === proto.id) && l.type === 'opposition'),
+  'seeded protagonist has an opposition conflict line');
+assert(TEMPLATES.blank.build().factions.length === 0, 'blank template seeds nothing');
+
+// ── AI settings round-trip ───────────────────────────────────────────────────
+const { getAISettings, saveAISettings, clearAISettings } = await import('../src/core/ai-settings.js');
+const { isAIEnabled } = await import('../src/core/ai.js');
+assert(isAIEnabled() === false, 'AI disabled with no key');
+saveAISettings({ provider: 'openai', apiKey: 'sk-test' });
+assert(getAISettings().provider === 'openai' && isAIEnabled() === true, 'AI enabled after saving a key');
+clearAISettings();
+assert(isAIEnabled() === false, 'AI disabled after clearing key');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} data-layer tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

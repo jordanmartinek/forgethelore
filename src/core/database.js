@@ -204,6 +204,83 @@ class LoreForgeDB {
     return snapshot;
   }
 
+  /**
+   * Dump object stores into a plain object for backup/export.
+   *
+   * Note: `appState` is intentionally EXCLUDED — it is global (not per-project)
+   * app state, so exporting/importing it would leak or clobber settings across
+   * projects. We only back up the content stores.
+   * @returns {Promise<Record<string, any[]>>}
+   */
+  async exportAll() {
+    if (!this.db) return {};
+    const stores = ['objects', 'relationships', 'boards'];
+    const dump = {};
+    for (const name of stores) {
+      try { dump[name] = await this.getAll(name); }
+      catch (_) { dump[name] = []; }
+    }
+    return dump;
+  }
+
+  /**
+   * Restore object stores from an exportAll() dump.
+   *
+   * IMPORTANT: the object stores are NOT namespaced per project (unlike
+   * localStorage). To honor the "import never overwrites your existing data"
+   * guarantee, every imported record is given a FRESH id, and relationship
+   * source/target ids are remapped to the new ids. This makes import purely
+   * additive — it can never collide with or overwrite existing records.
+   *
+   * `appState` is never imported (it is excluded from export too).
+   * @param {Record<string, any[]>} dump
+   * @returns {Promise<number>} number of records imported
+   */
+  async importAll(dump) {
+    if (!this.db || !dump || typeof dump !== 'object') return 0;
+
+    const idMap = new Map(); // oldId -> newId
+    const freshId = (oldId) => {
+      if (oldId == null) return `imp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+      if (!idMap.has(oldId)) idMap.set(oldId, `imp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`);
+      return idMap.get(oldId);
+    };
+
+    let count = 0;
+
+    // Pass 1: objects + boards get fresh ids (record the mapping).
+    for (const name of ['objects', 'boards']) {
+      const records = dump[name];
+      if (!Array.isArray(records) || !this.db.objectStoreNames.contains(name)) continue;
+      for (const rec of records) {
+        if (!rec || typeof rec !== 'object') continue;
+        try {
+          await this.put(name, { ...rec, id: freshId(rec.id) });
+          count++;
+        } catch (_) { /* skip bad record */ }
+      }
+    }
+
+    // Pass 2: relationships remap source/target to the new object ids.
+    const rels = dump.relationships;
+    if (Array.isArray(rels) && this.db.objectStoreNames.contains('relationships')) {
+      for (const rel of rels) {
+        if (!rel || typeof rel !== 'object') continue;
+        try {
+          await this.put('relationships', {
+            ...rel,
+            id: freshId(rel.id),
+            sourceId: idMap.get(rel.sourceId) || rel.sourceId,
+            targetId: idMap.get(rel.targetId) || rel.targetId,
+          });
+          count++;
+        } catch (_) { /* skip bad record */ }
+      }
+    }
+
+    return count;
+  }
+
   // Listeners for save status
   onStatusChange(listener) {
     this.listeners.add(listener);

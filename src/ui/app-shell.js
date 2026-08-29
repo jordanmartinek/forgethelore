@@ -10,6 +10,8 @@ import { db } from '../core/database.js';
 import { getNavGroups, getModuleLabel, renderModuleById } from '../core/registry.js';
 import { APP_NAME, APP_VERSION } from '../core/version.js';
 import { timeAgo, formatNumber, countWords } from '../core/format.js';
+import { openAISettings } from './ai-settings-panel.js';
+import { TEMPLATES, applyTemplate } from '../core/templates.js';
 import { renderCommandPalette } from './command-palette.js';
 
 // ─── Navigation Structure ────────────────────────────────────────────────────
@@ -102,7 +104,7 @@ function createTopBar() {
     ),
     h('div', { class: 'topbar__right' },
       createSaveIndicator(),
-      h('button', { class: 'btn btn--ghost btn--icon', title: 'Settings' }, '⚙'),
+      h('button', { class: 'btn btn--ghost btn--icon', title: 'AI Settings', 'aria-label': 'AI Settings', onclick: () => openAISettings() }, '⚙'),
     )
   );
 }
@@ -512,8 +514,26 @@ function switchProject(projectId) {
 }
 
 function openNewProjectModal() {
-  const state = { name: '', icon: '📖', description: '' };
+  const state = { name: '', icon: '📖', description: '', template: 'blank' };
   const PROJECT_ICONS = ['📖', '🌌', '⚔️', '🌃', '🏰', '🚀', '🐉', '🔮', '🌍', '💫', '🎭', '🕸️', '🌊', '⚡', '👑', '🗡️', '🛸', '🌑', '🔥', '🧬'];
+
+  // Genre starter templates seed a new project with a small scaffold.
+  const templateGrid = h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' } },
+    ...Object.entries(TEMPLATES).map(([id, tpl]) => h('button', {
+      class: 'btn',
+      type: 'button',
+      style: { textAlign: 'left', padding: '8px 10px', border: id === state.template ? '1px solid var(--border-accent)' : '1px solid var(--border-subtle)', background: id === state.template ? 'var(--bg-active)' : 'transparent' },
+      onclick: (e) => {
+        state.template = id;
+        e.currentTarget.parentElement.querySelectorAll('button').forEach(b => { b.style.border = '1px solid var(--border-subtle)'; b.style.background = 'transparent'; });
+        e.currentTarget.style.border = '1px solid var(--border-accent)';
+        e.currentTarget.style.background = 'var(--bg-active)';
+      },
+    },
+      h('div', { style: { fontSize: '13px', fontWeight: '600' } }, `${tpl.icon} ${tpl.label}`),
+      h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' } }, tpl.description),
+    )),
+  );
 
   const iconGrid = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
     ...PROJECT_ICONS.map(ic => h('span', {
@@ -535,6 +555,10 @@ function openNewProjectModal() {
       h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, 'Description (optional)'),
       h('input', { class: 'input', placeholder: 'A short description of this universe...', oninput: (e) => state.description = e.target.value }),
     ),
+    h('div', { style: { marginBottom: '12px' } },
+      h('label', { style: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' } }, 'Starter Template'),
+      templateGrid,
+    ),
   );
 
   const existing = document.querySelector('.modal-overlay');
@@ -550,6 +574,8 @@ function openNewProjectModal() {
           const newId = `proj_${Date.now()}`;
           const appState = appStore.getState();
           appState.projects.push({ id: newId, name: state.name, icon: state.icon, lastOpened: Date.now(), description: state.description });
+          // Seed the new project with the chosen genre template before switching.
+          if (state.template && state.template !== 'blank') applyTemplate(newId, state.template);
           switchProject(newId);
           overlay.remove();
         } }, 'Create Project'),

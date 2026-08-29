@@ -11,6 +11,7 @@ import { propagateSceneOutcome } from '../core/progression.js';
 import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { showModal, formField as createFormField, confirmDialog } from '../ui/modal.js';
 import { events } from '../core/events.js';
+import { getInsights, isAIEnabled } from '../core/ai.js';
 
 // ─── Board Data (loaded from localStorage or defaults) ───────────────────────
 
@@ -60,12 +61,12 @@ const pieces = loadData('pieces', _isDemo ? DEFAULT_PIECES : []);
 const conflictLines = loadData('conflictLines', _isDemo ? DEFAULT_CONFLICT_LINES : []);
 const scenes = loadData('scenes', _isDemo ? DEFAULT_SCENES : []);
 
+// NOTE: the old hardcoded aiSuggestions array has been replaced by the real
+// analysis engine (core/analysis.js) + optional AI layer (core/ai.js), wired
+// into renderIntelPanel below. This constant is kept only as an initial
+// placeholder shown for the split-second before the async analysis resolves.
 const aiSuggestions = [
-  { icon: '⚠️', text: 'Captain Sera currently has no meaningful opposition. Consider adding a direct antagonist or increasing pressure from the Dominion.' },
-  { icon: '💥', text: 'Aurelian and AXIOM Prime plans are likely to collide at the Void Conduit. This creates a natural escalation point.' },
-  { icon: '🔄', text: 'The Swarm has become too dominant in sector 7. No faction is currently defending that territory.' },
-  { icon: '🗡️', text: 'Senator Vex would logically betray Aurelian once Conduit control is achieved. Their hidden objectives conflict.' },
-  { icon: '🤝', text: 'Unit-7 and Dr. Orin Voss share knowledge-focused goals. An unlikely alliance could create interesting narrative tension.' },
+  { icon: '🧠', text: 'Analyzing your board…' },
 ];
 
 const strategicLayers = ['All', 'Political', 'Military', 'Personal', 'Economic', 'Knowledge', 'Mystery'];
@@ -686,11 +687,23 @@ function renderIntelPanel() {
   const panel = h('div', { class: 'conflict-board__intel', id: 'intel-panel' });
 
   if (!selectedPiece) {
-    panel.append(
-      h('div', { class: 'intel-section' },
-        h('div', { class: 'intel-section__title' }, '🧠 AI STRATEGIC ANALYSIS'),
-        ...aiSuggestions.map(s => h('div', { class: 'ai-suggestion' }, h('span', { class: 'ai-suggestion__icon' }, s.icon), ' ', s.text))
+    const analysisSection = h('div', { class: 'intel-section', id: 'intel-analysis' },
+      h('div', { class: 'intel-section__title' },
+        isAIEnabled() ? '🧠 AI STRATEGIC ANALYSIS' : '🧠 STRATEGIC ANALYSIS',
+        h('button', {
+          class: 'btn btn--ghost btn--sm',
+          style: { float: 'right', fontSize: '10px', padding: '2px 6px' },
+          title: 'Re-run analysis',
+          onclick: () => refreshIntelAnalysis(),
+        }, '↻'),
       ),
+      ...aiSuggestions.map(s => h('div', { class: 'ai-suggestion' }, h('span', { class: 'ai-suggestion__icon' }, s.icon), ' ', s.text)),
+    );
+    // Populate with real, data-driven insights (async so an optional AI call
+    // never blocks the board render).
+    refreshIntelAnalysis(analysisSection);
+    panel.append(
+      analysisSection,
       h('div', { class: 'intel-section' },
         h('div', { class: 'intel-section__title' }, '📊 BOARD STATISTICS'),
         h('div', { class: 'intel-card' }, h('div', { class: 'intel-card__label' }, 'Active Factions'), h('div', { class: 'intel-card__value' }, String(factions.length))),
@@ -705,6 +718,51 @@ function renderIntelPanel() {
   }
 
   return panel;
+}
+
+/**
+ * Fill the analysis section with real insights. Runs the deterministic engine
+ * immediately; if the user configured an AI key, upgrades with model insights
+ * when they arrive. Never throws into the render path.
+ * @param {HTMLElement} [section] Optional target; falls back to #intel-analysis.
+ */
+async function refreshIntelAnalysis(section) {
+  const target = section || document.getElementById('intel-analysis');
+  if (!target) return;
+
+  const paint = (insights, loading) => {
+    const el = section || document.getElementById('intel-analysis');
+    if (!el) return;
+    // Keep the title row (first child), replace the rest.
+    const title = el.querySelector('.intel-section__title');
+    el.innerHTML = '';
+    if (title) el.appendChild(title);
+    if (loading) {
+      el.appendChild(h('div', { class: 'ai-suggestion' }, h('span', { class: 'ai-suggestion__icon' }, '🧠'), ' Analyzing your board…'));
+      return;
+    }
+    if (!insights.length) {
+      el.appendChild(h('div', { class: 'ai-suggestion' }, h('span', { class: 'ai-suggestion__icon' }, '✅'), ' No issues detected.'));
+      return;
+    }
+    insights.slice(0, 8).forEach((ins) => {
+      el.appendChild(
+        h('div', { class: 'ai-suggestion', style: ins.kind === 'issue' ? { borderLeft: '2px solid var(--danger, #ef4444)', paddingLeft: '8px' } : {}, title: ins.detail },
+          h('span', { class: 'ai-suggestion__icon' }, ins.icon), ' ',
+          h('strong', {}, ins.title),
+          ins.detail ? h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' } }, ins.detail) : null,
+        )
+      );
+    });
+  };
+
+  try {
+    const { insights } = await getInsights();
+    paint(insights, false);
+  } catch (e) {
+    console.warn('[LoreForge] analysis failed:', e);
+    paint([], false);
+  }
 }
 
 function renderObjectiveProgress() {

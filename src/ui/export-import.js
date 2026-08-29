@@ -6,37 +6,41 @@
 
 import { h } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
+import { db } from '../core/database.js';
 import { toast, toastSuccess, toastError } from './toast.js';
 import { confirmDialog } from './modal.js';
 import { APP_NAME, EXPORT_SCHEMA_VERSION } from '../core/version.js';
 
 /**
- * Export the current project's data as a downloadable JSON file
+ * Gather the full export payload for the active project: the namespaced
+ * localStorage data (all module data) AND the IndexedDB object stores (which
+ * the old exporter silently omitted). Async because IndexedDB is async.
+ * @returns {Promise<{payload: object, projectName: string}>}
  */
-export function exportProject() {
+async function gatherExportData() {
   const state = appStore.getState();
   const projectId = state.activeProjectId;
   const project = state.projects.find(p => p.id === projectId);
   const projectName = project ? project.name : 'LoreForge Project';
 
-  // Gather all localStorage keys for this project
+  // localStorage (namespaced per project).
   const prefix = `loreforge_${projectId}_`;
   const data = {};
-  
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key.startsWith(prefix)) {
       const shortKey = key.slice(prefix.length);
-      try {
-        data[shortKey] = JSON.parse(localStorage.getItem(key));
-      } catch (e) {
-        data[shortKey] = localStorage.getItem(key);
-      }
+      try { data[shortKey] = JSON.parse(localStorage.getItem(key)); }
+      catch (e) { data[shortKey] = localStorage.getItem(key); }
     }
   }
 
-  // Include project metadata
-  const exportPayload = {
+  // IndexedDB object stores (objects/relationships/boards/snapshots/appState).
+  let indexeddb = {};
+  try { indexeddb = await db.exportAll(); }
+  catch (e) { console.warn('[LoreForge] IndexedDB export skipped:', e.message); }
+
+  const payload = {
     _meta: {
       appName: APP_NAME,
       schemaVersion: EXPORT_SCHEMA_VERSION,
@@ -47,13 +51,42 @@ export function exportProject() {
       projectDescription: project?.description || '',
     },
     data,
+    indexeddb,
   };
+  return { payload, projectName };
+}
 
-  // Create and download the file
-  const json = JSON.stringify(exportPayload, null, 2);
+/**
+ * Migrate an imported payload from an older schema version to the current one.
+ * This is the hook that keeps old backups importable as the format evolves.
+ * @param {object} payload
+ * @returns {object} migrated payload (never mutates the input in place)
+ */
+export function migrateExportPayload(payload) {
+  const p = { ...payload, _meta: { ...(payload._meta || {}) }, data: payload.data || {} };
+  // Legacy exports used _meta.version ("1.0") and had no schemaVersion / indexeddb.
+  const ver = typeof p._meta.schemaVersion === 'number' ? p._meta.schemaVersion : 1;
+
+  if (ver < 2) {
+    // v1 -> v2: ensure an indexeddb section exists (v1 had none).
+    if (!p.indexeddb) p.indexeddb = {};
+  }
+
+  p._meta.schemaVersion = EXPORT_SCHEMA_VERSION;
+  return p;
+}
+
+/**
+ * Export the current project's data as a downloadable JSON file (now includes
+ * IndexedDB stores, not just localStorage).
+ */
+export async function exportProject() {
+  const { payload, projectName } = await gatherExportData();
+
+  const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  
+
   const a = document.createElement('a');
   a.href = url;
   a.download = `${projectName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.loreforge.json`;
@@ -81,19 +114,23 @@ export function importProject() {
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const payload = JSON.parse(event.target.result);
-        
+        let payload = JSON.parse(event.target.result);
+
         if (!payload._meta || !payload.data) {
           toastError('Invalid file format. Please select a valid LoreForge export file.');
           return;
         }
 
+        // Migrate older export schemas forward before importing.
+        payload = migrateExportPayload(payload);
+
         const meta = payload._meta;
+        const hasDB = payload.indexeddb && Object.values(payload.indexeddb).some((a) => Array.isArray(a) && a.length);
         const importMode = await confirmDialog({
           title: `Import "${meta.projectName}"?`,
           message:
             `Exported: ${new Date(meta.exportDate).toLocaleString()}\n` +
-            `Data keys: ${Object.keys(payload.data).length}\n\n` +
+            `Data keys: ${Object.keys(payload.data).length}${hasDB ? ' (+ object database)' : ''}\n\n` +
             `This will be created as a new project so it never overwrites your existing data.`,
           confirmLabel: 'Import as New Project',
           cancelLabel: 'Cancel',
@@ -119,6 +156,12 @@ export function importProject() {
         const prefix = `loreforge_${newProjectId}_`;
         for (const [key, value] of Object.entries(payload.data)) {
           localStorage.setItem(prefix + key, JSON.stringify(value));
+        }
+
+        // Restore the IndexedDB object stores, if the export included them.
+        if (payload.indexeddb) {
+          try { await db.importAll(payload.indexeddb); }
+          catch (e) { console.warn('[LoreForge] IndexedDB import skipped:', e.message); }
         }
 
         // Switch to the imported project
@@ -265,35 +308,8 @@ async function exportToFolder() {
       localStorage.setItem('loreforge_exportFolderName', savedDirectoryHandle.name);
     }
 
-    // Build the export data
-    const state = appStore.getState();
-    const projectId = state.activeProjectId;
-    const project = state.projects.find(p => p.id === projectId);
-    const projectName = project ? project.name : 'LoreForge Project';
-
-    const prefix = `loreforge_${projectId}_`;
-    const data = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key.startsWith(prefix)) {
-        const shortKey = key.slice(prefix.length);
-        try { data[shortKey] = JSON.parse(localStorage.getItem(key)); }
-        catch (e) { data[shortKey] = localStorage.getItem(key); }
-      }
-    }
-
-    const exportPayload = {
-      _meta: {
-        appName: APP_NAME,
-        schemaVersion: EXPORT_SCHEMA_VERSION,
-        exportDate: new Date().toISOString(),
-        projectId,
-        projectName: project?.name || 'Unknown',
-        projectIcon: project?.icon || '📖',
-        projectDescription: project?.description || '',
-      },
-      data,
-    };
+    // Build the export data (same payload as file export: localStorage + IndexedDB).
+    const { payload: exportPayload, projectName } = await gatherExportData();
 
     // Write to the folder
     const fileName = `${projectName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.loreforge.json`;
