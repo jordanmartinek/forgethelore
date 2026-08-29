@@ -10,6 +10,7 @@ import { generateId } from '../core/objects.js';
 import { propagateSceneOutcome } from '../core/progression.js';
 import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { showModal, formField as createFormField, confirmDialog } from '../ui/modal.js';
+import { events } from '../core/events.js';
 
 // ─── Board Data (loaded from localStorage or defaults) ───────────────────────
 
@@ -96,6 +97,17 @@ let activeSceneId = null;
 window.__loreforge_pieces = pieces;
 window.__loreforge_scenes = scenes;
 window.__loreforge_factions = factions;
+
+// Persist the demo defaults to storage on first load so the unified data layer
+// (entities/search/knowledge-graph) sees the same world the board holds in
+// memory. Without this, a fresh demo project would show demo data on the board
+// but an empty graph/search until the first edit triggered a save.
+(function persistDemoDefaultsOnce() {
+  if (loadData('pieces', null) === null && pieces.length) saveData('pieces', pieces);
+  if (loadData('factions', null) === null && factions.length) saveData('factions', factions);
+  if (loadData('scenes', null) === null && scenes.length) saveData('scenes', scenes);
+  if (loadData('conflictLines', null) === null && conflictLines.length) saveData('conflictLines', conflictLines);
+})();
 
 // ─── Modal System ────────────────────────────────────────────────────────────
 
@@ -349,6 +361,12 @@ function triggerSave() {
     saveData('conflictLines', conflictLines),
     saveData('scenes', scenes),
   ].every(Boolean);
+  // Keep the compatibility globals pointing at the current arrays and notify
+  // the entity layer (knowledge graph, search, dashboard) that data changed.
+  window.__loreforge_pieces = pieces;
+  window.__loreforge_scenes = scenes;
+  window.__loreforge_factions = factions;
+  events.emit('repo:changed', { collection: 'board' });
   appStore.setState(ok
     ? { saveStatus: 'saved', lastSaved: Date.now() }
     : { saveStatus: 'offline' });

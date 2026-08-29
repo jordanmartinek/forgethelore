@@ -10,7 +10,7 @@
  * navigates the user straight to the relevant planner.
  */
 
-import { loadData } from './persist.js';
+import * as repo from './repo.js';
 
 /**
  * Map of localStorage key -> descriptor for how to interpret its records.
@@ -35,6 +35,9 @@ const SEARCHABLE = [
   { key: 'mysteries',         module: 'mysteries',       icon: '🔍', label: 'Mystery',      fields: ['title', 'name', 'description'] },
   { key: 'manuscriptScenes',  module: 'manuscript',      icon: '📖', label: 'Scene',        fields: ['title', 'summary', 'content'] },
   { key: 'brainstormSessions',module: 'brainstorm',      icon: '💭', label: 'Brainstorm',   fields: ['title', 'content'] },
+  { key: 'characterArcs',     module: 'knowledge-matrix',icon: '📈', label: 'Character Arc',fields: ['name', 'summary'] },
+  { key: 'writingSprints',    module: 'writing-sprint',  icon: '⏱️', label: 'Sprint',       fields: ['title', 'content'] },
+  { key: 'timelineEvents',    module: 'timeline',        icon: '⏳', label: 'Timeline Event',fields: ['title', 'name', 'description'] },
 ];
 
 /**
@@ -67,8 +70,8 @@ export function searchContent(query, limit = 8) {
   const hits = [];
 
   for (const src of SEARCHABLE) {
-    const records = loadData(src.key, null);
-    if (!Array.isArray(records)) continue;
+    const records = repo.list(src.key);
+    if (!Array.isArray(records) || records.length === 0) continue;
 
     for (const rec of records) {
       if (!rec || typeof rec !== 'object') continue;

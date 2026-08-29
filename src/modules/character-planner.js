@@ -3,9 +3,16 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { loadData, saveData, persistState, getActiveProjectId } from '../core/persist.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { showModal, formField, confirmDialog } from '../ui/modal.js';
+import { getBoardFactions, getFactionData } from '../core/entities.js';
+
+// Combined faction list from both the strategic board and the faction planner,
+// read live through the entity layer (replaces window.__loreforge_* globals).
+function allFactionSources() {
+  return [...getBoardFactions(), ...getFactionData()];
+}
 
 let demoCharacters = [
   { id: 'c1', name: 'Aurelian', role: 'Supreme Commander', faction: 'The Dominion', color: '#ef4444', momentum: 'rising', status: 'active', description: 'The charismatic and ruthless leader of the Dominion. Publicly champions human survival but secretly pursues Void evolution.' },
@@ -20,7 +27,18 @@ let demoCharacters = [
 
 // Load persisted data (replaces demo data if user has saved)
 const _savedChars = loadData("characters", null);
-if (_savedChars) { demoCharacters.length = 0; demoCharacters.push(..._savedChars); }
+if (_savedChars) {
+  demoCharacters.length = 0;
+  demoCharacters.push(..._savedChars);
+} else if (getActiveProjectId() === 'proj1') {
+  // Demo project: persist the seed characters so the unified data layer
+  // (entity graph, search) sees them without waiting for the first edit.
+  // Uses saveData (not persistState) since this runs at module load.
+  saveData('characters', demoCharacters);
+} else {
+  // New/non-demo projects start empty rather than inheriting demo characters.
+  demoCharacters.length = 0;
+}
 
 export function renderCharacterPlanner(container, mode = 'characters') {
   const planner = h('div', { class: 'character-planner' },
@@ -44,8 +62,7 @@ export function renderCharacterPlanner(container, mode = 'characters') {
 function renderCharacterList(mode) {
   const factionColors = {};
   // Build faction color map from all sources
-  (window.__loreforge_factions || []).forEach(f => { factionColors[f.name] = f.color; });
-  (window.__loreforge_factionData || []).forEach(f => { factionColors[f.name] = f.color; });
+  allFactionSources().forEach(f => { factionColors[f.name] = f.color; });
   
   // Get unique factions for filter
   const allFactions = [...new Set(demoCharacters.map(c => c.faction))];
@@ -98,8 +115,7 @@ function filterCharactersByFaction(faction) {
   // Temporarily filter and re-render
   const filtered = demoCharacters.filter(c => c.faction === faction);
   const factionColors = {};
-  (window.__loreforge_factions || []).forEach(f => { factionColors[f.name] = f.color; });
-  (window.__loreforge_factionData || []).forEach(f => { factionColors[f.name] = f.color; });
+  allFactionSources().forEach(f => { factionColors[f.name] = f.color; });
   
   const allFactions = [...new Set(demoCharacters.map(c => c.faction))];
   
@@ -163,8 +179,7 @@ function createCharacterCard(char, factionColor) {
 function openEditCharacterModal(char) {
   const state = { ...char };
   const factionOptions = [
-    ...(window.__loreforge_factions || []).map(f => f.name),
-    ...(window.__loreforge_factionData || []).map(f => f.name),
+    ...allFactionSources().map(f => f.name),
     ...new Set(demoCharacters.map(c => c.faction)),
     'Independent', 'Other'
   ].filter((v, i, a) => a.indexOf(v) === i);
@@ -219,8 +234,7 @@ function renderCharacterDetail(char) {
 
 function renderCharacterDetailContent(char) {
   const factionColors = {};
-  (window.__loreforge_factions || []).forEach(f => { factionColors[f.name] = f.color; });
-  (window.__loreforge_factionData || []).forEach(f => { factionColors[f.name] = f.color; });
+  allFactionSources().forEach(f => { factionColors[f.name] = f.color; });
   const color = factionColors[char.faction] || char.color || '#6366f1';
 
   return h('div', {},
@@ -334,8 +348,7 @@ function updateCharacterSidebar(mode) {
 function openAddCharacterModal() {
   const state = { name: '', role: '', faction: 'Independent', description: '' };
   const factionOptions = [
-    ...(window.__loreforge_factions || []).map(f => f.name),
-    ...(window.__loreforge_factionData || []).map(f => f.name),
+    ...allFactionSources().map(f => f.name),
     ...new Set(demoCharacters.map(c => c.faction)),
     'Independent', 'Other'
   ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate

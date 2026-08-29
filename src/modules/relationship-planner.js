@@ -17,10 +17,7 @@ function reportSave(ok) {
 }
 
 // Reference to pieces from conflict board (shared data)
-function getPieces() {
-  // Import dynamically to avoid circular deps
-  return window.__loreforge_pieces || [];
-}
+import { getPieces } from '../core/entities.js';
 
 export function renderRelationshipPlanner(container) {
   const planner = h('div', { class: 'character-planner' },
@@ -47,9 +44,12 @@ function renderRelationshipList() {
     ),
   );
 
+  // Read pieces once per render and index by id (avoids re-parsing storage per row).
+  const pieceById = new Map(getPieces().map(p => [p.id, p]));
+
   relationships.forEach(rel => {
-    const source = getPieces().find(p => p.id === rel.sourceId);
-    const target = getPieces().find(p => p.id === rel.targetId);
+    const source = pieceById.get(rel.sourceId);
+    const target = pieceById.get(rel.targetId);
     const sourceName = source ? source.name : rel.sourceId;
     const targetName = target ? target.name : rel.targetId;
     const typeColor = getTypeColor(rel.type);
@@ -264,12 +264,13 @@ function updateRelationshipSidebar() {
   if (!sidebar) return;
   sidebar.innerHTML = '';
 
+  const pieceById = new Map(getPieces().map(p => [p.id, p]));
   const types = [...new Set(relationships.map(r => r.type))];
   types.forEach(type => {
     sidebar.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginTop: '8px' } }, type));
     relationships.filter(r => r.type === type).forEach(rel => {
-      const source = getPieces().find(p => p.id === rel.sourceId);
-      const target = getPieces().find(p => p.id === rel.targetId);
+      const source = pieceById.get(rel.sourceId);
+      const target = pieceById.get(rel.targetId);
       sidebar.appendChild(h('div', { class: 'sidebar-item' },
         h('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: getTypeColor(type), flexShrink: '0' } }),
         h('span', { class: 'sidebar-item__label' }, `${source?.name || '?'} ↔ ${target?.name || '?'}`),

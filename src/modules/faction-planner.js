@@ -4,7 +4,7 @@
  */
 
 import { h } from '../core/renderer.js';
-import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
+import { loadData, saveData, persistState, getActiveProjectId } from '../core/persist.js';
 import { generateId } from '../core/objects.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { showModal, formField, confirmDialog } from '../ui/modal.js';
@@ -27,6 +27,12 @@ if (_saved_factionData) { factionData.length = 0; factionData.push(..._saved_fac
 
 // Expose faction data globally so other modules can read faction names
 window.__loreforge_factionData = factionData;
+
+// Persist demo defaults on first load so the unified data layer sees them
+// (see the matching note in conflict-board.js).
+if (loadData('factionData', null) === null && factionData.length) {
+  saveData('factionData', factionData);
+}
 
 export function renderFactionPlanner(container) {
   const planner = h('div', { class: 'character-planner' },

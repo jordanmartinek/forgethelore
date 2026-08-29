@@ -10,6 +10,9 @@ import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 import { generateId } from '../core/objects.js';
 import { showModal, formField, confirmDialog } from '../ui/modal.js';
 import { toastError } from '../ui/toast.js';
+import { getPieces, getBoardFactions, getFactionData } from '../core/entities.js';
+
+function allFactionSources() { return [...getBoardFactions(), ...getFactionData()]; }
 import { expandableText } from '../ui/expandable-text.js';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -257,8 +260,8 @@ async function deleteLanguage(lang) {
 function renderConnections(lang) {
   const chars = lang.connectedCharacters || [];
   const facs = lang.connectedFactions || [];
-  const allPieces = window.__loreforge_pieces || [];
-  const allFactions = [...(window.__loreforge_factions || []), ...(window.__loreforge_factionData || [])];
+  const allPieces = getPieces();
+  const allFactions = allFactionSources();
 
   return h('div', {},
     // Connected Factions
@@ -299,7 +302,7 @@ function renderConnections(lang) {
 }
 
 function openConnectFactionModal(lang) {
-  const allFactions = [...(window.__loreforge_factions || []), ...(window.__loreforge_factionData || [])];
+  const allFactions = allFactionSources();
   const existing = lang.connectedFactions || [];
   const available = allFactions.filter(f => !existing.includes(f.name));
 
@@ -322,7 +325,7 @@ function openConnectFactionModal(lang) {
 }
 
 function openConnectCharacterModal(lang) {
-  const allPieces = window.__loreforge_pieces || [];
+  const allPieces = getPieces();
   const existing = lang.connectedCharacters || [];
   const available = allPieces.filter(p => !existing.includes(p.name));
 
