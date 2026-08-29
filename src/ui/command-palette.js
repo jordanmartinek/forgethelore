@@ -19,6 +19,9 @@ import { promptDialog, openModal } from './modal.js';
 import { toastSuccess, toastInfo } from './toast.js';
 import { exportProject } from './export-import.js';
 import { openAISettings } from './ai-settings-panel.js';
+import { openSyncSettings } from './sync-settings-panel.js';
+import { syncNow } from '../core/sync/sync-init.js';
+import { isSyncConfigured } from '../core/sync/sync-settings.js';
 import { getInsights } from '../core/ai.js';
 
 // Navigation commands generated from the registry.
@@ -51,6 +54,8 @@ const createCommands = [
 const utilityCommands = [
   { id: 'goto-dashboard', icon: '🏠', label: 'Go to Dashboard', category: 'Navigate', action: () => appStore.setState({ activeModule: 'dashboard' }) },
   { id: 'ai-settings', icon: '🧠', label: 'AI Settings (Bring Your Own Key)', category: 'Utility', action: () => openAISettings() },
+  { id: 'sync-settings', icon: '☁️', label: 'Cloud Sync Settings', category: 'Utility', action: () => openSyncSettings() },
+  { id: 'sync-now', icon: '🔄', label: 'Sync Now', category: 'Utility', action: () => { if (isSyncConfigured()) { syncNow(); toastInfo('Syncing…'); } else { openSyncSettings(); } } },
   { id: 'analyze', icon: '🔍', label: 'Analyze Story for Issues', category: 'Utility', action: () => runAnalysis() },
   { id: 'export', icon: '📦', label: 'Export Project', category: 'Utility', action: () => exportProject() },
   { id: 'import-panel', icon: '📥', label: 'Open Export / Import', category: 'Utility', action: () => appStore.setState({ activeModule: 'export-import' }) },

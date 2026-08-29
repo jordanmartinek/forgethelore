@@ -40,6 +40,8 @@ function makeFakeDB() {
             put: (rec) => makeRequest(() => { store.set(rec[KEYPATH[name]], rec); return rec[KEYPATH[name]]; }),
             get: (id) => makeRequest(() => store.get(id)),
             getAll: () => makeRequest(() => [...store.values()]),
+            clear: () => makeRequest(() => { store.clear(); return undefined; }),
+            delete: (id) => makeRequest(() => { store.delete(id); return undefined; }),
           };
         },
       };
@@ -106,6 +108,31 @@ assert(importedRel.id !== 'rel_A', 'imported relationship got a fresh id (did no
 // appState must be untouched by import.
 const themeAfter = (await db.getAll('appState')).find((r) => r.key === 'theme');
 assert(themeAfter && themeAfter.value === 'dark', 'appState was NOT modified by import');
+
+// ── replaceAll (the SYNC apply path) must be IDEMPOTENT ──────────────────────
+// Applying the same snapshot twice must NOT grow the stores or change ids —
+// this is what keeps cloud sync from duplicating objects on every pull.
+const syncSnapshot = {
+  objects: [
+    { id: 'sync_obj_1', type: 'character', name: 'Synced Hero' },
+    { id: 'sync_obj_2', type: 'faction', name: 'Synced Faction' },
+  ],
+  relationships: [
+    { id: 'sync_rel_1', sourceId: 'sync_obj_1', targetId: 'sync_obj_2', type: 'member_of' },
+  ],
+};
+
+await db.replaceAll(syncSnapshot);
+const firstApply = await db.getAll('objects');
+assert(firstApply.length === 2, `replaceAll clears then writes: exactly 2 objects (got ${firstApply.length})`);
+assert(firstApply.find((o) => o.id === 'sync_obj_1'), 'replaceAll preserves ids verbatim (no fresh-id remap)');
+
+await db.replaceAll(syncSnapshot); // apply the SAME snapshot again (simulates a 2nd pull)
+const secondApply = await db.getAll('objects');
+const secondRels = await db.getAll('relationships');
+assert(secondApply.length === 2, `replaceAll is idempotent: still 2 objects after re-apply (got ${secondApply.length})`);
+assert(secondRels.length === 1, `replaceAll is idempotent: still 1 relationship after re-apply (got ${secondRels.length})`);
+assert(secondApply.find((o) => o.id === 'sync_obj_1'), 'replaceAll re-apply keeps stable ids');
 
 console.log(`\n${failed === 0 ? '✅' : '❌'} export round-trip tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

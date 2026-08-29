@@ -52,6 +52,9 @@ export function initAppShell() {
     if (state.saveStatus !== prev.saveStatus) {
       updateSaveIndicator();
     }
+    if (state.syncStatus !== prev.syncStatus) {
+      updateSyncIndicator();
+    }
     if (state.commandPaletteOpen !== prev.commandPaletteOpen) {
       if (state.commandPaletteOpen) {
         renderCommandPalette();
@@ -104,6 +107,7 @@ function createTopBar() {
     ),
     h('div', { class: 'topbar__right' },
       createSaveIndicator(),
+      createSyncIndicator(),
       h('button', { class: 'btn btn--ghost btn--icon', title: 'AI Settings', 'aria-label': 'AI Settings', onclick: () => openAISettings() }, '⚙'),
     )
   );
@@ -129,6 +133,44 @@ function updateSaveIndicator() {
     case 'saving': text.textContent = 'Saving...'; break;
     case 'offline': text.textContent = 'Offline (Queued)'; break;
   }
+}
+
+// Cloud sync indicator — only visible once sync is configured (status !== 'idle').
+// Clicking it triggers a manual sync (handled in main.js via a custom event).
+function createSyncIndicator() {
+  return h('button', {
+    class: 'save-indicator save-indicator--idle',
+    id: 'sync-indicator',
+    title: 'Cloud sync — click to sync now',
+    'aria-label': 'Cloud sync status',
+    style: { display: 'none', background: 'transparent', border: 'none', cursor: 'pointer' },
+    onclick: () => window.dispatchEvent(new CustomEvent('loreforge:sync-now')),
+  },
+    h('span', { class: 'save-indicator__dot' }),
+    h('span', { class: 'save-indicator__text' }, 'Sync'),
+  );
+}
+
+const SYNC_LABEL = {
+  idle: '', syncing: 'Syncing…', synced: 'Synced', offline: 'Sync offline',
+  conflict: 'Sync conflict', error: 'Sync error',
+};
+
+function updateSyncIndicator() {
+  const indicator = document.getElementById('sync-indicator');
+  if (!indicator) return;
+  const state = appStore.getState();
+  const status = state.syncStatus || 'idle';
+  // 'idle' means sync isn't configured — hide the indicator entirely.
+  indicator.style.display = status === 'idle' ? 'none' : '';
+  // Reuse save-indicator visual states: map sync statuses onto them.
+  const visual = status === 'syncing' ? 'saving' : status === 'synced' ? 'saved' : 'offline';
+  indicator.className = `save-indicator save-indicator--${visual}`;
+  indicator.style.background = 'transparent';
+  indicator.style.border = 'none';
+  indicator.style.cursor = 'pointer';
+  const text = indicator.querySelector('.save-indicator__text');
+  if (text) text.textContent = SYNC_LABEL[status] || 'Sync';
 }
 
 function updateBreadcrumbs() {

@@ -42,6 +42,10 @@ export const appStore = createStore({
   // Save State
   saveStatus: 'saved', // 'saved' | 'saving' | 'offline'
   lastSaved: Date.now(),
+
+  // Cloud Sync State (separate from local save status)
+  syncStatus: 'idle', // 'idle' | 'syncing' | 'synced' | 'offline' | 'conflict' | 'error'
+  lastSynced: null,
   
   // UI State
   commandPaletteOpen: false,

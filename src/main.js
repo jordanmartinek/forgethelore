@@ -16,6 +16,8 @@ import { events, Events } from './core/events.js';
 import { wirePersistStatus } from './core/persist.js';
 import { initAppShell } from './ui/app-shell.js';
 import { initToasts, toastSuccess, toastInfo, toastError } from './ui/toast.js';
+import { initSync, wireSyncListeners, setConflictResolver } from './core/sync/sync-init.js';
+import { promptConflict } from './ui/sync-settings-panel.js';
 
 async function init() {
   try {
@@ -54,6 +56,12 @@ async function init() {
     // Initialize the application shell
     initAppShell();
     console.log('[LoreForge] Application shell initialized');
+
+    // Initialize optional cloud sync (no-op unless the user configured it).
+    // The UI-driven conflict resolver is installed before any pull can run.
+    setConflictResolver(promptConflict);
+    wireSyncListeners();
+    initSync();
     
     // Welcome toast
     setTimeout(() => toastInfo('LoreForge Planner ready. Press Ctrl+K for commands.'), 500);
