@@ -1,0 +1,137 @@
+/**
+ * LoreForge Planner - Theme Palettes (#37)
+ *
+ * The default palette lives in main.css `:root` ("Candlelit Parchment").
+ * Alternate themes are pure CSS custom-property swaps applied via a
+ * `data-theme` attribute on <html> (set by src/core/theme.js). Because every
+ * component styles itself off the same variables, switching a theme only means
+ * redefining the variables here — no component needs to change.
+ *
+ * IMPORTANT: only redeclare *color/shadow/surface* tokens here. Spacing, radii,
+ * typography, transitions, and z-index stay inherited from :root so the layout
+ * never shifts between themes.
+ */
+
+/* ── Midnight Ink — cool indigo dark ─────────────────────────────────────── */
+html[data-theme='midnight'] {
+  --bg-primary: #0d0d16;
+  --bg-secondary: #12121e;
+  --bg-tertiary: #171726;
+  --bg-elevated: #1c1c2e;
+  --bg-hover: #24243a;
+  --bg-active: #2d2d48;
+
+  --surface-1: #14141f;
+  --surface-2: #1a1a29;
+  --surface-3: #222235;
+  --surface-4: #2c2c44;
+
+  --text-primary: #e8e8f5;
+  --text-secondary: #a8a8c8;
+  --text-tertiary: #7a7a9c;
+  --text-muted: #55556e;
+
+  --accent-primary: #6366f1;
+  --accent-primary-hover: #818cf8;
+  --accent-secondary: #a855f7;
+  --accent-tertiary: #22d3ee;
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+
+  --border-subtle: rgba(99,102,241,0.08);
+  --border-default: rgba(99,102,241,0.16);
+  --border-strong: rgba(99,102,241,0.28);
+  --border-accent: rgba(99,102,241,0.55);
+
+  --shadow-glow: 0 0 20px rgba(99,102,241,0.18), 0 0 40px rgba(99,102,241,0.06);
+}
+
+/* ── Daylight — light theme ──────────────────────────────────────────────── */
+html[data-theme='daylight'] {
+  --bg-primary: #f7f6f2;
+  --bg-secondary: #efeee8;
+  --bg-tertiary: #e7e5dd;
+  --bg-elevated: #ffffff;
+  --bg-hover: #ecebe4;
+  --bg-active: #e2e0d5;
+
+  --surface-1: #ffffff;
+  --surface-2: #f4f3ee;
+  --surface-3: #eceae2;
+  --surface-4: #e3e1d7;
+
+  --text-primary: #1f1b14;
+  --text-secondary: #4a4438;
+  --text-tertiary: #726a58;
+  --text-muted: #9a9484;
+
+  --accent-primary: #2563eb;
+  --accent-primary-hover: #1d4ed8;
+  --accent-secondary: #7c3aed;
+  --accent-tertiary: #0d9488;
+
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+
+  --border-subtle: rgba(31,27,20,0.06);
+  --border-default: rgba(31,27,20,0.12);
+  --border-strong: rgba(31,27,20,0.20);
+  --border-accent: rgba(37,99,235,0.45);
+
+  --shadow-sm: 0 1px 3px rgba(31,27,20,0.10), 0 1px 2px rgba(31,27,20,0.06);
+  --shadow-md: 0 4px 16px rgba(31,27,20,0.12), 0 2px 4px rgba(31,27,20,0.06);
+  --shadow-lg: 0 12px 40px rgba(31,27,20,0.16), 0 4px 12px rgba(31,27,20,0.08);
+  --shadow-glow: 0 0 20px rgba(37,99,235,0.10), 0 0 40px rgba(37,99,235,0.04);
+}
+
+/* The default body background layers warm radial gradients tuned for a dark
+ * canvas; on the light theme they muddy the page, so flatten them. */
+html[data-theme='daylight'] body {
+  background-image: none;
+}
+
+/* ── Terminal Green — high-contrast phosphor ─────────────────────────────── */
+html[data-theme='terminal'] {
+  --bg-primary: #0a0f0a;
+  --bg-secondary: #0d140d;
+  --bg-tertiary: #111a11;
+  --bg-elevated: #142014;
+  --bg-hover: #1a2a1a;
+  --bg-active: #213421;
+
+  --surface-1: #0f170f;
+  --surface-2: #131e13;
+  --surface-3: #1a281a;
+  --surface-4: #223322;
+
+  --text-primary: #d6ffd6;
+  --text-secondary: #8fce8f;
+  --text-tertiary: #5f9a5f;
+  --text-muted: #3f663f;
+
+  --accent-primary: #22c55e;
+  --accent-primary-hover: #4ade80;
+  --accent-secondary: #14b8a6;
+  --accent-tertiary: #a3e635;
+
+  --success: #22c55e;
+  --warning: #eab308;
+  --danger: #ef4444;
+  --info: #22d3ee;
+
+  --border-subtle: rgba(34,197,94,0.10);
+  --border-default: rgba(34,197,94,0.20);
+  --border-strong: rgba(34,197,94,0.32);
+  --border-accent: rgba(34,197,94,0.55);
+
+  --shadow-glow: 0 0 20px rgba(34,197,94,0.18), 0 0 40px rgba(34,197,94,0.06);
+
+  --font-sans: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-heading: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-ui: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+}
