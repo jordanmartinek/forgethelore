@@ -22,6 +22,8 @@ import { renderMysteryPlanner } from '../modules/mystery-planner.js';
 import { renderTimeline } from '../modules/timeline.js';
 import { renderKnowledgeGraph } from '../modules/knowledge-graph.js';
 import { renderAnalytics } from '../modules/analytics.js';
+import { renderKnowledgeMatrix } from '../modules/knowledge-matrix.js';
+import { renderFamilyTree } from '../modules/family-tree.js';
 import { renderLocationPlanner } from '../modules/location-planner.js';
 import { renderReligionPlanner } from '../modules/religion-planner.js';
 import { renderPoliticsPlanner } from '../modules/politics-planner.js';
@@ -83,6 +85,8 @@ export const MODULES = [
   { id: 'knowledge-graph', label: 'Knowledge Graph', icon: '🕸️', group: 'analysis', render: renderKnowledgeGraph },
   { id: 'relationships',   label: 'Relationships',   icon: '💫', group: 'analysis', render: renderRelationshipPlanner },
   { id: 'knowledge-matrix',label: 'Character Arcs',  icon: '📈', group: 'analysis', render: renderCharacterArc },
+  { id: 'secrets-matrix',  label: 'Knowledge & Setups', icon: '🕵️', group: 'analysis', render: renderKnowledgeMatrix },
+  { id: 'family-tree',     label: 'Family Trees',    icon: '🌳', group: 'analysis', render: renderFamilyTree },
   { id: 'analytics',       label: 'Analytics',       icon: '📊', group: 'analysis', render: renderAnalytics },
   { id: 'export-import',   label: 'Export / Import', icon: '💾', group: 'analysis', render: renderExportImport },
 ];
