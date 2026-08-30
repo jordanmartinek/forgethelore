@@ -183,5 +183,40 @@ assert(railLimited.characters.length === 1, 'rail respects the character limit')
 const railEmpty = contextRail({ participants: [], location: '' }, {});
 assert(railEmpty.characters.length === 0 && railEmpty.factions.length === 0 && railEmpty.location === null, 'empty scene yields empty rail');
 
+// ── Persistent reminder banner ────────────────────────────────────────────────
+const banner = await import('../src/core/banner.js');
+theme.setTheme('parchment');
+assert(banner.getBannerText() === banner.DEFAULT_TEXT, 'banner defaults to the {theme} reminder');
+assert(banner.isBannerEnabled() === true, 'banner is enabled by default');
+// {theme} token resolves to the active theme's label.
+assert(banner.resolveBannerText('Theme: {theme}') === 'Theme: Candlelit Parchment', 'resolves {theme} to the active theme label');
+theme.setTheme('terminal');
+assert(banner.resolveBannerText('Theme: {theme}') === 'Theme: Terminal Green', '{theme} tracks the current theme live');
+theme.setTheme('parchment');
+// Custom text persists and unknown tokens pass through untouched.
+banner.setBannerText('Tone: grimdark {unknown}');
+assert(banner.getBannerText() === 'Tone: grimdark {unknown}', 'custom banner text persists');
+assert(banner.resolveBannerText() === 'Tone: grimdark {unknown}', 'unknown tokens are left as-is');
+assert(banner.resolveBannerText('no tokens here') === 'no tokens here', 'plain text returned unchanged');
+// {date} resolves to today's locale date (non-empty) and is substituted.
+const dateOut = banner.resolveBannerText('As of {date}');
+assert(dateOut.startsWith('As of ') && !dateOut.includes('{date}'), '{date} token is substituted');
+// Enable/disable round-trip.
+banner.setBannerEnabled(false);
+assert(banner.isBannerEnabled() === false, 'banner can be hidden');
+banner.setBannerEnabled(true);
+assert(banner.isBannerEnabled() === true, 'banner can be re-shown');
+// Empty custom text is allowed (author cleared it) and does not fall back to default.
+banner.setBannerText('');
+assert(banner.getBannerText() === '' && banner.resolveBannerText() === '', 'empty banner text is respected');
+// Changes emit an event so every window can update live.
+let notified = false;
+const { events: evBus } = await import('../src/core/events.js');
+const offB = evBus.on(banner.BANNER_CHANGED, () => { notified = true; });
+banner.setBannerText('Goal: 1000 words');
+assert(notified === true, 'setBannerText emits BANNER_CHANGED');
+offB();
+banner.setBannerText(banner.DEFAULT_TEXT);
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} writing/spatial tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

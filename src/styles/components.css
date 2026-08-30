@@ -4,7 +4,8 @@
 .app-layout {
   display: grid;
   grid-template-columns: 240px 1fr;
-  grid-template-rows: 44px 1fr 28px;
+  /* rows: topbar | reminder banner | nav+content | statusbar */
+  grid-template-rows: 44px auto 1fr 28px;
   height: 100vh;
   overflow: hidden;
   transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -12,6 +13,11 @@
 
 .app-layout--sidebar-collapsed {
   grid-template-columns: 0px 1fr;
+}
+
+/* Collapse the banner row entirely when the banner is hidden. */
+.app-layout--banner-hidden {
+  grid-template-rows: 44px 0 1fr 28px;
 }
 
 .app-layout--sidebar-collapsed .nav-sidebar {
@@ -89,6 +95,182 @@
   gap: var(--space-md);
 }
 
+/* ─── Persistent Reminder Banner ───────────────────────────────────────────── */
+
+.reminder-banner {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 40px;
+  padding: 6px var(--space-lg);
+  /* Warm accent wash so the strip clearly stands apart from the top bar and
+     content in every theme (colors come from theme CSS variables). */
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--accent-primary) 26%, var(--bg-elevated)) 0%,
+      color-mix(in srgb, var(--accent-primary) 12%, var(--bg-elevated)) 45%,
+      var(--bg-elevated) 100%);
+  border-top: 1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  border-bottom: 2px solid var(--accent-primary);
+  box-shadow: 0 2px 14px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+/* A bright accent bar down the leading edge — an unmissable "pinned" cue. */
+.reminder-banner::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent-primary);
+  box-shadow: 0 0 10px var(--accent-primary);
+}
+
+/* Slow shimmer sweep to draw the eye without being distracting. */
+.reminder-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.10) 50%, transparent 80%);
+  background-size: 220% 100%;
+  animation: reminder-shimmer 7s ease-in-out infinite;
+}
+
+@keyframes reminder-shimmer {
+  0%   { background-position: 140% 0; }
+  55%  { background-position: -40% 0; }
+  100% { background-position: -40% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reminder-banner::after { animation: none; }
+}
+
+/* "PINNED" badge / pill. */
+.reminder-banner__badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
+  /* White glyphs with a dark halo stay legible on any accent hue (gold, blue,
+     green) across all themes. */
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  z-index: 1;
+}
+
+.reminder-banner__badge-icon {
+  font-size: 12px;
+  line-height: 1;
+  filter: saturate(1.2);
+}
+
+.reminder-banner__text {
+  flex: 1;
+  min-width: 0;
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  color: var(--text-primary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  z-index: 1;
+}
+
+.reminder-banner__text:hover,
+.reminder-banner__text:focus-visible {
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  box-shadow: inset 0 0 0 1px var(--border-accent);
+  outline: none;
+}
+
+/* Placeholder state reads as an invitation, not a real reminder. */
+.reminder-banner__text--empty {
+  font-weight: 600;
+  font-style: italic;
+  color: var(--text-secondary);
+  text-shadow: none;
+}
+
+.reminder-banner__input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 5px 10px;
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+  z-index: 1;
+}
+
+.reminder-banner__hint {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.reminder-banner__btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  z-index: 1;
+}
+
+.reminder-banner__btn:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  border-color: var(--border-accent);
+}
+
+/* Read-only mirror shown inside overlays (e.g. Focus Mode). */
+.reminder-banner--mirror {
+  grid-column: auto;
+  grid-row: auto;
+  min-height: 0;
+}
+
+.reminder-banner--mirror::after { animation-duration: 9s; }
+
+.reminder-banner--mirror .reminder-banner__text--static {
+  cursor: default;
+}
+
 /* ─── Save Indicator ───────────────────────────────────────────────────────── */
 
 .save-indicator {
@@ -130,7 +312,7 @@
 
 .nav-sidebar {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
@@ -271,7 +453,7 @@
 
 .main-content {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   overflow: auto;
   position: relative;
   background: var(--bg-primary);
@@ -282,7 +464,7 @@
 
 .statusbar {
   grid-column: 1 / -1;
-  grid-row: 3;
+  grid-row: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;

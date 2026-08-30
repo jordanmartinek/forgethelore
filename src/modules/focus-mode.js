@@ -16,6 +16,7 @@ import { h } from '../core/renderer.js';
 import { loadData, persistState } from '../core/persist.js';
 import { list, Collections } from '../core/repo.js';
 import { sessionStats, contextRail } from '../core/focus-model.js';
+import { mountBannerInto } from '../ui/banner.js';
 
 const TRUBY_TITLES = {
   1: 'Self-Revelation, Need & Desire', 2: 'Ghost & Story World', 3: 'Weakness & Need',
@@ -117,7 +118,13 @@ function saveCard(stepNum, card) {
 
 function openOverlay(card, root) {
   const existing = document.getElementById('focus-overlay');
-  if (existing) existing.remove();
+  if (existing) {
+    // Tear down the previous overlay's banner-mirror subscriptions before
+    // discarding it, so switching/reopening cards doesn't leak event handlers.
+    const oldMirror = existing.querySelector('.reminder-banner--mirror');
+    if (oldMirror && typeof oldMirror._cleanup === 'function') oldMirror._cleanup();
+    existing.remove();
+  }
 
   const startedAt = Date.now();
   const startText = card.content || '';
@@ -175,6 +182,9 @@ function openOverlay(card, root) {
     if (saveTimer) clearTimeout(saveTimer);
     saveCard(card.stepNum, { id: card.id, title: card.title, content: editor.value, color: card.color });
     document.removeEventListener('keydown', onKey);
+    // Tear down the banner mirror's event subscriptions.
+    const mirror = overlay.querySelector('.reminder-banner--mirror');
+    if (mirror && typeof mirror._cleanup === 'function') mirror._cleanup();
     overlay.remove();
     renderPicker(root); // refresh previews
   };
@@ -184,6 +194,11 @@ function openOverlay(card, root) {
   };
   document.addEventListener('keydown', onKey);
 
+  // Persistent reminder banner mirror — keeps the reminder visible even in the
+  // distraction-free fullscreen window.
+  const bannerSlot = h('div', {});
+  mountBannerInto(bannerSlot);
+
   const overlay = h('div', {
     id: 'focus-overlay',
     style: {
@@ -191,6 +206,7 @@ function openOverlay(card, root) {
       display: 'flex', flexDirection: 'column',
     },
   },
+    bannerSlot,
     // Top bar.
     h('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)' } },
       h('div', { style: { flex: '1', minWidth: '0' } }, titleInput),
