@@ -44,7 +44,12 @@ export function mountBannerInto(container) {
     // "click to add" placeholder on empty text, but the read-only mirror has no
     // edit affordance, so it simply hides when there's nothing to remind.
     mirror.style.display = isBannerEnabled() && getBannerText().trim() ? '' : 'none';
-    mirror.textContent = resolveBannerText();
+    mirror.innerHTML = '';
+    mirror.appendChild(h('span', { class: 'reminder-banner__badge', 'aria-hidden': 'true' },
+      h('span', { class: 'reminder-banner__badge-icon' }, '📌'),
+      h('span', { class: 'reminder-banner__badge-label' }, 'PINNED'),
+    ));
+    mirror.appendChild(h('span', { class: 'reminder-banner__text reminder-banner__text--static' }, resolveBannerText()));
   };
   paintMirror();
   const off = events.on(BANNER_CHANGED, paintMirror);
@@ -63,14 +68,21 @@ function paint(banner) {
   banner.innerHTML = '';
   if (!enabled) return;
 
+  // Leading badge makes the strip read as a deliberate, important reminder.
+  const badge = h('span', { class: 'reminder-banner__badge', 'aria-hidden': 'true' },
+    h('span', { class: 'reminder-banner__badge-icon' }, '📌'),
+    h('span', { class: 'reminder-banner__badge-label' }, 'PINNED'),
+  );
+
+  const hasText = !!resolveBannerText(text).trim();
   const label = h('span', {
-    class: 'reminder-banner__text',
+    class: `reminder-banner__text${hasText ? '' : ' reminder-banner__text--empty'}`,
     title: 'Click to edit this reminder. Use {theme} to show the current theme.',
     tabindex: '0',
     role: 'button',
     onclick: () => startEdit(banner),
     onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEdit(banner); } },
-  }, resolveBannerText(text) || 'Click to add a persistent reminder…');
+  }, hasText ? resolveBannerText(text) : 'Click to add a persistent reminder…');
 
   const editBtn = h('button', {
     class: 'reminder-banner__btn', title: 'Edit reminder', 'aria-label': 'Edit reminder',
@@ -82,6 +94,7 @@ function paint(banner) {
     onclick: () => setBannerEnabled(false),
   }, '✕');
 
+  banner.appendChild(badge);
   banner.appendChild(label);
   banner.appendChild(editBtn);
   banner.appendChild(hideBtn);
