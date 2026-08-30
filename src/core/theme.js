@@ -8,6 +8,8 @@
  * (not per project) in localStorage and applied as early as possible.
  */
 
+import { events } from './events.js';
+
 const STORAGE_KEY = 'loreforge_theme';
 
 /** Available themes. 'parchment' is the built-in default (no data-theme attr). */
@@ -27,6 +29,9 @@ export function setTheme(id) {
   const theme = THEMES.some((t) => t.id === id) ? id : 'parchment';
   try { localStorage.setItem(STORAGE_KEY, theme); } catch (_) { /* ignore */ }
   applyTheme(theme);
+  // Notify listeners (e.g. the reminder banner's {theme} token) so UI reflecting
+  // the active theme stays live without a manual refresh.
+  try { events.emit('theme:changed', { theme }); } catch (_) { /* events optional */ }
   return theme;
 }
 

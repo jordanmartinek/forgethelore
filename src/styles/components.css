@@ -4,7 +4,8 @@
 .app-layout {
   display: grid;
   grid-template-columns: 240px 1fr;
-  grid-template-rows: 44px 1fr 28px;
+  /* rows: topbar | reminder banner | nav+content | statusbar */
+  grid-template-rows: 44px auto 1fr 28px;
   height: 100vh;
   overflow: hidden;
   transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -12,6 +13,11 @@
 
 .app-layout--sidebar-collapsed {
   grid-template-columns: 0px 1fr;
+}
+
+/* Collapse the banner row entirely when the banner is hidden. */
+.app-layout--banner-hidden {
+  grid-template-rows: 44px 0 1fr 28px;
 }
 
 .app-layout--sidebar-collapsed .nav-sidebar {
@@ -89,6 +95,97 @@
   gap: var(--space-md);
 }
 
+/* ─── Persistent Reminder Banner ───────────────────────────────────────────── */
+
+.reminder-banner {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 30px;
+  padding: 4px var(--space-lg);
+  background: linear-gradient(90deg, var(--bg-active), var(--bg-elevated));
+  border-bottom: 1px solid var(--border-default);
+  box-shadow: var(--shadow-glow);
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.reminder-banner__text {
+  flex: 1;
+  min-width: 0;
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  transition: background var(--transition-fast);
+}
+
+.reminder-banner__text:hover,
+.reminder-banner__text:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+.reminder-banner__input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 3px 8px;
+  outline: none;
+}
+
+.reminder-banner__hint {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.reminder-banner__btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.reminder-banner__btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* Read-only mirror shown inside overlays (e.g. Focus Mode). */
+.reminder-banner--mirror {
+  display: block;
+  grid-column: auto;
+  grid-row: auto;
+  min-height: 0;
+  padding: 6px var(--space-lg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  box-shadow: none;
+}
+
 /* ─── Save Indicator ───────────────────────────────────────────────────────── */
 
 .save-indicator {
@@ -130,7 +227,7 @@
 
 .nav-sidebar {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
@@ -271,7 +368,7 @@
 
 .main-content {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   overflow: auto;
   position: relative;
   background: var(--bg-primary);
@@ -282,7 +379,7 @@
 
 .statusbar {
   grid-column: 1 / -1;
-  grid-row: 3;
+  grid-row: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -109,6 +109,8 @@ const modules = [
   '../src/ui/expandable-text.js',
   '../src/ui/export-import.js',
   '../src/core/theme.js',
+  '../src/core/banner.js',
+  '../src/ui/banner.js',
   '../src/core/pov-analytics.js',
   '../src/core/map-model.js',
   '../src/core/focus-model.js',

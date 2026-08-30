@@ -14,6 +14,15 @@ import { openAISettings } from './ai-settings-panel.js';
 import { TEMPLATES, applyTemplate, applyGeneratedWorld } from '../core/templates.js';
 import { renderCommandPalette } from './command-palette.js';
 import { THEMES, getTheme, setTheme } from '../core/theme.js';
+import { createBanner, showBanner } from './banner.js';
+import { isBannerEnabled } from '../core/banner.js';
+
+// Reflect the banner's initial visibility on the layout grid so a hidden banner
+// collapses its row. banner.js keeps this in sync on later toggles.
+function applyInitialBannerLayout() {
+  const layout = document.querySelector('.app-layout');
+  if (layout) layout.classList.toggle('app-layout--banner-hidden', !isBannerEnabled());
+}
 
 // ─── Navigation Structure ────────────────────────────────────────────────────
 // Sidebar groups are derived from the single module registry (core/registry.js)
@@ -33,12 +42,14 @@ export function initAppShell() {
 
   const layout = h('div', { class: 'app-layout' },
     createTopBar(),
+    createBanner(),
     createNavSidebar(),
     createMainContent(),
     createStatusBar()
   );
 
   render(app, layout);
+  applyInitialBannerLayout();
 
   // Render initial module
   renderActiveModule();
@@ -109,6 +120,7 @@ function createTopBar() {
     h('div', { class: 'topbar__right' },
       createSaveIndicator(),
       createSyncIndicator(),
+      h('button', { class: 'btn btn--ghost btn--icon', title: 'Show/edit reminder banner', 'aria-label': 'Show reminder banner', id: 'banner-btn', onclick: () => showBanner() }, '📌'),
       h('button', { class: 'btn btn--ghost btn--icon', title: 'Theme', 'aria-label': 'Change theme', id: 'theme-btn', onclick: toggleThemeMenu }, '🎨'),
       h('button', { class: 'btn btn--ghost btn--icon', title: 'AI Settings', 'aria-label': 'AI Settings', onclick: () => openAISettings() }, '⚙'),
     )
