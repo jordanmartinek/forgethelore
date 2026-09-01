@@ -176,7 +176,7 @@ function renderToolbar() {
     { id: 'path', icon: '〰️', label: 'Paths & routes' },
     { id: 'stamp', icon: '🌲', label: 'Stamp' },
     { id: 'label', icon: '🔤', label: 'Label' },
-    { id: 'select', icon: '🖐️', label: 'Move / select' },
+    { id: 'select', icon: '⤢', label: 'Select · Move · Resize' },
   ];
   return h('div', { class: 'fmap__toolbar' },
     // Style switcher (fantasy vs sci-fi)
@@ -314,14 +314,40 @@ function labelPalette() {
 function selectedLabelControls() {
   const lb = project.labels.find((l) => l.id === selectedLabelId);
   if (!lb) return null;
+  const setSize = (v) => { lb.size = clamp(Math.round(v), 8, 160); renderLabelsLayer(); renderOverlayLayer(); refreshPalette(); scheduleSave(); };
   return h('div', { class: 'fmap__pal-box' },
-    h('div', { class: 'fmap__pal-sub' }, `Selected: “${lb.text}”`),
-    sliderRow('Size', Math.round(lb.size || 18), 8, 160, (v) => { lb.size = v; renderLabelsLayer(); renderOverlayLayer(); scheduleSave(); }),
+    h('div', { class: 'fmap__pal-sub' }, `Selected label: “${lb.text}”`),
+    resizeControl('Size', lb.size || 18, 8, 160, setSize),
     sliderRow('Curve', Math.round((lb.curve || 0) * 100), -100, 100, (v) => { lb.curve = v / 100; renderLabelsLayer(); scheduleSave(); }),
     h('select', { class: 'input', onchange: (e) => { lb.font = e.target.value; renderLabelsLayer(); scheduleSave(); } },
       ...FONTS.map((f) => h('option', { value: f.id, selected: (lb.font || 'serif') === f.id ? 'selected' : null }, f.label)),
     ),
     h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%', marginTop: '6px' }, onclick: () => deleteSelectedLabel() }, '🗑 Delete label'),
+  );
+}
+
+/**
+ * A prominent resize control: −/+ step buttons flanking a size slider, with the
+ * current value shown. Both stamps and labels use it, so "resize after placing"
+ * is obvious no matter how the user prefers to interact.
+ */
+function resizeControl(label, value, min, max, setValue) {
+  const v = Math.round(value);
+  const step = Math.max(1, Math.round((max - min) / 40));
+  return h('div', { class: 'fmap__resize' },
+    h('div', { class: 'fmap__resize-head' },
+      h('span', {}, `⤢ ${label}`),
+      h('span', { class: 'fmap__resize-val' }, String(v)),
+    ),
+    h('div', { class: 'fmap__resize-row' },
+      h('button', { class: 'fmap__resize-btn', title: 'Smaller', onclick: () => setValue(v - step) }, '−'),
+      h('input', {
+        type: 'range', min: String(min), max: String(max), value: String(clamp(v, min, max)),
+        class: 'fmap__resize-slider',
+        oninput: (e) => setValue(parseInt(e.target.value, 10)),
+      }),
+      h('button', { class: 'fmap__resize-btn', title: 'Bigger', onclick: () => setValue(v + step) }, '+'),
+    ),
   );
 }
 
@@ -356,20 +382,23 @@ function selectPalette() {
   return h('div', {},
     h('div', { class: 'fmap__pal-title' }, 'Select & Move'),
     selectedLabelId ? selectedLabelControls() : null,
-    selectedStampId ? h('div', { class: 'fmap__pal-box' },
-      h('div', { class: 'fmap__pal-sub' }, 'Selected stamp'),
-      sliderRow('Size', Math.round((project.stamps.find((s) => s.id === selectedStampId) || {}).size || 46), 12, 400, (v) => { const s = project.stamps.find((x) => x.id === selectedStampId); if (s) { s.size = v; renderStampsLayer(); renderOverlayLayer(); scheduleSave(); } }),
-      h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%', marginTop: '6px' }, onclick: () => deleteSelectedStamp() }, '🗑 Delete stamp'),
-    ) : null,
+    selectedStampId ? (() => {
+      const s = project.stamps.find((x) => x.id === selectedStampId);
+      return h('div', { class: 'fmap__pal-box' },
+        h('div', { class: 'fmap__pal-sub' }, 'Selected element'),
+        resizeControl('Size', (s && s.size) || 46, 12, 400, (v) => { if (s) { s.size = clamp(Math.round(v), 12, 400); renderStampsLayer(); renderOverlayLayer(); refreshPalette(); scheduleSave(); } }),
+        h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%', marginTop: '6px' }, onclick: () => deleteSelectedStamp() }, '🗑 Delete'),
+      );
+    })() : null,
     selectedPathId ? h('div', { class: 'fmap__pal-box' },
       h('div', { class: 'fmap__pal-sub' }, 'Selected path'),
       h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%' }, onclick: () => deleteSelectedPath() }, '🗑 Delete path'),
     ) : null,
     (selectedStampId || selectedLabelId)
-      ? h('div', { class: 'fmap__pal-hint' }, 'Tip: drag the blue corner handle on the map to resize, or use the slider above.')
+      ? h('div', { class: 'fmap__pal-hint' }, 'Resize with the −/+ buttons or slider above, or drag the blue corner handle on the map. Drag the element itself to move it.')
       : null,
     (!selectedLabelId && !selectedStampId && !selectedPathId)
-      ? h('div', { class: 'fmap__pal-hint' }, 'Click a stamp, label, or path to select it. Drag it to move, drag its corner handle to resize, or delete it here.')
+      ? h('div', { class: 'fmap__pal-hint' }, 'Click any element on the map to select it — then resize it here (−/+ , slider, or the corner handle), move it by dragging, or delete it.')
       : null,
   );
 }
@@ -645,17 +674,47 @@ function onDoubleClick(e) {
 function commitStampStroke() {
   const opts = { ...stampOpts, seed: (Date.now() & 0xffff) || 1 };
   const placements = scatterStamps(strokePath.length ? strokePath : [lastPoint || strokePath[0]], opts);
+  const added = [];
   placements.forEach((p) => {
-    project.stamps.push({
+    const stamp = {
       id: `st_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
       shape: activeStamp,
       x: p.x, y: p.y, size: p.size,
       color: stampColor(activeStamp),
-    });
+    };
+    project.stamps.push(stamp);
+    added.push(stamp);
   });
+  const wasTap = strokePath.length <= 1; // no drag movement was recorded
   strokePath = [];
   renderStampsLayer();
   save();
+  // First single-tap placement of a session: auto-select it and switch to the
+  // Select tool so the resize handle + controls are discovered. After that,
+  // stay on the Stamp tool so repeated tapping places many stamps freely.
+  if (wasTap && added.length === 1 && !_autoResizeIntroShown) {
+    _autoResizeIntroShown = true;
+    selectAndEdit('stamp', added[0].id);
+    toastInfo('Tip: drag the corner handle (or use −/+) to resize. Re-pick a tool to keep placing.');
+  }
+}
+
+// One-shot: the first placed element auto-switches to Select so the user
+// discovers resizing; subsequent placements don't interrupt the workflow.
+let _autoResizeIntroShown = false;
+
+/**
+ * Select an element by kind+id, switch to the Select tool, and reveal its
+ * controls — the bridge that makes "place then resize" a continuous flow
+ * instead of a hidden, multi-step chore.
+ */
+function selectAndEdit(kind, id) {
+  selectedStampId = kind === 'stamp' ? id : null;
+  selectedLabelId = kind === 'label' ? id : null;
+  selectedPathId = kind === 'path' ? id : null;
+  if (tool !== 'select') { setTool('select'); } // setTool re-renders palette + overlay
+  else { refreshPalette(); renderOverlayLayer(); }
+  renderStampsLayer(); renderLabelsLayer(); renderPathsLayer();
 }
 
 function renderStampsLayer() {
@@ -861,7 +920,7 @@ function renderOverlayLayer() {
   if (tool === 'select') drawSelectionChrome(ctx);
 }
 
-const HANDLE = 11; // resize-handle square size (canvas px)
+const HANDLE = 16; // resize-handle square size (canvas px)
 
 /** Bounding box {x,y,w,h} of the currently selected stamp or label, or null. */
 function selectionBounds() {
@@ -888,33 +947,56 @@ function drawSelectionChrome(ctx) {
   const b = selectionBounds();
   if (!b) return;
   ctx.save();
-  // Dashed bounding box.
-  ctx.strokeStyle = 'rgba(80,140,255,0.95)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([5, 4]);
-  ctx.strokeRect(b.x - 4, b.y - 4, b.w + 8, b.h + 8);
-  // Resize handle at the bottom-right corner.
+  // Bounding box: a white casing under a blue dashed line so it reads on any
+  // surface (light parchment or dark star chart).
+  const bx = b.x - 5, by = b.y - 5, bw = b.w + 10, bh = b.h + 10;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
   ctx.setLineDash([]);
-  const hx = b.x + b.w + 4 - HANDLE / 2;
-  const hy = b.y + b.h + 4 - HANDLE / 2;
-  ctx.fillStyle = '#5088ff';
+  ctx.strokeRect(bx, by, bw, bh);
+  ctx.strokeStyle = 'rgba(60,120,255,0.98)';
+  ctx.lineWidth = 1.6;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(bx, by, bw, bh);
+
+  // Prominent resize handle at the bottom-right corner with a diagonal glyph.
+  ctx.setLineDash([]);
+  const hx = bx + bw - HANDLE / 2;
+  const hy = by + bh - HANDLE / 2;
+  ctx.fillStyle = '#3b82f6';
   ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(hx, hy, HANDLE, HANDLE, 2) : ctx.rect(hx, hy, HANDLE, HANDLE);
+  if (ctx.roundRect) ctx.roundRect(hx, hy, HANDLE, HANDLE, 3); else ctx.rect(hx, hy, HANDLE, HANDLE);
   ctx.fill();
+  ctx.stroke();
+  // Little diagonal resize arrows inside the handle.
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(hx + 4, hy + HANDLE - 4); ctx.lineTo(hx + HANDLE - 4, hy + 4);
+  ctx.moveTo(hx + HANDLE - 4, hy + 4); ctx.lineTo(hx + HANDLE - 4, hy + 8);
+  ctx.moveTo(hx + HANDLE - 4, hy + 4); ctx.lineTo(hx + HANDLE - 8, hy + 4);
+  ctx.moveTo(hx + 4, hy + HANDLE - 4); ctx.lineTo(hx + 4, hy + HANDLE - 8);
+  ctx.moveTo(hx + 4, hy + HANDLE - 4); ctx.lineTo(hx + 8, hy + HANDLE - 4);
   ctx.stroke();
   ctx.restore();
 }
 
-/** Is the point on the selection's resize handle? */
+/** Is the point on the selection's resize handle? (matches drawSelectionChrome) */
 function hitResizeHandle(pt) {
   const b = selectionBounds();
   if (!b) return false;
-  const hx = b.x + b.w + 4 - HANDLE / 2;
-  const hy = b.y + b.h + 4 - HANDLE / 2;
-  const pad = 6; // generous grab area
-  return pt.x >= hx - pad && pt.x <= hx + HANDLE + pad && pt.y >= hy - pad && pt.y <= hy + HANDLE + pad;
+  const bx = b.x - 5, by = b.y - 5, bw = b.w + 10, bh = b.h + 10;
+  // Handle sits at the bottom-right corner of the box.
+  const hx = bx + bw - HANDLE / 2;
+  const hy = by + bh - HANDLE / 2;
+  const cx = hx + HANDLE / 2, cy = hy + HANDLE / 2;
+  // Grab radius scales DOWN for small elements so the handle can't swallow the
+  // whole element (which would make drag-to-move unreachable). Also require the
+  // point to be near the corner, not anywhere in a big padded square.
+  const grab = Math.min(HANDLE / 2 + 8, Math.max(7, Math.min(b.w, b.h) * 0.4));
+  return Math.hypot(pt.x - cx, pt.y - cy) <= grab;
 }
 
 function gridColor() {
@@ -1043,6 +1125,21 @@ function createLabelAt(pt) {
   renderLabelsLayer();
   save();
   editLabel(label);
+  // If the label survived (wasn't deleted via empty text in editLabel), keep it
+  // selected. On the first placement of a session, also switch to the Select
+  // tool so the resize handle is discovered; afterwards stay on Label so the
+  // user can keep dropping labels.
+  if (project.labels.some((l) => l.id === label.id)) {
+    if (!_autoResizeIntroShown) {
+      _autoResizeIntroShown = true;
+      selectAndEdit('label', label.id);
+    } else {
+      selectedLabelId = label.id;
+      selectedStampId = null; selectedPathId = null;
+      refreshPalette();
+      renderOverlayLayer();
+    }
+  }
 }
 
 function renderLabelsLayer() {
