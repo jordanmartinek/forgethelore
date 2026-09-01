@@ -145,6 +145,41 @@ function scheduleSave() {
 
 // ─── Main render ────────────────────────────────────────────────────────────
 
+/**
+ * Paint a filled sample of one terrain into `canvas` using the REAL brush
+ * pipeline (dab → terrainMotifs → drawMotif). Exposed so the texture look can
+ * be verified/previewed with the exact code paths the painter uses, rather than
+ * a reconstruction. Temporarily rebinds module paint state and restores it.
+ * @param {HTMLCanvasElement} canvas
+ * @param {string} terrainId
+ * @param {{ brushSize?: number }} [opts]
+ */
+export function renderTerrainSample(canvas, terrainId, opts = {}) {
+  if (!canvas || !canvas.getContext) return;
+  const terrain = getTerrain(terrainId);
+  const savedCtx = ctxTerrain;
+  const savedBrush = brush;
+  const savedMotif = motifLastPoint;
+  ctxTerrain = canvas.getContext('2d');
+  brush = { ...defaultBrush(), size: opts.brushSize || 70, softness: 0.35, flow: 1 };
+  motifLastPoint = null;
+  const w = canvas.width, hgt = canvas.height;
+  const r = brush.size / 2;
+  const step = r * 0.5;
+  let row = 0;
+  for (let y = r * 0.4; y < hgt + r; y += step, row++) {
+    const leftToRight = row % 2 === 0;
+    for (let i = 0; i <= Math.ceil(w / step); i++) {
+      const x = leftToRight ? (i * step) : (w - i * step);
+      dab({ x, y }, terrain, false);
+    }
+    motifLastPoint = null; // let each row seed fresh motifs
+  }
+  ctxTerrain = savedCtx;
+  brush = savedBrush;
+  motifLastPoint = savedMotif;
+}
+
 export function renderFantasyMap(container) {
   if (!project) load();
   hostContainer = container;
@@ -609,161 +644,258 @@ function dab(pt, terrain, erase) {
   ctxTerrain.beginPath();
   ctxTerrain.arc(pt.x, pt.y, r, 0, Math.PI * 2);
   ctxTerrain.clip();
-  ctxTerrain.globalAlpha = clamp(brush.flow, 0.35, 1);
+  // Motifs carry the terrain's identity, so keep them near-opaque (they only
+  // fade a little at very low brush flow).
+  ctxTerrain.globalAlpha = clamp(0.6 + brush.flow * 0.4, 0.6, 1);
   motifs.forEach((m2) => drawMotif(ctxTerrain, m2, scaleMul));
   ctxTerrain.restore();
 }
 
-/** Draw a single terrain-motif primitive returned by engine.terrainMotifs(). */
+/**
+ * Draw a single terrain-motif primitive with real light/shadow/outline so it
+ * reads as a distinct feature (a tree, a peak, a wave) rather than a same-hue
+ * blob. `col` is the motif accent; we derive a darker body, lighter highlight,
+ * and dark outline from it for depth.
+ */
 function drawMotif(ctx, m2, k = 1) {
   const col = safeColor(m2.color, '#4a6b3a');
+  const dark = shift(col, -0.4);        // shadow / outline
+  const body = col;                     // main tone
+  const light = shift(col, 0.4);        // sunlit highlight
   const s = (m2.s || 4) * k;
   ctx.save();
-  ctx.strokeStyle = col;
-  ctx.fillStyle = col;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
   switch (m2.type) {
-    case 'tree': { // conifer triangle + tiny trunk
+    case 'tree': { // conifer: trunk + two-tone triangular canopy + outline
+      // trunk
+      ctx.fillStyle = shift('#5b3a1e', 0);
+      ctx.fillRect(m2.x - s * 0.11, m2.y + s * 0.45, s * 0.22, s * 0.5);
+      // canopy (dark body)
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.12);
       ctx.beginPath();
-      ctx.moveTo(m2.x, m2.y - s);
-      ctx.lineTo(m2.x - s * 0.6, m2.y + s * 0.7);
-      ctx.lineTo(m2.x + s * 0.6, m2.y + s * 0.7);
+      ctx.moveTo(m2.x, m2.y - s * 1.05);
+      ctx.lineTo(m2.x - s * 0.72, m2.y + s * 0.6);
+      ctx.lineTo(m2.x + s * 0.72, m2.y + s * 0.6);
       ctx.closePath();
       ctx.fill();
-      ctx.fillRect(m2.x - s * 0.09, m2.y + s * 0.6, s * 0.18, s * 0.35);
+      ctx.stroke();
+      // sunlit left face
+      ctx.fillStyle = light;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s * 1.05);
+      ctx.lineTo(m2.x - s * 0.72, m2.y + s * 0.6);
+      ctx.lineTo(m2.x - s * 0.1, m2.y + s * 0.6);
+      ctx.lineTo(m2.x - s * 0.04, m2.y - s * 0.5);
+      ctx.closePath();
+      ctx.fill();
       break;
     }
-    case 'blob': { // canopy / bush / rock — soft filled circle (poly = jagged)
+    case 'blob': { // canopy / bush / rock — shaded round mass + highlight
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
       ctx.beginPath();
       if (m2.poly) {
-        const n = 6;
+        const n = 7;
         for (let i = 0; i < n; i++) {
-          const a = (Math.PI * 2 / n) * i;
-          const rr = s * (0.7 + ((i % 2) ? 0.25 : 0));
+          const a = (Math.PI * 2 / n) * i + (m2.x % 1);
+          const rr = s * (0.72 + ((i % 2) ? 0.22 : 0));
           const px = m2.x + Math.cos(a) * rr, py = m2.y + Math.sin(a) * rr;
           if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
         }
         ctx.closePath();
       } else {
-        ctx.arc(m2.x, m2.y, s * 0.75, 0, Math.PI * 2);
+        ctx.arc(m2.x, m2.y, s * 0.8, 0, Math.PI * 2);
       }
+      ctx.fill();
+      ctx.stroke();
+      // top-left highlight
+      ctx.fillStyle = shift(col, 0.35, 0.85);
+      ctx.beginPath();
+      ctx.arc(m2.x - s * 0.25, m2.y - s * 0.25, s * 0.34, 0, Math.PI * 2);
       ctx.fill();
       break;
     }
-    case 'tuft': { // a few grass blades
-      ctx.lineWidth = Math.max(0.7, s * 0.18);
-      ctx.lineCap = 'round';
+    case 'tuft': { // grass — dark back blades + lighter front blades
+      ctx.lineWidth = Math.max(0.8, s * 0.22);
+      ctx.strokeStyle = dark;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(m2.x + i * s * 0.3, m2.y + s * 0.55);
+        ctx.quadraticCurveTo(m2.x + i * s * 0.42, m2.y - s * 0.2, m2.x + i * s * 0.62, m2.y - s * 0.75);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.16);
       for (let i = -1; i <= 1; i++) {
         ctx.beginPath();
-        ctx.moveTo(m2.x + i * s * 0.35, m2.y + s * 0.5);
-        ctx.lineTo(m2.x + i * s * 0.55, m2.y - s * 0.6);
+        ctx.moveTo(m2.x + i * s * 0.32, m2.y + s * 0.5);
+        ctx.quadraticCurveTo(m2.x + i * s * 0.3, m2.y - s * 0.1, m2.x + i * s * 0.4, m2.y - s * 0.6);
         ctx.stroke();
       }
       break;
     }
-    case 'peak': { // mountain chevron with a light face
+    case 'peak': { // mountain — dark rock, shadowed right face, snow cap
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
       ctx.beginPath();
       ctx.moveTo(m2.x, m2.y - s);
-      ctx.lineTo(m2.x - s * 0.8, m2.y + s * 0.6);
-      ctx.lineTo(m2.x + s * 0.8, m2.y + s * 0.6);
+      ctx.lineTo(m2.x - s * 0.85, m2.y + s * 0.62);
+      ctx.lineTo(m2.x + s * 0.85, m2.y + s * 0.62);
       ctx.closePath();
       ctx.fill();
-      // snow/shade cap
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.stroke();
+      // shadowed right face
+      ctx.fillStyle = dark;
       ctx.beginPath();
       ctx.moveTo(m2.x, m2.y - s);
-      ctx.lineTo(m2.x - s * 0.28, m2.y - s * 0.4);
-      ctx.lineTo(m2.x + s * 0.28, m2.y - s * 0.4);
+      ctx.lineTo(m2.x + s * 0.85, m2.y + s * 0.62);
+      ctx.lineTo(m2.x, m2.y + s * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      // snow cap
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x - s * 0.3, m2.y - s * 0.35);
+      ctx.lineTo(m2.x - s * 0.12, m2.y - s * 0.42);
+      ctx.lineTo(m2.x + s * 0.06, m2.y - s * 0.3);
+      ctx.lineTo(m2.x + s * 0.3, m2.y - s * 0.35);
       ctx.closePath();
       ctx.fill();
       break;
     }
-    case 'hill': { // rounded bump (half-disc)
+    case 'hill': { // rounded bump with a highlight
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
       ctx.beginPath();
-      ctx.arc(m2.x, m2.y, s * 0.7, Math.PI, Math.PI * 2);
+      ctx.arc(m2.x, m2.y + s * 0.2, s * 0.8, Math.PI * 1.05, Math.PI * 1.95);
       ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.14);
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y + s * 0.2, s * 0.6, Math.PI * 1.15, Math.PI * 1.6);
+      ctx.stroke();
       break;
     }
-    case 'shard': { // crystal facet (diamond)
+    case 'shard': { // crystal — lit left facet + dark right facet + outline
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      // left (light) facet
+      ctx.fillStyle = light;
       ctx.beginPath();
       ctx.moveTo(m2.x, m2.y - s);
-      ctx.lineTo(m2.x + s * 0.5, m2.y);
+      ctx.lineTo(m2.x - s * 0.55, m2.y);
       ctx.lineTo(m2.x, m2.y + s);
-      ctx.lineTo(m2.x - s * 0.5, m2.y);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-      break;
-    }
-    case 'cross': { // thorn / spike
-      ctx.lineWidth = Math.max(0.8, s * 0.2);
-      ctx.lineCap = 'round';
+      // right (dark) facet
+      ctx.fillStyle = body;
       ctx.beginPath();
-      ctx.moveTo(m2.x - s * 0.6, m2.y); ctx.lineTo(m2.x + s * 0.6, m2.y);
-      ctx.moveTo(m2.x, m2.y - s * 0.6); ctx.lineTo(m2.x, m2.y + s * 0.6);
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x + s * 0.55, m2.y);
+      ctx.lineTo(m2.x, m2.y + s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s); ctx.lineTo(m2.x + s * 0.55, m2.y);
+      ctx.lineTo(m2.x, m2.y + s); ctx.lineTo(m2.x - s * 0.55, m2.y);
+      ctx.closePath(); ctx.stroke();
+      break;
+    }
+    case 'cross': { // thorn / spike cluster
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(1, s * 0.24);
+      ctx.beginPath();
+      ctx.moveTo(m2.x - s * 0.6, m2.y + s * 0.3); ctx.lineTo(m2.x + s * 0.6, m2.y - s * 0.3);
+      ctx.moveTo(m2.x + s * 0.6, m2.y + s * 0.3); ctx.lineTo(m2.x - s * 0.6, m2.y - s * 0.3);
+      ctx.moveTo(m2.x, m2.y + s * 0.55); ctx.lineTo(m2.x, m2.y - s * 0.55);
       ctx.stroke();
       break;
     }
-    case 'ring': { // bubble / crater
-      ctx.lineWidth = Math.max(0.8, s * 0.18);
+    case 'ring': { // bubble / crater — rim + inner shadow
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.8, s * 0.2);
       ctx.beginPath();
       ctx.arc(m2.x, m2.y, s * 0.7, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.12);
+      ctx.beginPath();
+      ctx.arc(m2.x - s * 0.1, m2.y - s * 0.1, s * 0.5, Math.PI * 0.9, Math.PI * 1.7);
+      ctx.stroke();
       break;
     }
-    case 'cloud': { // soft nebula puff
-      const grad = ctx.createRadialGradient(m2.x, m2.y, 0, m2.x, m2.y, s);
-      grad.addColorStop(0, hexA(col, 0.35));
-      grad.addColorStop(1, hexA(col, 0));
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(m2.x, m2.y, s, 0, Math.PI * 2);
-      ctx.fill();
+    case 'cloud': { // soft nebula puff (layered for depth)
+      const g1 = ctx.createRadialGradient(m2.x, m2.y, 0, m2.x, m2.y, s);
+      g1.addColorStop(0, hexA(col, 0.5));
+      g1.addColorStop(1, hexA(col, 0));
+      ctx.fillStyle = g1;
+      ctx.beginPath(); ctx.arc(m2.x, m2.y, s, 0, Math.PI * 2); ctx.fill();
+      const g2 = ctx.createRadialGradient(m2.x - s * 0.2, m2.y - s * 0.2, 0, m2.x - s * 0.2, m2.y - s * 0.2, s * 0.5);
+      g2.addColorStop(0, shift(col, 0.5, 0.55));
+      g2.addColorStop(1, hexA(col, 0));
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(m2.x - s * 0.2, m2.y - s * 0.2, s * 0.5, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'dot': { // speckle / star / ember / sparkle
       if (m2.glow) {
-        const grad = ctx.createRadialGradient(m2.x, m2.y, 0, m2.x, m2.y, Math.max(1.5, s * 2));
-        grad.addColorStop(0, hexA(col, 0.9));
+        const grad = ctx.createRadialGradient(m2.x, m2.y, 0, m2.x, m2.y, Math.max(2, s * 2.4));
+        grad.addColorStop(0, hexA(col, 0.95));
+        grad.addColorStop(0.4, hexA(col, 0.5));
         grad.addColorStop(1, hexA(col, 0));
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(m2.x, m2.y, Math.max(1.5, s * 2), 0, Math.PI * 2);
+        ctx.arc(m2.x, m2.y, Math.max(2, s * 2.4), 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = col;
+        ctx.fillStyle = shift(col, 0.6);
+      } else {
+        ctx.fillStyle = body;
       }
       ctx.beginPath();
-      ctx.arc(m2.x, m2.y, Math.max(0.6, s * 0.6), 0, Math.PI * 2);
+      ctx.arc(m2.x, m2.y, Math.max(0.8, s * 0.7), 0, Math.PI * 2);
       ctx.fill();
       break;
     }
     case 'crack': {
-      ctx.lineWidth = Math.max(0.7, k * 0.9);
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.9, k * 1.1);
       ctx.beginPath();
       ctx.moveTo(m2.x1, m2.y1); ctx.lineTo(m2.x2, m2.y2);
       ctx.stroke();
       break;
     }
     case 'line': {
+      ctx.strokeStyle = col;
       ctx.lineWidth = m2.w || 1;
       ctx.beginPath();
       ctx.moveTo(m2.x1, m2.y1); ctx.lineTo(m2.x2, m2.y2);
       ctx.stroke();
       break;
     }
-    case 'wave': { // gently curved horizontal stroke (ocean / dune / furrow)
-      ctx.lineWidth = m2.w || 1.5;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      const steps = 8;
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const x = m2.x1 + (m2.x2 - m2.x1) * t;
-        const y = m2.y + (m2.amp ? Math.sin(t * Math.PI * 2 + (m2.phase || 0)) * m2.amp : 0);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
+    case 'wave': { // ocean / dune / furrow — dark trough + light crest
+      const drawWave = (dy, color, w) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        const steps = 10;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const x = m2.x1 + (m2.x2 - m2.x1) * t;
+          const y = m2.y + dy + (m2.amp ? Math.sin(t * Math.PI * 2 + (m2.phase || 0)) * m2.amp : 0);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      };
+      drawWave(0.6, dark, (m2.w || 1.5) + 0.5);   // shadow trough
+      drawWave(-0.4, light, (m2.w || 1.5));        // bright crest
       break;
     }
     default:
@@ -772,18 +904,33 @@ function drawMotif(ctx, m2, k = 1) {
   ctx.restore();
 }
 
-function hexA(hex, alpha) {
+// Parse a hex color (#rgb or #rrggbb) to {r,g,b}, or null.
+function hexRGB(hex) {
   const c = safeColor(hex, '#7a8f4a');
-  // Accept both #rgb and #rrggbb so a shorthand motif color still fades to
-  // transparent (used by glow/cloud gradients) instead of rendering opaque.
-  let hex6 = null;
   const m6 = /^#([0-9a-f]{6})$/i.exec(c);
   const m3 = /^#([0-9a-f]{3})$/i.exec(c);
-  if (m6) hex6 = m6[1];
-  else if (m3) hex6 = m3[1].replace(/(.)/g, '$1$1');
-  if (!hex6) return c;
-  const num = parseInt(hex6, 16);
-  return `rgba(${(num >> 16) & 255},${(num >> 8) & 255},${num & 255},${clamp(alpha, 0, 1)})`;
+  let h = null;
+  if (m6) h = m6[1];
+  else if (m3) h = m3[1].replace(/(.)/g, '$1$1');
+  if (!h) return null;
+  const n = parseInt(h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function hexA(hex, alpha) {
+  const rgb = hexRGB(hex);
+  if (!rgb) return safeColor(hex, '#7a8f4a');
+  return `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(alpha, 0, 1)})`;
+}
+
+// Lighten (amt>0) or darken (amt<0) a color by a fraction toward white/black.
+// Used to give motifs real light/shadow so they read as 3D features, not flat
+// same-hue shapes.
+function shift(hex, amt, alpha = 1) {
+  const rgb = hexRGB(hex);
+  if (!rgb) return safeColor(hex, '#7a8f4a');
+  const mix = (c) => amt >= 0 ? Math.round(c + (255 - c) * amt) : Math.round(c * (1 + amt));
+  return `rgba(${mix(rgb.r)},${mix(rgb.g)},${mix(rgb.b)},${clamp(alpha, 0, 1)})`;
 }
 
 // ─── Pointer handling ──────────────────────────────────────────────────────────
