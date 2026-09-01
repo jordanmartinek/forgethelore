@@ -691,10 +691,107 @@ export const CANVAS_PRESETS = [
   { id: 'square', label: 'Square (1024×1024)', width: 1024, height: 1024 },
   { id: 'wide', label: 'Wide (1600×720)', width: 1600, height: 720 },
   { id: 'large', label: 'Large (1920×1200)', width: 1920, height: 1200 },
+  { id: 'huge', label: 'Huge (2560×1600)', width: 2560, height: 1600 },
+  { id: 'ultrawide', label: 'Ultrawide (3440×1440)', width: 3440, height: 1440 },
+  { id: 'grand', label: 'Grand Atlas (3840×2400)', width: 3840, height: 2400 },
+  { id: 'bigsquare', label: 'Big Square (2560×2560)', width: 2560, height: 2560 },
 ];
 
 export function getCanvasPreset(id) {
   return CANVAS_PRESETS.find((p) => p.id === id) || CANVAS_PRESETS[0];
+}
+
+/* ─── View transform (zoom + pan) ─────────────────────────────────────────── */
+
+/** Zoom bounds for the map viewport. */
+export const MIN_ZOOM = 0.2;
+export const MAX_ZOOM = 6;
+
+/** A fresh, neutral view (100%, centered/no pan). */
+export function defaultView() {
+  return { zoom: 1, panX: 0, panY: 0 };
+}
+
+/** Clamp a zoom factor into the allowed range. */
+export function clampZoom(z) {
+  const n = Number.isFinite(z) ? z : 1;
+  return clamp(n, MIN_ZOOM, MAX_ZOOM);
+}
+
+/**
+ * Normalize an arbitrary view-ish value to a valid {zoom,panX,panY}.
+ * @param {*} raw
+ */
+export function normalizeView(raw) {
+  const v = raw && typeof raw === 'object' ? raw : {};
+  return {
+    zoom: clampZoom(v.zoom),
+    panX: Number.isFinite(v.panX) ? v.panX : 0,
+    panY: Number.isFinite(v.panY) ? v.panY : 0,
+  };
+}
+
+/**
+ * Convert a screen-space point (relative to the un-transformed frame origin, in
+ * CSS px) into world/canvas coordinates, given the current view. The frame is
+ * rendered as `translate(panX, panY) scale(zoom)`, so world = (screen - pan) / zoom.
+ * @param {{x:number,y:number}} pt   Screen point relative to the frame's laid-out origin.
+ * @param {{zoom:number,panX:number,panY:number}} view
+ * @returns {{x:number,y:number}}
+ */
+export function screenToWorld(pt, view) {
+  const v = normalizeView(view);
+  return { x: (pt.x - v.panX) / v.zoom, y: (pt.y - v.panY) / v.zoom };
+}
+
+/** Inverse of screenToWorld: world → screen (relative to frame origin). */
+export function worldToScreen(pt, view) {
+  const v = normalizeView(view);
+  return { x: pt.x * v.zoom + v.panX, y: pt.y * v.zoom + v.panY };
+}
+
+/**
+ * Compute a new view that zooms toward a fixed screen anchor (e.g. the cursor),
+ * so the world point under the cursor stays put while zooming — the standard
+ * "zoom to cursor" behavior. Returns a fresh normalized view.
+ * @param {{zoom:number,panX:number,panY:number}} view  Current view.
+ * @param {number} factor   Multiplier applied to zoom (e.g. 1.1 to zoom in).
+ * @param {{x:number,y:number}} anchor  Screen point (relative to frame origin) to keep fixed.
+ */
+export function zoomAt(view, factor, anchor) {
+  const v = normalizeView(view);
+  const ax = anchor && Number.isFinite(anchor.x) ? anchor.x : 0;
+  const ay = anchor && Number.isFinite(anchor.y) ? anchor.y : 0;
+  const nextZoom = clampZoom(v.zoom * (Number.isFinite(factor) ? factor : 1));
+  // Keep the world point under the anchor fixed:
+  //   world = (anchor - pan) / zoom  must be equal before & after.
+  const worldX = (ax - v.panX) / v.zoom;
+  const worldY = (ay - v.panY) / v.zoom;
+  return {
+    zoom: nextZoom,
+    panX: ax - worldX * nextZoom,
+    panY: ay - worldY * nextZoom,
+  };
+}
+
+/**
+ * Deterministic seed for a procedural world-type surface. Mixes the canvas
+ * dimensions with a full hash of the world flavor string (not just its length),
+ * so distinct flavors of equal name length — barren/desert, ice/gas — still get
+ * distinct textures. Returns an unsigned 32-bit int suitable for makeRng.
+ * @param {string} world  World flavor id (e.g. 'barren').
+ * @param {number} w
+ * @param {number} h
+ */
+export function worldSurfaceSeed(world, w, h) {
+  const s = String(world || '');
+  let hash = 2166136261; // FNV-1a basis
+  for (let i = 0; i < s.length; i++) {
+    hash ^= s.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const seed = (Math.imul(w | 0, 73856093) ^ Math.imul(h | 0, 19349663) ^ hash) >>> 0;
+  return seed || 1;
 }
 
 /* ─── Export resolution presets ───────────────────────────────────────────── */
@@ -778,6 +875,32 @@ export const SURFACES = [
     base: '#0d2440', edge: '#08182c', vignette: 'rgba(0,10,20,0.5)', grain: 0.0, ink: '#8fd0ff' },
   { id: 'hologram', label: 'Holo Display', style: 'scifi', kind: 'grid',
     base: '#04141a', edge: '#02080c', vignette: 'rgba(0,20,20,0.5)', grain: 0.0, ink: '#5fffd0' },
+
+  // ── Sci-fi WORLD TYPES ──────────────────────────────────────────────────
+  // Planetary "surface template" backdrops to place elements on. Each renders
+  // as a full-canvas planet-surface look (base terrain tone + an atmospheric
+  // wash + world-specific speckle) via the 'world' paint kind. `world` names
+  // the flavor so the renderer can tint the atmosphere/speckle per template.
+  { id: 'world_barren', label: 'World · Barren Rock', style: 'scifi', kind: 'world', world: 'barren',
+    base: '#6b6259', edge: '#40382f', vignette: 'rgba(20,14,8,0.5)', grain: 0.5, ink: '#e8ddc8' },
+  { id: 'world_lush', label: 'World · Lush / Verdant', style: 'scifi', kind: 'world', world: 'lush',
+    base: '#3f7d4f', edge: '#1f4a2e', vignette: 'rgba(6,26,12,0.5)', grain: 0.45, ink: '#eaffe6' },
+  { id: 'world_industrial', label: 'World · Industrial', style: 'scifi', kind: 'world', world: 'industrial',
+    base: '#4a4e57', edge: '#23262c', vignette: 'rgba(8,10,14,0.55)', grain: 0.6, ink: '#ffd27f' },
+  { id: 'world_oceanic', label: 'World · Oceanic', style: 'scifi', kind: 'world', world: 'oceanic',
+    base: '#2f6f9e', edge: '#123a5c', vignette: 'rgba(4,18,32,0.5)', grain: 0.4, ink: '#e6f6ff' },
+  { id: 'world_ice', label: 'World · Frozen / Ice', style: 'scifi', kind: 'world', world: 'ice',
+    base: '#c3d8e6', edge: '#7f9fb5', vignette: 'rgba(30,50,70,0.4)', grain: 0.45, ink: '#20384a' },
+  { id: 'world_desert', label: 'World · Desert / Arid', style: 'scifi', kind: 'world', world: 'desert',
+    base: '#cc9a5a', edge: '#96683a', vignette: 'rgba(50,30,10,0.45)', grain: 0.5, ink: '#3a2410' },
+  { id: 'world_volcanic', label: 'World · Volcanic / Molten', style: 'scifi', kind: 'world', world: 'volcanic',
+    base: '#5a2620', edge: '#2a0e0a', vignette: 'rgba(20,4,2,0.6)', grain: 0.6, ink: '#ffcaa0' },
+  { id: 'world_toxic', label: 'World · Toxic / Corrosive', style: 'scifi', kind: 'world', world: 'toxic',
+    base: '#5c6b2a', edge: '#2f3a12', vignette: 'rgba(16,22,4,0.55)', grain: 0.55, ink: '#eaffb0' },
+  { id: 'world_gas', label: 'World · Gas Giant Cloudscape', style: 'scifi', kind: 'world', world: 'gas',
+    base: '#c99a63', edge: '#8a5f38', vignette: 'rgba(40,24,10,0.45)', grain: 0.3, ink: '#fff0da' },
+  { id: 'world_crystal', label: 'World · Crystalline', style: 'scifi', kind: 'world', world: 'crystal',
+    base: '#5a4a8a', edge: '#2c2050', vignette: 'rgba(10,6,28,0.55)', grain: 0.5, ink: '#e6ddff' },
 ];
 
 const SURFACE_BY_ID = new Map(SURFACES.map((s) => [s.id, s]));
@@ -854,6 +977,7 @@ export function emptyMapProject(width = 1280, height = 800, style = 'fantasy') {
     labels: [],             // MapLabel[]
     grid: defaultGrid(),    // { mode, size, color }
     ornaments: defaultOrnaments(), // { frame, compass, scale }
+    view: defaultView(),    // { zoom, panX, panY } — viewport transform (not exported)
     updatedAt: Date.now(),
   };
 }
@@ -881,6 +1005,7 @@ export function normalizeMapProject(raw) {
     labels: Array.isArray(raw.labels) ? raw.labels : [],
     grid: { ...base.grid, ...(raw.grid && typeof raw.grid === 'object' ? raw.grid : {}) },
     ornaments: { ...base.ornaments, ...(raw.ornaments && typeof raw.ornaments === 'object' ? raw.ornaments : {}) },
+    view: normalizeView(raw.view),
     terrainDataUrl: typeof raw.terrainDataUrl === 'string' ? raw.terrainDataUrl : null,
   };
 }

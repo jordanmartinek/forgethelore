@@ -257,5 +257,66 @@ assert(circuit.some((p) => p.type === 'line') && circuit.some((p) => p.type === 
 assert(Array.isArray(m.terrainMotifs(forest, 0, 0, 0, 1)), 'zero-radius dab is safe (array)');
 assert(Array.isArray(m.terrainMotifs({ texture: 'nope' }, 0, 0, 20, 1)), 'unknown texture falls back safely');
 
+// ── View transform (zoom + pan) ────────────────────────────────────────────────
+assert(m.defaultView().zoom === 1 && m.defaultView().panX === 0 && m.defaultView().panY === 0, 'default view is 100% / no pan');
+assert(m.MIN_ZOOM > 0 && m.MAX_ZOOM > m.MIN_ZOOM, 'zoom bounds are sane');
+assert(m.clampZoom(1000) === m.MAX_ZOOM && m.clampZoom(0.0001) === m.MIN_ZOOM, 'clampZoom bounds a zoom factor');
+assert(m.clampZoom('nope') === 1 && m.clampZoom(NaN) === 1, 'clampZoom guards non-finite input');
+// normalizeView repairs junk.
+const nv = m.normalizeView({ zoom: 999, panX: 'x', panY: 12 });
+assert(nv.zoom === m.MAX_ZOOM && nv.panX === 0 && nv.panY === 12, 'normalizeView clamps zoom + coerces bad pan');
+assert(m.normalizeView(null).zoom === 1, 'normalizeView(null) yields a neutral view');
+// screenToWorld / worldToScreen are inverses under a given view.
+const vv = { zoom: 2, panX: 40, panY: -10 };
+const world = { x: 123, y: 77 };
+const screen = m.worldToScreen(world, vv);
+const back = m.screenToWorld(screen, vv);
+assert(approx(back.x, world.x) && approx(back.y, world.y), 'screen<->world roundtrips under a view');
+assert(approx(screen.x, 123 * 2 + 40) && approx(screen.y, 77 * 2 - 10), 'worldToScreen applies scale then pan');
+// zoomAt keeps the world point under the anchor fixed (zoom-to-cursor).
+const anchor = { x: 200, y: 150 };
+const before = m.screenToWorld(anchor, vv);
+const zoomed = m.zoomAt(vv, 1.5, anchor);
+const after = m.screenToWorld(anchor, zoomed);
+assert(approx(before.x, after.x) && approx(before.y, after.y), 'zoomAt keeps the anchor world point fixed');
+assert(approx(zoomed.zoom, 3), 'zoomAt multiplies the zoom factor');
+assert(m.zoomAt(vv, 100, anchor).zoom === m.MAX_ZOOM, 'zoomAt still clamps to MAX_ZOOM');
+
+// ── Larger canvas presets ──────────────────────────────────────────────────────
+['huge', 'ultrawide', 'grand', 'bigsquare'].forEach((id) => {
+  assert(m.getCanvasPreset(id).id === id, `canvas preset ${id} exists`);
+});
+assert(m.getCanvasPreset('grand').width >= 3840, 'grand preset is large');
+assert(m.CANVAS_PRESETS.every((p) => p.width >= 1 && p.height >= 1), 'all canvas presets have positive size');
+
+// ── Project view serialization ─────────────────────────────────────────────────
+assert(m.emptyMapProject().view && m.emptyMapProject().view.zoom === 1, 'empty project carries a default view');
+const viewLoaded = m.normalizeMapProject({ style: 'scifi', view: { zoom: 3, panX: 5, panY: 6 } });
+assert(viewLoaded.view.zoom === 3 && viewLoaded.view.panX === 5, 'normalize keeps a valid saved view');
+assert(m.normalizeMapProject({ view: 'bad' }).view.zoom === 1, 'normalize repairs a bad saved view');
+assert(m.normalizeMapProject({ style: 'fantasy' }).view.zoom === 1, 'legacy project (no view) gains a default view');
+
+// ── Sci-fi world-type surface templates ────────────────────────────────────────
+const scifiSurfaces = m.surfacesForStyle('scifi');
+const worldSurfaces = scifiSurfaces.filter((s) => s.kind === 'world');
+assert(worldSurfaces.length >= 8, `sci-fi has world-type surfaces (${worldSurfaces.length})`);
+assert(worldSurfaces.every((s) => typeof s.world === 'string' && s.world.length > 0), 'world surfaces name a world flavor');
+assert(worldSurfaces.every((s) => s.style === 'scifi'), 'world surfaces are sci-fi style');
+['world_barren', 'world_lush', 'world_industrial', 'world_oceanic', 'world_ice'].forEach((id) => {
+  assert(m.getSurface(id).kind === 'world', `${id} is a world-kind surface`);
+});
+// New surfaces keep clean hex base/edge like the originals (guards the injection bug).
+assert(m.SURFACES.every((s) => /^#[0-9a-f]{6}$/i.test(s.base) && /^#[0-9a-f]{6}$/i.test(s.edge)), 'all surfaces (incl. world types) have clean hex');
+
+// worldSurfaceSeed: deterministic, and distinct per flavor even at equal name length.
+assert(m.worldSurfaceSeed('barren', 800, 600) === m.worldSurfaceSeed('barren', 800, 600), 'worldSurfaceSeed is deterministic');
+assert(m.worldSurfaceSeed('barren', 800, 600) !== m.worldSurfaceSeed('desert', 800, 600), 'same-length flavors get distinct seeds (barren vs desert)');
+assert(m.worldSurfaceSeed('ice', 800, 600) !== m.worldSurfaceSeed('gas', 800, 600), 'same-length flavors get distinct seeds (ice vs gas)');
+assert(m.worldSurfaceSeed('barren', 800, 600) !== m.worldSurfaceSeed('barren', 1200, 600), 'seed varies with canvas size');
+assert(m.worldSurfaceSeed('', 0, 0) >= 1, 'worldSurfaceSeed is a positive int even for empty/zero input');
+// Every world-type surface produces a distinct seed at a fixed size (no collisions).
+const worldSeeds = worldSurfaces.map((s) => m.worldSurfaceSeed(s.world, 1000, 700));
+assert(new Set(worldSeeds).size === worldSeeds.length, 'all world-type flavors get unique seeds at a given size');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} map-engine tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
