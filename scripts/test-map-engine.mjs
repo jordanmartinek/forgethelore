@@ -183,5 +183,50 @@ assert(legacy.grid.mode === 'off' && typeof legacy.ornaments.frame === 'boolean'
 assert(legacy.layers.paths && legacy.layers.overlay, 'legacy project gains new layer entries');
 assert(m.normalizeMapProject({ paths: 'bad', grid: 5, ornaments: null }).paths.length === 0, 'normalize coerces bad paths/grid/ornaments');
 
+// ── Terrain textures + motifs ─────────────────────────────────────────────────
+// Every terrain declares a texture kind that exists in TEXTURE_KINDS.
+assert(m.TERRAINS.every((t) => typeof t.texture === 'string' && m.TEXTURE_KINDS[t.texture]),
+  'every terrain has a valid texture kind');
+// Motif accent colors, where present, are hex.
+assert(m.TERRAINS.every((t) => !t.motif || /^#[0-9a-f]{3,8}$/i.test(t.motif)), 'terrain motif colors are hex');
+assert(Object.keys(m.TEXTURE_KINDS).length >= 15, 'a rich set of texture kinds');
+assert(Object.values(m.TEXTURE_KINDS).every((k) => Number.isFinite(k.density) && k.scale > 0), 'texture kinds have density + positive scale');
+
+// terrainMotifs is deterministic for a given seed and varies with the seed.
+const forest = m.getTerrain('forest');
+const fa = m.terrainMotifs(forest, 100, 100, 40, 7);
+const fb = m.terrainMotifs(forest, 100, 100, 40, 7);
+const fc = m.terrainMotifs(forest, 100, 100, 40, 8);
+assert(fa.length > 0, 'forest produces motifs');
+assert(JSON.stringify(fa) === JSON.stringify(fb), 'terrainMotifs deterministic for a seed');
+assert(JSON.stringify(fa) !== JSON.stringify(fc), 'terrainMotifs varies with the seed');
+assert(fa.every((p) => p.type === 'tree'), 'forest motifs are trees');
+
+// Scatter motifs stay within the dab disc (+ a small motif-size margin).
+const disc = m.terrainMotifs(m.getTerrain('tundra'), 200, 150, 30, 3);
+assert(disc.length > 0 && disc.every((p) => p.x == null || Math.hypot(p.x - 200, p.y - 150) <= 30 + 6),
+  'scatter motifs stay within the dab radius');
+
+// Motif count scales with area × density (bigger radius → more motifs).
+const small = m.terrainMotifs(forest, 0, 0, 20, 5).length;
+const big = m.terrainMotifs(forest, 0, 0, 60, 5).length;
+assert(big > small, 'more motifs on a larger dab');
+
+// Subject-specific motif types.
+assert(m.terrainMotifs(m.getTerrain('mountain'), 50, 50, 40, 2)[0].type === 'peak', 'mountains → peaks');
+assert(m.terrainMotifs(m.getTerrain('void'), 50, 50, 40, 2).every((p) => p.type === 'dot'), 'space → star dots');
+assert(m.terrainMotifs(m.getTerrain('crystal'), 50, 50, 40, 2).some((p) => p.type === 'shard'), 'crystal → shards');
+
+// Line textures (density 0) return stroke primitives spanning the disc, not scatter.
+const waves = m.terrainMotifs(m.getTerrain('ocean'), 100, 100, 40, 4);
+assert(waves.length > 0 && waves.every((p) => p.type === 'wave'), 'ocean → wave strokes');
+assert(waves.every((p) => p.x1 != null && p.x2 != null && p.y != null), 'wave strokes have endpoints');
+const circuit = m.terrainMotifs(m.getTerrain('sprawl'), 100, 100, 40, 4);
+assert(circuit.some((p) => p.type === 'line') && circuit.some((p) => p.type === 'dot'), 'circuit → grid lines + nodes');
+
+// Degenerate inputs are safe.
+assert(Array.isArray(m.terrainMotifs(forest, 0, 0, 0, 1)), 'zero-radius dab is safe (array)');
+assert(Array.isArray(m.terrainMotifs({ texture: 'nope' }, 0, 0, 20, 1)), 'unknown texture falls back safely');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} map-engine tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

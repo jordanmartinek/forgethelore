@@ -49,53 +49,89 @@ export function makeRng(seed) {
  * @property {string} shade   Secondary tone blended in for texture.
  * @property {string} icon    Emoji for the palette button.
  * @property {string} style   'fantasy' | 'scifi'
+ * @property {string} texture Motif kind painted over the base so the fill reads
+ *                            as its subject (e.g. 'trees' for forest, 'waves'
+ *                            for ocean, 'peaks' for mountains). See TEXTURE_KINDS.
+ * @property {string} [motif] Accent color for the motifs.
  */
 
 /** @type {Terrain[]} */
 export const TERRAINS = [
   // ── Fantasy world terrain ──────────────────────────────────────────────
-  { id: 'ocean',    label: 'Ocean',     base: '#3f6b8a', shade: '#325876', icon: '🌊', style: 'fantasy' },
-  { id: 'shallows', label: 'Shallows',  base: '#5a8fa8', shade: '#4a7d95', icon: '💧', style: 'fantasy' },
-  { id: 'grass',    label: 'Grassland', base: '#7a8f4a', shade: '#6b8040', icon: '🌱', style: 'fantasy' },
-  { id: 'plains',   label: 'Plains',    base: '#9caf5e', shade: '#8a9d50', icon: '🌾', style: 'fantasy' },
-  { id: 'farmland', label: 'Farmland',  base: '#b7a24e', shade: '#9c8a3f', icon: '🚜', style: 'fantasy' },
-  { id: 'forest',   label: 'Forest',    base: '#4a6b3a', shade: '#3d5a30', icon: '🌲', style: 'fantasy' },
-  { id: 'jungle',   label: 'Jungle',    base: '#2f6b3a', shade: '#245530', icon: '🌴', style: 'fantasy' },
-  { id: 'savanna',  label: 'Savanna',   base: '#b89a4e', shade: '#a2873f', icon: '🦁', style: 'fantasy' },
-  { id: 'desert',   label: 'Desert',    base: '#c9a86a', shade: '#bb9955', icon: '🏜️', style: 'fantasy' },
-  { id: 'dirt',     label: 'Badlands',  base: '#a06a44', shade: '#8f5c38', icon: '🟤', style: 'fantasy' },
-  { id: 'mountain', label: 'Mountains', base: '#8a8178', shade: '#756c62', icon: '⛰️', style: 'fantasy' },
-  { id: 'highland', label: 'Highlands', base: '#9a8f78', shade: '#847a64', icon: '🏔️', style: 'fantasy' },
-  { id: 'snow',     label: 'Snow',      base: '#e8ecef', shade: '#d3dae0', icon: '❄️', style: 'fantasy' },
-  { id: 'tundra',   label: 'Tundra',    base: '#c4cdc0', shade: '#adb6a8', icon: '🌫️', style: 'fantasy' },
-  { id: 'swamp',    label: 'Swamp',     base: '#5c6b3a', shade: '#4d5a30', icon: '🥬', style: 'fantasy' },
-  { id: 'wetland',  label: 'Wetland',   base: '#5f7d5a', shade: '#4e6a4a', icon: '🪷', style: 'fantasy' },
-  { id: 'volcanic', label: 'Volcanic',  base: '#4a3f3a', shade: '#362d29', icon: '🌋', style: 'fantasy' },
-  { id: 'lava',     label: 'Lava',      base: '#b5451f', shade: '#8f3316', icon: '🔥', style: 'fantasy' },
-  { id: 'corruption', label: 'Corruption', base: '#5a2f6b', shade: '#472456', icon: '💜', style: 'fantasy' },
-  { id: 'sand',     label: 'Coast Sand',base: '#e0cf96', shade: '#d1bd7f', icon: '🏖️', style: 'fantasy' },
+  { id: 'ocean',    label: 'Ocean',     base: '#3f6b8a', shade: '#325876', icon: '🌊', style: 'fantasy', texture: 'waves',   motif: '#6fa3c4' },
+  { id: 'shallows', label: 'Shallows',  base: '#5a8fa8', shade: '#4a7d95', icon: '💧', style: 'fantasy', texture: 'waves',   motif: '#8fbcd6' },
+  { id: 'grass',    label: 'Grassland', base: '#7a8f4a', shade: '#6b8040', icon: '🌱', style: 'fantasy', texture: 'blades',  motif: '#8fa657' },
+  { id: 'plains',   label: 'Plains',    base: '#9caf5e', shade: '#8a9d50', icon: '🌾', style: 'fantasy', texture: 'blades',  motif: '#b3c46f' },
+  { id: 'farmland', label: 'Farmland',  base: '#b7a24e', shade: '#9c8a3f', icon: '🚜', style: 'fantasy', texture: 'furrows', motif: '#9c8a3f' },
+  { id: 'forest',   label: 'Forest',    base: '#4a6b3a', shade: '#3d5a30', icon: '🌲', style: 'fantasy', texture: 'trees',   motif: '#3a5a2c' },
+  { id: 'jungle',   label: 'Jungle',    base: '#2f6b3a', shade: '#245530', icon: '🌴', style: 'fantasy', texture: 'canopy',  motif: '#3f8048' },
+  { id: 'savanna',  label: 'Savanna',   base: '#b89a4e', shade: '#a2873f', icon: '🦁', style: 'fantasy', texture: 'scrub',   motif: '#8a7a38' },
+  { id: 'desert',   label: 'Desert',    base: '#c9a86a', shade: '#bb9955', icon: '🏜️', style: 'fantasy', texture: 'dunes',   motif: '#b39152' },
+  { id: 'dirt',     label: 'Badlands',  base: '#a06a44', shade: '#8f5c38', icon: '🟤', style: 'fantasy', texture: 'cracks',  motif: '#734424' },
+  { id: 'mountain', label: 'Mountains', base: '#8a8178', shade: '#756c62', icon: '⛰️', style: 'fantasy', texture: 'peaks',   motif: '#6b6258' },
+  { id: 'highland', label: 'Highlands', base: '#9a8f78', shade: '#847a64', icon: '🏔️', style: 'fantasy', texture: 'hills',   motif: '#7a7060' },
+  { id: 'snow',     label: 'Snow',      base: '#e8ecef', shade: '#d3dae0', icon: '❄️', style: 'fantasy', texture: 'sparkle', motif: '#ffffff' },
+  { id: 'tundra',   label: 'Tundra',    base: '#c4cdc0', shade: '#adb6a8', icon: '🌫️', style: 'fantasy', texture: 'speckle', motif: '#9ca89c' },
+  { id: 'swamp',    label: 'Swamp',     base: '#5c6b3a', shade: '#4d5a30', icon: '🥬', style: 'fantasy', texture: 'marsh',   motif: '#42502a' },
+  { id: 'wetland',  label: 'Wetland',   base: '#5f7d5a', shade: '#4e6a4a', icon: '🪷', style: 'fantasy', texture: 'marsh',   motif: '#496b4a' },
+  { id: 'volcanic', label: 'Volcanic',  base: '#4a3f3a', shade: '#362d29', icon: '🌋', style: 'fantasy', texture: 'cracks',  motif: '#2a221f' },
+  { id: 'lava',     label: 'Lava',      base: '#b5451f', shade: '#8f3316', icon: '🔥', style: 'fantasy', texture: 'ember',   motif: '#ffb24a' },
+  { id: 'corruption', label: 'Corruption', base: '#5a2f6b', shade: '#472456', icon: '💜', style: 'fantasy', texture: 'thorns', motif: '#7d4a96' },
+  { id: 'sand',     label: 'Coast Sand',base: '#e0cf96', shade: '#d1bd7f', icon: '🏖️', style: 'fantasy', texture: 'dunes',   motif: '#cdb877' },
 
   // ── Sci-fi star chart / planetary surface ──────────────────────────────
-  { id: 'void',      label: 'Deep Space',  base: '#0b1026', shade: '#05070f', icon: '🌌', style: 'scifi' },
-  { id: 'deepvoid',  label: 'Dark Void',   base: '#05060d', shade: '#020308', icon: '⬛', style: 'scifi' },
-  { id: 'nebula',    label: 'Nebula',      base: '#5b3a8a', shade: '#7d4fb0', icon: '☁️', style: 'scifi' },
-  { id: 'gascloud',  label: 'Gas Cloud',   base: '#2f6b8a', shade: '#245570', icon: '🌫️', style: 'scifi' },
-  { id: 'plasma',    label: 'Plasma Field',base: '#b0367a', shade: '#8f2a61', icon: '⚡', style: 'scifi' },
-  { id: 'starfield', label: 'Starfield',   base: '#141a33', shade: '#1f2a4d', icon: '✨', style: 'scifi' },
-  { id: 'asteroids', label: 'Asteroid Field', base: '#54504a', shade: '#3f3c37', icon: '☄️', style: 'scifi' },
-  { id: 'terran',    label: 'Terran',      base: '#2f7d55', shade: '#256045', icon: '🌍', style: 'scifi' },
-  { id: 'jungleworld', label: 'Jungle World', base: '#2c7a3f', shade: '#216030', icon: '🌴', style: 'scifi' },
-  { id: 'oceanic',   label: 'Ocean World', base: '#1f5f8a', shade: '#164a70', icon: '💧', style: 'scifi' },
-  { id: 'desertworld', label: 'Desert World', base: '#c99a55', shade: '#b58644', icon: '🏜️', style: 'scifi' },
-  { id: 'iceworld',  label: 'Ice World',   base: '#bcd6e6', shade: '#9fc0d4', icon: '🧊', style: 'scifi' },
-  { id: 'barren',    label: 'Barren Rock', base: '#8a7d6c', shade: '#6f6456', icon: '🪨', style: 'scifi' },
-  { id: 'crystal',   label: 'Crystal World', base: '#4fb0c4', shade: '#3d94a8', icon: '💎', style: 'scifi' },
-  { id: 'toxic',     label: 'Toxic',       base: '#7fa02a', shade: '#65801f', icon: '☢️', style: 'scifi' },
-  { id: 'radiation', label: 'Radiation',   base: '#9c8f2a', shade: '#82761f', icon: '🟡', style: 'scifi' },
-  { id: 'molten',    label: 'Molten',      base: '#c24a1e', shade: '#963616', icon: '🔥', style: 'scifi' },
-  { id: 'sprawl',    label: 'Urban Sprawl',base: '#4a5a72', shade: '#3a4860', icon: '🏙️', style: 'scifi' },
-  { id: 'shield',    label: 'Shield Grid', base: '#2a6b8f', shade: '#1f5273', icon: '🛡️', style: 'scifi' },
+  { id: 'void',      label: 'Deep Space',  base: '#0b1026', shade: '#05070f', icon: '🌌', style: 'scifi', texture: 'stars',   motif: '#ffffff' },
+  { id: 'deepvoid',  label: 'Dark Void',   base: '#05060d', shade: '#020308', icon: '⬛', style: 'scifi', texture: 'stars',   motif: '#c8d4ff' },
+  { id: 'nebula',    label: 'Nebula',      base: '#5b3a8a', shade: '#7d4fb0', icon: '☁️', style: 'scifi', texture: 'nebula',  motif: '#a86fd0' },
+  { id: 'gascloud',  label: 'Gas Cloud',   base: '#2f6b8a', shade: '#245570', icon: '🌫️', style: 'scifi', texture: 'nebula',  motif: '#4f9bc0' },
+  { id: 'plasma',    label: 'Plasma Field',base: '#b0367a', shade: '#8f2a61', icon: '⚡', style: 'scifi', texture: 'ember',   motif: '#ff6ab0' },
+  { id: 'starfield', label: 'Starfield',   base: '#141a33', shade: '#1f2a4d', icon: '✨', style: 'scifi', texture: 'stars',   motif: '#bcd0ff' },
+  { id: 'asteroids', label: 'Asteroid Field', base: '#54504a', shade: '#3f3c37', icon: '☄️', style: 'scifi', texture: 'rocks', motif: '#726c62' },
+  { id: 'terran',    label: 'Terran',      base: '#2f7d55', shade: '#256045', icon: '🌍', style: 'scifi', texture: 'canopy',  motif: '#3f9668' },
+  { id: 'jungleworld', label: 'Jungle World', base: '#2c7a3f', shade: '#216030', icon: '🌴', style: 'scifi', texture: 'canopy', motif: '#3f9648' },
+  { id: 'oceanic',   label: 'Ocean World', base: '#1f5f8a', shade: '#164a70', icon: '💧', style: 'scifi', texture: 'waves',   motif: '#4f8fb8' },
+  { id: 'desertworld', label: 'Desert World', base: '#c99a55', shade: '#b58644', icon: '🏜️', style: 'scifi', texture: 'dunes', motif: '#b3853f' },
+  { id: 'iceworld',  label: 'Ice World',   base: '#bcd6e6', shade: '#9fc0d4', icon: '🧊', style: 'scifi', texture: 'sparkle', motif: '#ffffff' },
+  { id: 'barren',    label: 'Barren Rock', base: '#8a7d6c', shade: '#6f6456', icon: '🪨', style: 'scifi', texture: 'cracks',  motif: '#5f574c' },
+  { id: 'crystal',   label: 'Crystal World', base: '#4fb0c4', shade: '#3d94a8', icon: '💎', style: 'scifi', texture: 'crystal', motif: '#8fe0ee' },
+  { id: 'toxic',     label: 'Toxic',       base: '#7fa02a', shade: '#65801f', icon: '☢️', style: 'scifi', texture: 'bubbles', motif: '#a8c840' },
+  { id: 'radiation', label: 'Radiation',   base: '#9c8f2a', shade: '#82761f', icon: '🟡', style: 'scifi', texture: 'bubbles', motif: '#d4c040' },
+  { id: 'molten',    label: 'Molten',      base: '#c24a1e', shade: '#963616', icon: '🔥', style: 'scifi', texture: 'ember',   motif: '#ffb24a' },
+  { id: 'sprawl',    label: 'Urban Sprawl',base: '#4a5a72', shade: '#3a4860', icon: '🏙️', style: 'scifi', texture: 'circuit', motif: '#6a86b0' },
+  { id: 'shield',    label: 'Shield Grid', base: '#2a6b8f', shade: '#1f5273', icon: '🛡️', style: 'scifi', texture: 'circuit', motif: '#4f9bc0' },
 ];
+
+/**
+ * Texture kinds — how each terrain's motifs are drawn. `density` is motifs per
+ * ~10,000 px² of painted area; `scale` is the base motif size in px. A density
+ * of 0 marks "line" textures (waves/dunes/furrows/circuit) that terrainMotifs
+ * renders as strokes rather than scattered points. The geometry is produced by
+ * terrainMotifs() below; the renderer just draws the returned primitives.
+ * @type {Record<string, {density:number, scale:number}>}
+ */
+export const TEXTURE_KINDS = {
+  trees:   { density: 22, scale: 9 },
+  canopy:  { density: 26, scale: 8 },
+  blades:  { density: 40, scale: 5 },
+  scrub:   { density: 14, scale: 6 },
+  furrows: { density: 0,  scale: 10 },
+  waves:   { density: 0,  scale: 12 },
+  dunes:   { density: 0,  scale: 14 },
+  peaks:   { density: 16, scale: 12 },
+  hills:   { density: 16, scale: 10 },
+  cracks:  { density: 18, scale: 8 },
+  marsh:   { density: 20, scale: 6 },
+  speckle: { density: 44, scale: 3 },
+  sparkle: { density: 30, scale: 3 },
+  ember:   { density: 26, scale: 4 },
+  thorns:  { density: 20, scale: 7 },
+  rocks:   { density: 22, scale: 6 },
+  stars:   { density: 34, scale: 2 },
+  nebula:  { density: 10, scale: 22 },
+  crystal: { density: 18, scale: 10 },
+  bubbles: { density: 22, scale: 6 },
+  circuit: { density: 0,  scale: 16 },
+};
 
 const TERRAIN_BY_ID = new Map(TERRAINS.map((t) => [t.id, t]));
 
@@ -107,6 +143,116 @@ export function getTerrain(id) {
 /** Terrains available for a given map style. */
 export function terrainsForStyle(style) {
   return TERRAINS.filter((t) => t.style === (style === 'scifi' ? 'scifi' : 'fantasy'));
+}
+
+/* ─── Terrain motifs (per-terrain texture geometry) ───────────────────────── */
+
+/**
+ * Produce the little texture motifs (trees, waves, peaks, dunes, stars…) that
+ * make a painted terrain read as its subject instead of a flat hue. Pure and
+ * DOM-free: returns an array of primitive descriptors the renderer draws.
+ *
+ * Primitive shapes returned:
+ *   { type:'tree',    x, y, s, color }            conifer triangle
+ *   { type:'blob',    x, y, s, color }            round canopy/bush/rock
+ *   { type:'tuft',    x, y, s, color }            grass tuft (few blades)
+ *   { type:'peak',    x, y, s, color }            mountain chevron
+ *   { type:'hill',    x, y, s, color }            rounded bump
+ *   { type:'dot',     x, y, s, color, glow }      speckle / star / ember / sparkle
+ *   { type:'ring',    x, y, s, color }            bubble / crater
+ *   { type:'shard',   x, y, s, color }            crystal facet
+ *   { type:'cross',   x, y, s, color }            thorn / spike
+ *   { type:'crack',   x1,y1, x2,y2, color }       short angular crack
+ *   { type:'line',    x1,y1, x2,y2, color, w }    wave / dune / furrow / circuit stroke
+ *   { type:'cloud',   x, y, s, color }            soft nebula puff
+ *
+ * @param {Terrain} terrain
+ * @param {number} cx      dab center x
+ * @param {number} cy      dab center y
+ * @param {number} radius  dab radius (motifs are placed within this disc)
+ * @param {number} seed    RNG seed (per-dab) for reproducibility
+ * @returns {Array<object>}
+ */
+export function terrainMotifs(terrain, cx, cy, radius, seed = 1) {
+  const kind = (terrain && terrain.texture) || 'speckle';
+  const meta = TEXTURE_KINDS[kind] || TEXTURE_KINDS.speckle;
+  const color = (terrain && terrain.motif) || (terrain && terrain.shade) || '#000';
+  const rng = makeRng(seed || 1);
+  const r = Math.max(2, radius);
+  const out = [];
+
+  // Line textures: draw a few strokes spanning the dab rather than scattering.
+  if (meta.density === 0) {
+    return lineMotifs(kind, cx, cy, r, color, meta.scale, rng);
+  }
+
+  // Scatter textures: count scales with disc area × density.
+  const area = Math.PI * r * r;
+  const count = Math.max(1, Math.round((area / 10000) * meta.density));
+  for (let i = 0; i < count; i++) {
+    // Uniform point in the disc (sqrt keeps it even, not center-biased).
+    const ang = rng() * Math.PI * 2;
+    const dist = Math.sqrt(rng()) * r;
+    const x = cx + Math.cos(ang) * dist;
+    const y = cy + Math.sin(ang) * dist;
+    const s = meta.scale * (0.7 + rng() * 0.6);
+    out.push(motifPrimitive(kind, x, y, s, color, rng));
+  }
+  // Depth-sort scatter motifs so nearer (lower) ones overlap farther ones.
+  out.sort((a, b) => (a.y || 0) - (b.y || 0));
+  return out;
+}
+
+function motifPrimitive(kind, x, y, s, color, rng) {
+  switch (kind) {
+    case 'trees':   return { type: 'tree', x, y, s, color };
+    case 'canopy':  return { type: 'blob', x, y, s, color };
+    case 'blades':  return { type: 'tuft', x, y, s, color };
+    case 'scrub':   return { type: 'blob', x, y, s: s * 0.8, color };
+    case 'peaks':   return { type: 'peak', x, y, s, color };
+    case 'hills':   return { type: 'hill', x, y, s, color };
+    case 'rocks':   return { type: 'blob', x, y, s: s * 0.7, color, poly: true };
+    case 'crystal': return { type: 'shard', x, y, s, color };
+    case 'thorns':  return { type: 'cross', x, y, s, color };
+    case 'bubbles': return { type: 'ring', x, y, s, color };
+    case 'nebula':  return { type: 'cloud', x, y, s, color };
+    case 'marsh':   return { type: (rng() > 0.5 ? 'ring' : 'tuft'), x, y, s: s * 0.9, color };
+    case 'cracks':  {
+      const a = rng() * Math.PI;
+      const len = s * 1.4;
+      return { type: 'crack', x1: x - Math.cos(a) * len, y1: y - Math.sin(a) * len, x2: x + Math.cos(a) * len, y2: y + Math.sin(a) * len, color };
+    }
+    case 'stars':
+    case 'sparkle': return { type: 'dot', x, y, s: Math.max(0.6, s * 0.6), color, glow: true };
+    case 'ember':   return { type: 'dot', x, y, s: Math.max(0.8, s * 0.7), color, glow: true };
+    case 'speckle':
+    default:        return { type: 'dot', x, y, s: Math.max(0.6, s * 0.5), color };
+  }
+}
+
+/** Line-based textures (waves, dunes, furrows, circuit) spanning the dab disc. */
+function lineMotifs(kind, cx, cy, r, color, scale, rng) {
+  const out = [];
+  if (kind === 'circuit') {
+    // A little grid patch + a couple of nodes.
+    const step = Math.max(8, scale);
+    for (let gy = cy - r; gy <= cy + r; gy += step) out.push({ type: 'line', x1: cx - r, y1: gy, x2: cx + r, y2: gy, color, w: 1 });
+    for (let gx = cx - r; gx <= cx + r; gx += step) out.push({ type: 'line', x1: gx, y1: cy - r, x2: gx, y2: cy + r, color, w: 1 });
+    const nodes = 2 + Math.floor(rng() * 3);
+    for (let i = 0; i < nodes; i++) out.push({ type: 'dot', x: cx + (rng() * 2 - 1) * r * 0.7, y: cy + (rng() * 2 - 1) * r * 0.7, s: 2.2, color, glow: true });
+    return out;
+  }
+  // waves / dunes / furrows: a set of gently curved horizontal strokes.
+  const gap = Math.max(6, scale * 0.9);
+  const amp = kind === 'furrows' ? 0 : scale * 0.5;
+  const w = kind === 'furrows' ? 2 : 1.5;
+  for (let yy = cy - r + gap * 0.5; yy <= cy + r; yy += gap) {
+    const half = Math.sqrt(Math.max(0, r * r - (yy - cy) * (yy - cy))); // chord half-width
+    if (half < 3) continue;
+    const phase = rng() * Math.PI * 2;
+    out.push({ type: 'wave', x1: cx - half, x2: cx + half, y: yy, amp, phase, color, w });
+  }
+  return out;
 }
 
 /* ─── Brush model ─────────────────────────────────────────────────────────── */
