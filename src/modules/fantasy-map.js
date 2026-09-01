@@ -316,7 +316,7 @@ function selectedLabelControls() {
   if (!lb) return null;
   return h('div', { class: 'fmap__pal-box' },
     h('div', { class: 'fmap__pal-sub' }, `Selected: “${lb.text}”`),
-    sliderRow('Size', Math.round(lb.size || 18), 10, 80, (v) => { lb.size = v; renderLabelsLayer(); scheduleSave(); }),
+    sliderRow('Size', Math.round(lb.size || 18), 8, 160, (v) => { lb.size = v; renderLabelsLayer(); renderOverlayLayer(); scheduleSave(); }),
     sliderRow('Curve', Math.round((lb.curve || 0) * 100), -100, 100, (v) => { lb.curve = v / 100; renderLabelsLayer(); scheduleSave(); }),
     h('select', { class: 'input', onchange: (e) => { lb.font = e.target.value; renderLabelsLayer(); scheduleSave(); } },
       ...FONTS.map((f) => h('option', { value: f.id, selected: (lb.font || 'serif') === f.id ? 'selected' : null }, f.label)),
@@ -358,15 +358,18 @@ function selectPalette() {
     selectedLabelId ? selectedLabelControls() : null,
     selectedStampId ? h('div', { class: 'fmap__pal-box' },
       h('div', { class: 'fmap__pal-sub' }, 'Selected stamp'),
-      sliderRow('Size', Math.round((project.stamps.find((s) => s.id === selectedStampId) || {}).size || 46), 12, 200, (v) => { const s = project.stamps.find((x) => x.id === selectedStampId); if (s) { s.size = v; renderStampsLayer(); scheduleSave(); } }),
+      sliderRow('Size', Math.round((project.stamps.find((s) => s.id === selectedStampId) || {}).size || 46), 12, 400, (v) => { const s = project.stamps.find((x) => x.id === selectedStampId); if (s) { s.size = v; renderStampsLayer(); renderOverlayLayer(); scheduleSave(); } }),
       h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%', marginTop: '6px' }, onclick: () => deleteSelectedStamp() }, '🗑 Delete stamp'),
     ) : null,
     selectedPathId ? h('div', { class: 'fmap__pal-box' },
       h('div', { class: 'fmap__pal-sub' }, 'Selected path'),
       h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%' }, onclick: () => deleteSelectedPath() }, '🗑 Delete path'),
     ) : null,
+    (selectedStampId || selectedLabelId)
+      ? h('div', { class: 'fmap__pal-hint' }, 'Tip: drag the blue corner handle on the map to resize, or use the slider above.')
+      : null,
     (!selectedLabelId && !selectedStampId && !selectedPathId)
-      ? h('div', { class: 'fmap__pal-hint' }, 'Click a stamp, label, or path to select it. Drag to move. Selected items can be resized or deleted here.')
+      ? h('div', { class: 'fmap__pal-hint' }, 'Click a stamp, label, or path to select it. Drag it to move, drag its corner handle to resize, or delete it here.')
       : null,
   );
 }
@@ -585,7 +588,15 @@ function onPointerDown(e) {
 }
 
 function onPointerMove(e) {
-  if (!painting && !dragging) return;
+  // Hover feedback: show a resize cursor over the handle when idle in Select mode.
+  if (!painting && !dragging) {
+    if (tool === 'select') {
+      const hp = pointFromEvent(e);
+      const surf = document.getElementById('fmap-surface');
+      if (surf) surf.style.cursor = hitResizeHandle(hp) ? 'nwse-resize' : 'default';
+    }
+    return;
+  }
   const pt = pointFromEvent(e);
 
   if ((tool === 'brush' || tool === 'erase') && painting && lastPoint) {
@@ -607,11 +618,20 @@ function onPointerUp() {
   if (tool === 'stamp' && painting) commitStampStroke();
   if (tool === 'path' && painting) commitPathStroke();
   if ((tool === 'brush' || tool === 'erase') && painting) { schedulePersistTerrain(); }
-  // A drag of a stamp/label ends here — persist its new position.
-  if (tool === 'select' && dragging) save();
+  // A drag/resize of a stamp/label/path ends here — persist and, if it was a
+  // resize, refresh the palette so the size slider mirrors the new value.
+  if (tool === 'select' && dragging) {
+    const wasResize = dragging.kind === 'resize';
+    save();
+    if (wasResize) refreshPalette();
+  }
   painting = false;
   lastPoint = null;
   dragging = null;
+  // Clear any transient resize cursor (also covers pointerleave, which routes
+  // here) so it can't linger once the gesture/hover ends.
+  const surf = document.getElementById('fmap-surface');
+  if (surf && surf.style.cursor === 'nwse-resize') surf.style.cursor = '';
 }
 
 function onDoubleClick(e) {
@@ -835,6 +855,66 @@ function renderOverlayLayer() {
   if (orn.frame) drawFrame(ctx, w, hgt, surf);
   if (orn.compass) drawCompass(ctx, w, hgt, surf);
   if (orn.scale) drawScaleBar(ctx, w, hgt, surf);
+
+  // Selection chrome (only meaningful with the Select tool active): a bounding
+  // box plus a corner handle you can drag to resize the selected stamp/label.
+  if (tool === 'select') drawSelectionChrome(ctx);
+}
+
+const HANDLE = 11; // resize-handle square size (canvas px)
+
+/** Bounding box {x,y,w,h} of the currently selected stamp or label, or null. */
+function selectionBounds() {
+  if (selectedStampId) {
+    const s = project.stamps.find((x) => x.id === selectedStampId);
+    // Stamp draws from (x - size/2, y - size) to (x + size/2, y).
+    if (s) return { kind: 'stamp', ref: s, x: s.x - s.size / 2, y: s.y - s.size, w: s.size, h: s.size };
+  }
+  if (selectedLabelId) {
+    const lb = project.labels.find((x) => x.id === selectedLabelId);
+    if (lb) {
+      const preset = labelStyle(lb.role || 'place', project.style);
+      const size = lb.size || preset.size;
+      const n = String(lb.text).length;
+      const w = Math.max(60, n * size * 0.62 + n * (preset.letterSpacing || 0));
+      const hgt = size * 1.4;
+      return { kind: 'label', ref: lb, x: lb.x - w / 2, y: lb.y - hgt / 2, w, h: hgt };
+    }
+  }
+  return null;
+}
+
+function drawSelectionChrome(ctx) {
+  const b = selectionBounds();
+  if (!b) return;
+  ctx.save();
+  // Dashed bounding box.
+  ctx.strokeStyle = 'rgba(80,140,255,0.95)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.strokeRect(b.x - 4, b.y - 4, b.w + 8, b.h + 8);
+  // Resize handle at the bottom-right corner.
+  ctx.setLineDash([]);
+  const hx = b.x + b.w + 4 - HANDLE / 2;
+  const hy = b.y + b.h + 4 - HANDLE / 2;
+  ctx.fillStyle = '#5088ff';
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(hx, hy, HANDLE, HANDLE, 2) : ctx.rect(hx, hy, HANDLE, HANDLE);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Is the point on the selection's resize handle? */
+function hitResizeHandle(pt) {
+  const b = selectionBounds();
+  if (!b) return false;
+  const hx = b.x + b.w + 4 - HANDLE / 2;
+  const hy = b.y + b.h + 4 - HANDLE / 2;
+  const pad = 6; // generous grab area
+  return pt.x >= hx - pad && pt.x <= hx + HANDLE + pad && pt.y >= hy - pad && pt.y <= hy + HANDLE + pad;
 }
 
 function gridColor() {
@@ -1071,44 +1151,79 @@ function deleteSelectedLabel() {
   if (!selectedLabelId) return;
   project.labels = project.labels.filter((l) => l.id !== selectedLabelId);
   selectedLabelId = null;
-  renderLabelsLayer(); refreshPalette(); save();
+  renderLabelsLayer(); renderOverlayLayer(); refreshPalette(); save();
 }
 
 function deleteSelectedStamp() {
   if (!selectedStampId) return;
   project.stamps = project.stamps.filter((s) => s.id !== selectedStampId);
   selectedStampId = null;
-  renderStampsLayer(); refreshPalette(); save();
+  renderStampsLayer(); renderOverlayLayer(); refreshPalette(); save();
 }
 
 function deleteSelectedPath() {
   if (!selectedPathId) return;
   project.paths = project.paths.filter((p) => p.id !== selectedPathId);
   selectedPathId = null;
-  renderPathsLayer(); refreshPalette(); save();
+  renderPathsLayer(); renderOverlayLayer(); refreshPalette(); save();
 }
 
 // ─── Select / drag stamps & labels ──────────────────────────────────────────────
 
 function beginDrag(pt) {
+  // 1) Grabbing the resize handle of the already-selected item starts a resize.
+  if (hitResizeHandle(pt)) {
+    const b = selectionBounds();
+    if (b) {
+      // Anchor is the item's fixed corner opposite the handle. Capture it ONCE
+      // here (not per-frame) so it can't shift as the item's size changes mid-
+      // drag — otherwise a stamp's left edge (x - size/2) would slide with the
+      // size it controls, producing drift. startDist is the pointer's distance
+      // from that fixed anchor; new size = startSize * (dist / startDist).
+      const anchor = { x: b.x, y: b.kind === 'stamp' ? b.y + b.h : b.y };
+      dragging = {
+        kind: 'resize', target: b.kind, id: b.ref.id, anchor,
+        startSize: b.kind === 'stamp' ? b.ref.size : (b.ref.size || labelStyle(b.ref.role || 'place', project.style).size),
+        startDist: Math.max(4, Math.hypot(pt.x - anchor.x, pt.y - anchor.y)),
+      };
+      return;
+    }
+  }
+  // 2) Otherwise: select/move (labels, then stamps, then paths — topmost first).
   const lb = hitLabel(pt);
-  if (lb) { selectedLabelId = lb.id; selectedStampId = null; selectedPathId = null; dragging = { kind: 'label', id: lb.id, offX: pt.x - lb.x, offY: pt.y - lb.y }; renderLabelsLayer(); refreshPalette(); return; }
+  if (lb) { selectedLabelId = lb.id; selectedStampId = null; selectedPathId = null; dragging = { kind: 'label', id: lb.id, offX: pt.x - lb.x, offY: pt.y - lb.y }; renderLabelsLayer(); renderOverlayLayer(); refreshPalette(); return; }
   const st = hitStamp(pt);
-  if (st) { selectedStampId = st.id; selectedLabelId = null; selectedPathId = null; dragging = { kind: 'stamp', id: st.id, offX: pt.x - st.x, offY: pt.y - st.y }; renderStampsLayer(); refreshPalette(); return; }
+  if (st) { selectedStampId = st.id; selectedLabelId = null; selectedPathId = null; dragging = { kind: 'stamp', id: st.id, offX: pt.x - st.x, offY: pt.y - st.y }; renderStampsLayer(); renderOverlayLayer(); refreshPalette(); return; }
   const pa = hitPath(pt);
-  if (pa) { selectedPathId = pa.id; selectedStampId = null; selectedLabelId = null; dragging = { kind: 'path', id: pa.id, points: pa.points.map((q) => ({ ...q })), start: pt }; renderPathsLayer(); refreshPalette(); return; }
+  if (pa) { selectedPathId = pa.id; selectedStampId = null; selectedLabelId = null; dragging = { kind: 'path', id: pa.id, points: pa.points.map((q) => ({ ...q })), start: pt }; renderPathsLayer(); renderOverlayLayer(); refreshPalette(); return; }
   selectedStampId = null; selectedLabelId = null; selectedPathId = null;
-  renderStampsLayer(); renderLabelsLayer(); renderPathsLayer(); refreshPalette();
+  renderStampsLayer(); renderLabelsLayer(); renderPathsLayer(); renderOverlayLayer(); refreshPalette();
 }
 
 function moveDrag(pt) {
   if (!dragging) return;
+  if (dragging.kind === 'resize') {
+    // Use the anchor captured at drag start (fixed point) — never recompute it
+    // from the live, resizing item, or the mapping becomes path-dependent.
+    const anchor = dragging.anchor;
+    const dist = Math.max(4, Math.hypot(pt.x - anchor.x, pt.y - anchor.y));
+    const scale = dist / dragging.startDist;
+    if (dragging.target === 'stamp') {
+      const s = project.stamps.find((x) => x.id === dragging.id);
+      if (s) { s.size = clamp(Math.round(dragging.startSize * scale), 12, 400); renderStampsLayer(); }
+    } else {
+      const lb = project.labels.find((x) => x.id === dragging.id);
+      if (lb) { lb.size = clamp(Math.round(dragging.startSize * scale), 8, 160); renderLabelsLayer(); }
+    }
+    renderOverlayLayer();
+    return;
+  }
   if (dragging.kind === 'label') {
     const lb = project.labels.find((l) => l.id === dragging.id);
-    if (lb) { lb.x = pt.x - dragging.offX; lb.y = pt.y - dragging.offY; renderLabelsLayer(); }
+    if (lb) { lb.x = pt.x - dragging.offX; lb.y = pt.y - dragging.offY; renderLabelsLayer(); renderOverlayLayer(); }
   } else if (dragging.kind === 'stamp') {
     const st = project.stamps.find((s) => s.id === dragging.id);
-    if (st) { st.x = pt.x - dragging.offX; st.y = pt.y - dragging.offY; renderStampsLayer(); }
+    if (st) { st.x = pt.x - dragging.offX; st.y = pt.y - dragging.offY; renderStampsLayer(); renderOverlayLayer(); }
   } else if (dragging.kind === 'path') {
     const pa = project.paths.find((p) => p.id === dragging.id);
     if (pa) {
@@ -1189,6 +1304,11 @@ function setTool(t) {
     el.classList.toggle('fmap__tool--active', el.dataset.tool === t);
   });
   refreshPalette();
+  // Show/hide the selection bounding box + resize handle with the Select tool.
+  renderOverlayLayer();
+  // Don't leave a stale resize cursor behind when switching away from Select.
+  const surf = document.getElementById('fmap-surface');
+  if (surf) surf.style.cursor = '';
 }
 
 function switchStyle(styleId) {
