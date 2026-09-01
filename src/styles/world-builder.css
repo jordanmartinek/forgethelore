@@ -739,6 +739,45 @@
   background: var(--surface-2);
 }
 
+/* Prominent resize control (−/+ buttons + slider) shown for a selected element */
+.fmap__resize { margin: 4px 0 8px; }
+.fmap__resize-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.fmap__resize-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--accent-primary);
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  padding: 1px 8px;
+}
+.fmap__resize-row { display: flex; align-items: center; gap: 6px; }
+.fmap__resize-slider { flex: 1; }
+.fmap__resize-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-default);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fmap__resize-btn:hover { background: var(--bg-hover); border-color: var(--accent-primary); }
+.fmap__resize-btn:active { background: var(--bg-active); }
+
 .fmap__grid { width: 130px; font-size: 12px; padding: 4px 8px; }
 
 .fmap__path-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
