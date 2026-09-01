@@ -306,55 +306,102 @@ export function brushDabs(from, to, brush) {
  * @typedef {Object} StampOptions
  * @property {number} size      Base stamp size (px).
  * @property {number} density   Stamps per 100px of stroke (approx).
- * @property {number} jitter    0..1 positional jitter as fraction of size.
- * @property {number} sizeJitter 0..1 random size variation.
+ * @property {number} jitter    0..1 positional jitter as a fraction of size. Kept
+ *                              small so stamps hug the dragged path; the offset
+ *                              is applied mostly PERPENDICULAR to the path.
+ * @property {number} sizeJitter 0..1 random size variation (±fraction).
+ * @property {number} rotJitter  0..1 random rotation (× ~25° max), for organic variety.
+ * @property {string[]} [variants] Optional pool of shape ids; each placement
+ *                              picks one so a stroke isn't all identical icons.
  * @property {number} seed      RNG seed for reproducibility.
  */
 
 export function defaultStampOptions() {
-  return { size: 46, density: 2.2, jitter: 0.5, sizeJitter: 0.35, seed: 1 };
+  return { size: 46, density: 3, jitter: 0.15, sizeJitter: 0.4, rotJitter: 0.5, seed: 1 };
 }
 
 /**
- * Turn a polyline stroke into scattered stamp placements. Used by the stamp
- * brush: you drag, and mountains/trees/etc. are scattered along the path with
- * organic position + size jitter (never a rigid grid).
+ * Turn a polyline stroke into stamp placements that FOLLOW the drag path.
+ *
+ * Stamps are stepped evenly along the path (spacing derived from density) so a
+ * drag lays a continuous trail rather than a sparse random cloud. Each stamp is
+ * nudged by a small offset that is mostly perpendicular to the local path
+ * direction (so it stays visually on the line you drew), plus per-stamp size,
+ * rotation, and (optionally) shape variety so the result never looks like a row
+ * of identical clones. Deterministic for a given seed.
  *
  * @param {Array<{x:number,y:number}>} points  Stroke path (canvas px).
  * @param {StampOptions} opts
- * @returns {Array<{x:number,y:number,size:number,rot:number}>}
+ * @returns {Array<{x:number,y:number,size:number,rot:number,shape?:string}>}
  */
 export function scatterStamps(points, opts) {
   const o = { ...defaultStampOptions(), ...opts };
   const pts = Array.isArray(points) ? points.filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y)) : [];
   if (pts.length === 0) return [];
   const rng = makeRng(o.seed || 1);
+  const variants = Array.isArray(o.variants) && o.variants.length ? o.variants : null;
+  const pickShape = () => (variants ? variants[Math.floor(rng() * variants.length)] : undefined);
+  const sizeAt = () => Math.max(6, o.size * (1 + (rng() * 2 - 1) * clamp(o.sizeJitter, 0, 1)));
+  const rotAt = () => (rng() * 2 - 1) * clamp(o.rotJitter, 0, 1) * 25; // degrees
 
   // Total path length.
   let length = 0;
   for (let i = 1; i < pts.length; i++) length += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-  // A single tap (no length) still drops one stamp.
-  const count = Math.max(1, Math.round((length / 100) * clamp(o.density, 0.1, 20)));
 
   const out = [];
+
+  // A single tap (no travel) drops one stamp exactly under the cursor.
+  if (length < 0.5) {
+    out.push({ x: pts[0].x, y: pts[0].y, size: sizeAt(), rot: rotAt(), shape: pickShape() });
+    return out;
+  }
+
+  // Even step so the whole path is covered; density = stamps per 100px.
+  const step = Math.max(4, 100 / clamp(o.density, 0.1, 20));
+  const count = Math.max(1, Math.round(length / step));
+  const jitterPx = o.size * clamp(o.jitter, 0, 1);
+
   for (let i = 0; i < count; i++) {
-    // Walk a random fraction along the path.
-    const target = length > 0 ? rng() * length : 0;
+    // Even position along the path (with a tiny along-path wobble), so stamps
+    // trace the drag instead of clustering at random fractions.
+    const base = (i + 0.5) / count;
+    const wobble = (rng() - 0.5) * (0.6 / count);
+    const target = clamp(base + wobble, 0, 1) * length;
     const at = pointAtLength(pts, target);
-    const jitterPx = o.size * clamp(o.jitter, 0, 2);
-    const jx = (rng() * 2 - 1) * jitterPx;
-    const jy = (rng() * 2 - 1) * jitterPx;
-    const sizeMul = 1 + (rng() * 2 - 1) * clamp(o.sizeJitter, 0, 1);
+    const tan = tangentAtLength(pts, target); // unit direction of the path here
+    // Normal (perpendicular) to the path.
+    const nx = -tan.y, ny = tan.x;
+    // Offset: mostly perpendicular (keeps stamps on the line), a little along.
+    const perp = (rng() * 2 - 1) * jitterPx;
+    const along = (rng() * 2 - 1) * jitterPx * 0.35;
     out.push({
-      x: at.x + jx,
-      y: at.y + jy,
-      size: Math.max(6, o.size * sizeMul),
-      rot: 0, // map stamps stay upright by default; kept for future rotation
+      x: at.x + nx * perp + tan.x * along,
+      y: at.y + ny * perp + tan.y * along,
+      size: sizeAt(),
+      rot: rotAt(),
+      shape: pickShape(),
     });
   }
   // Painterly depth: stamps lower on the map (larger y) draw last (in front).
   out.sort((a, b) => a.y - b.y);
   return out;
+}
+
+/** Unit tangent (direction) of the polyline at a given arc-length. */
+export function tangentAtLength(points, target) {
+  if (!Array.isArray(points) || points.length < 2) return { x: 1, y: 0 };
+  let acc = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    const seg = Math.hypot(dx, dy);
+    if (acc + seg >= target || i === points.length - 1) {
+      const len = seg || 1;
+      return { x: dx / len, y: dy / len };
+    }
+    acc += seg;
+  }
+  return { x: 1, y: 0 };
 }
 
 /** Point at a given arc-length along a polyline. */

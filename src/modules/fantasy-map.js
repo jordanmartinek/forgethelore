@@ -82,6 +82,23 @@ const STAMP_COLORS = {
   nebula: '#b06fd0',
 };
 
+// When you paint a stroke of one element, mix in related shapes so a "forest"
+// isn't a row of identical trees. The active shape is always included; the
+// scatter picks among these per placement. Shapes not listed just use themselves.
+const STAMP_VARIANTS = {
+  forest: ['forest', 'tree', 'pine_tree'],
+  tree: ['tree', 'pine_tree', 'forest'],
+  pine_tree: ['pine_tree', 'tree', 'forest'],
+  mountain: ['mountain', 'hill', 'volcano'],
+  hill: ['hill', 'mountain'],
+  metropolis: ['metropolis', 'town'],
+  town: ['town', 'village', 'metropolis'],
+  village: ['village', 'town'],
+  asteroid_belt: ['asteroid_belt', 'moon'],
+  fleet: ['fleet', 'spaceship'],
+  spaceship: ['spaceship', 'fleet'],
+};
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
 let project = null;
@@ -1045,15 +1062,18 @@ function onDoubleClick(e) {
 // ─── Stamps ────────────────────────────────────────────────────────────────────
 
 function commitStampStroke() {
-  const opts = { ...stampOpts, seed: (Date.now() & 0xffff) || 1 };
+  const variants = STAMP_VARIANTS[activeStamp];
+  const opts = { ...stampOpts, seed: (Date.now() & 0xffff) || 1, variants };
   const placements = scatterStamps(strokePath.length ? strokePath : [lastPoint || strokePath[0]], opts);
   const added = [];
   placements.forEach((p) => {
+    const shape = p.shape || activeStamp;
     const stamp = {
       id: `st_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
-      shape: activeStamp,
+      shape,
       x: p.x, y: p.y, size: p.size,
-      color: stampColor(activeStamp),
+      rot: p.rot || 0,
+      color: stampColor(shape),
     };
     project.stamps.push(stamp);
     added.push(stamp);
@@ -1111,7 +1131,17 @@ function renderStampsLayer() {
     ctx.shadowBlur = Math.max(2, s.size * 0.06);
     ctx.shadowOffsetY = Math.max(1, s.size * 0.04);
     if (s.id === selectedStampId) { ctx.shadowColor = 'rgba(80,140,255,0.8)'; ctx.shadowBlur = 12; }
-    ctx.drawImage(img, s.x - s.size / 2, s.y - s.size, s.size, s.size);
+    // Apply per-stamp rotation (for organic variety) about the stamp's anchor
+    // point (its base = bottom-center), so rotated icons still "sit" in place.
+    // Clamp on read so a corrupted/imported value can't spin an icon wildly.
+    const rot = Number.isFinite(s.rot) ? Math.max(-45, Math.min(45, s.rot)) : 0;
+    if (rot) {
+      ctx.translate(s.x, s.y);
+      ctx.rotate((rot * Math.PI) / 180);
+      ctx.drawImage(img, -s.size / 2, -s.size, s.size, s.size);
+    } else {
+      ctx.drawImage(img, s.x - s.size / 2, s.y - s.size, s.size, s.size);
+    }
     ctx.restore();
   };
 
