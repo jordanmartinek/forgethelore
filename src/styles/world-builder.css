@@ -712,6 +712,79 @@
 .fmap__stamp-art { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
 .fmap__stamp-label { font-size: 9px; color: var(--text-secondary); text-align: center; line-height: 1.1; }
 
+.fmap__pal-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 10px 0 4px;
+}
+
+.fmap__pal-box {
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.fmap__grid { width: 130px; font-size: 12px; padding: 4px 8px; }
+
+.fmap__path-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+
+.fmap__path-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+.fmap__path-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.fmap__path-btn--active { border-color: var(--accent-primary); background: var(--bg-active); color: var(--text-primary); }
+.fmap__path-swatch { width: 34px; flex-shrink: 0; }
+
+/* Floating layers panel */
+.fmap__layers-panel {
+  position: fixed;
+  right: 24px;
+  top: 120px;
+  width: 230px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  padding: 10px;
+}
+.fmap__layers-head {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-primary);
+  margin-bottom: 8px;
+}
+.fmap__layer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.fmap__layer-eye {
+  width: 26px; height: 26px;
+  border: none; background: transparent; cursor: pointer;
+  border-radius: var(--radius-sm); font-size: 14px;
+}
+.fmap__layer-eye:hover { background: var(--bg-hover); }
+.fmap__layer-name { flex: 1; font-size: 12px; color: var(--text-primary); }
+.fmap__layer-op { width: 70px; }
+
 .fmap__roles { display: flex; gap: 4px; margin-bottom: 6px; }
 .fmap__role {
   flex: 1;
