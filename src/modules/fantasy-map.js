@@ -25,7 +25,7 @@ import { loadData, persistState } from '../core/persist.js';
 import { toastSuccess, toastInfo } from '../ui/toast.js';
 import { shapeSVG, safeColor } from '../core/world-shapes.js';
 import {
-  terrainsForStyle, getTerrain,
+  terrainsForStyle, getTerrain, terrainMotifs,
   getSurface, surfacesForStyle, defaultSurfaceForStyle,
   MAP_STYLES, normalizeStyle,
   defaultBrush, clamp, brushDabs,
@@ -103,6 +103,7 @@ let ctxTerrain = null;         // 2d context of the terrain canvas
 let painting = false;
 let strokePath = [];           // for stamp scatter AND path drawing
 let lastPoint = null;
+let motifLastPoint = null;     // last point where terrain-texture motifs were stamped (per stroke)
 let selectedStampId = null;
 let selectedLabelId = null;
 let selectedPathId = null;
@@ -143,6 +144,41 @@ function scheduleSave() {
 }
 
 // ─── Main render ────────────────────────────────────────────────────────────
+
+/**
+ * Paint a filled sample of one terrain into `canvas` using the REAL brush
+ * pipeline (dab → terrainMotifs → drawMotif). Exposed so the texture look can
+ * be verified/previewed with the exact code paths the painter uses, rather than
+ * a reconstruction. Temporarily rebinds module paint state and restores it.
+ * @param {HTMLCanvasElement} canvas
+ * @param {string} terrainId
+ * @param {{ brushSize?: number }} [opts]
+ */
+export function renderTerrainSample(canvas, terrainId, opts = {}) {
+  if (!canvas || !canvas.getContext) return;
+  const terrain = getTerrain(terrainId);
+  const savedCtx = ctxTerrain;
+  const savedBrush = brush;
+  const savedMotif = motifLastPoint;
+  ctxTerrain = canvas.getContext('2d');
+  brush = { ...defaultBrush(), size: opts.brushSize || 70, softness: 0.35, flow: 1 };
+  motifLastPoint = null;
+  const w = canvas.width, hgt = canvas.height;
+  const r = brush.size / 2;
+  const step = r * 0.5;
+  let row = 0;
+  for (let y = r * 0.4; y < hgt + r; y += step, row++) {
+    const leftToRight = row % 2 === 0;
+    for (let i = 0; i <= Math.ceil(w / step); i++) {
+      const x = leftToRight ? (i * step) : (w - i * step);
+      dab({ x, y }, terrain, false);
+    }
+    motifLastPoint = null; // let each row seed fresh motifs
+  }
+  ctxTerrain = savedCtx;
+  brush = savedBrush;
+  motifLastPoint = savedMotif;
+}
 
 export function renderFantasyMap(container) {
   if (!project) load();
@@ -253,17 +289,43 @@ function brushPalette() {
   return h('div', {},
     h('div', { class: 'fmap__pal-title' }, tool === 'erase' ? 'Erase terrain' : 'Terrain'),
     tool === 'brush' ? h('div', { class: 'fmap__swatches' },
-      ...terrains.map((t) => h('button', {
-        class: `fmap__swatch ${activeTerrain === t.id ? 'fmap__swatch--active' : ''}`,
-        title: t.label,
-        style: { background: `linear-gradient(135deg, ${t.base}, ${t.shade})` },
-        onclick: () => { activeTerrain = t.id; refreshPalette(); },
-      }, h('span', { class: 'fmap__swatch-label' }, `${t.icon} ${t.label}`))),
+      ...terrains.map((t) => {
+        // A tiny textured preview canvas so the swatch shows the actual look
+        // (trees, waves, peaks…), not just a color gradient.
+        const preview = h('canvas', { class: 'fmap__swatch-canvas', width: '148', height: '30' });
+        requestAnimationFrame(() => paintSwatch(preview, t));
+        return h('button', {
+          class: `fmap__swatch ${activeTerrain === t.id ? 'fmap__swatch--active' : ''}`,
+          title: `${t.label} — ${t.texture}`,
+          onclick: () => { activeTerrain = t.id; refreshPalette(); },
+        }, preview, h('span', { class: 'fmap__swatch-label' }, `${t.icon} ${t.label}`));
+      }),
     ) : null,
     sliderRow('Size', brush.size, 8, 220, (v) => { brush.size = v; }),
     sliderRow('Softness', Math.round(brush.softness * 100), 0, 100, (v) => { brush.softness = v / 100; }),
     sliderRow('Flow', Math.round(brush.flow * 100), 5, 100, (v) => { brush.flow = v / 100; }),
   );
+}
+
+/** Render a small tiled texture preview of a terrain into a swatch canvas. */
+function paintSwatch(canvas, terrain) {
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, hgt = canvas.height;
+  // Base fill (blend base + shade).
+  const g = ctx.createLinearGradient(0, 0, w, hgt);
+  g.addColorStop(0, terrain.base);
+  g.addColorStop(1, terrain.shade);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, hgt);
+  // Motifs across the strip (a few overlapping discs to cover the width).
+  ctx.save();
+  ctx.globalAlpha = 0.95;
+  for (let cx = 16; cx < w; cx += 30) {
+    const seed = (cx * 2654435761) ^ (terrain.id.length * 40503);
+    terrainMotifs(terrain, cx, hgt / 2, 15, seed >>> 0).forEach((m2) => drawMotif(ctx, m2, 0.7));
+  }
+  ctx.restore();
 }
 
 function stampPalette() {
@@ -530,35 +592,345 @@ function pointFromEvent(e) {
 function dab(pt, terrain, erase) {
   if (!ctxTerrain) return;
   const r = brush.size / 2;
-  ctxTerrain.save();
+
   if (erase) {
+    ctxTerrain.save();
     ctxTerrain.globalCompositeOperation = 'destination-out';
     const g = ctxTerrain.createRadialGradient(pt.x, pt.y, r * (1 - brush.softness), pt.x, pt.y, r);
     g.addColorStop(0, `rgba(0,0,0,${brush.flow})`);
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctxTerrain.fillStyle = g;
-  } else {
-    ctxTerrain.globalCompositeOperation = 'source-over';
-    // Blend two terrain tones so fills never read flat.
-    const useShade = Math.random() > 0.5;
-    const col = useShade ? terrain.shade : terrain.base;
-    const g = ctxTerrain.createRadialGradient(pt.x, pt.y, r * (1 - brush.softness), pt.x, pt.y, r);
-    g.addColorStop(0, hexA(col, brush.flow));
-    g.addColorStop(1, hexA(col, 0));
-    ctxTerrain.fillStyle = g;
+    ctxTerrain.beginPath();
+    ctxTerrain.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+    ctxTerrain.fill();
+    ctxTerrain.restore();
+    return;
   }
+
+  // 1) Tonal base — soft radial disc that blends the two terrain tones. Kept a
+  //    touch lighter than before so the motifs painted on top carry the texture.
+  ctxTerrain.save();
+  ctxTerrain.globalCompositeOperation = 'source-over';
+  const col = Math.random() > 0.5 ? terrain.shade : terrain.base;
+  const baseAlpha = clamp(brush.flow * 0.85, 0.05, 1);
+  const g = ctxTerrain.createRadialGradient(pt.x, pt.y, r * (1 - brush.softness), pt.x, pt.y, r);
+  g.addColorStop(0, hexA(col, baseAlpha));
+  g.addColorStop(1, hexA(col, 0));
+  ctxTerrain.fillStyle = g;
   ctxTerrain.beginPath();
   ctxTerrain.arc(pt.x, pt.y, r, 0, Math.PI * 2);
   ctxTerrain.fill();
   ctxTerrain.restore();
+
+  // 2) Texture motifs — only when this dab has moved far enough from the last
+  //    motif drop, so a continuous drag doesn't pile motifs on top of each
+  //    other. Spacing ~= 55% of the brush radius.
+  const spacing = Math.max(6, r * 0.55);
+  if (motifLastPoint && Math.hypot(pt.x - motifLastPoint.x, pt.y - motifLastPoint.y) < spacing) return;
+  motifLastPoint = { x: pt.x, y: pt.y };
+
+  // Deterministic-ish per-dab seed from quantized position so repeated painting
+  // of the same spot is stable, but the stroke as a whole varies.
+  const seed = (Math.round(pt.x) * 73856093) ^ (Math.round(pt.y) * 19349663);
+  // Motifs cover a slightly smaller disc than the base so they stay off the
+  // feathered edge; scale the whole motif set with the brush size.
+  const motifR = r * 0.82;
+  const scaleMul = clamp(r / 32, 0.6, 2.4);
+  const motifs = terrainMotifs(terrain, pt.x, pt.y, motifR, seed >>> 0);
+  ctxTerrain.save();
+  // Clip the motif pass to the dab disc so a large motif near the edge can't
+  // spray onto un-based canvas, and so the hard motif edges tuck under the
+  // feathered base rim instead of sitting on bare pixels.
+  ctxTerrain.beginPath();
+  ctxTerrain.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+  ctxTerrain.clip();
+  // Motifs carry the terrain's identity, so keep them near-opaque (they only
+  // fade a little at very low brush flow).
+  ctxTerrain.globalAlpha = clamp(0.6 + brush.flow * 0.4, 0.6, 1);
+  motifs.forEach((m2) => drawMotif(ctxTerrain, m2, scaleMul));
+  ctxTerrain.restore();
+}
+
+/**
+ * Draw a single terrain-motif primitive with real light/shadow/outline so it
+ * reads as a distinct feature (a tree, a peak, a wave) rather than a same-hue
+ * blob. `col` is the motif accent; we derive a darker body, lighter highlight,
+ * and dark outline from it for depth.
+ */
+function drawMotif(ctx, m2, k = 1) {
+  const col = safeColor(m2.color, '#4a6b3a');
+  const dark = shift(col, -0.4);        // shadow / outline
+  const body = col;                     // main tone
+  const light = shift(col, 0.4);        // sunlit highlight
+  const s = (m2.s || 4) * k;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  switch (m2.type) {
+    case 'tree': { // conifer: trunk + two-tone triangular canopy + outline
+      // trunk
+      ctx.fillStyle = shift('#5b3a1e', 0);
+      ctx.fillRect(m2.x - s * 0.11, m2.y + s * 0.45, s * 0.22, s * 0.5);
+      // canopy (dark body)
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.12);
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s * 1.05);
+      ctx.lineTo(m2.x - s * 0.72, m2.y + s * 0.6);
+      ctx.lineTo(m2.x + s * 0.72, m2.y + s * 0.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // sunlit left face
+      ctx.fillStyle = light;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s * 1.05);
+      ctx.lineTo(m2.x - s * 0.72, m2.y + s * 0.6);
+      ctx.lineTo(m2.x - s * 0.1, m2.y + s * 0.6);
+      ctx.lineTo(m2.x - s * 0.04, m2.y - s * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'blob': { // canopy / bush / rock — shaded round mass + highlight
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      ctx.beginPath();
+      if (m2.poly) {
+        const n = 7;
+        for (let i = 0; i < n; i++) {
+          const a = (Math.PI * 2 / n) * i + (m2.x % 1);
+          const rr = s * (0.72 + ((i % 2) ? 0.22 : 0));
+          const px = m2.x + Math.cos(a) * rr, py = m2.y + Math.sin(a) * rr;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+      } else {
+        ctx.arc(m2.x, m2.y, s * 0.8, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.stroke();
+      // top-left highlight
+      ctx.fillStyle = shift(col, 0.35, 0.85);
+      ctx.beginPath();
+      ctx.arc(m2.x - s * 0.25, m2.y - s * 0.25, s * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'tuft': { // grass — dark back blades + lighter front blades
+      ctx.lineWidth = Math.max(0.8, s * 0.22);
+      ctx.strokeStyle = dark;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(m2.x + i * s * 0.3, m2.y + s * 0.55);
+        ctx.quadraticCurveTo(m2.x + i * s * 0.42, m2.y - s * 0.2, m2.x + i * s * 0.62, m2.y - s * 0.75);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.16);
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(m2.x + i * s * 0.32, m2.y + s * 0.5);
+        ctx.quadraticCurveTo(m2.x + i * s * 0.3, m2.y - s * 0.1, m2.x + i * s * 0.4, m2.y - s * 0.6);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'peak': { // mountain — dark rock, shadowed right face, snow cap
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x - s * 0.85, m2.y + s * 0.62);
+      ctx.lineTo(m2.x + s * 0.85, m2.y + s * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // shadowed right face
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x + s * 0.85, m2.y + s * 0.62);
+      ctx.lineTo(m2.x, m2.y + s * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      // snow cap
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x - s * 0.3, m2.y - s * 0.35);
+      ctx.lineTo(m2.x - s * 0.12, m2.y - s * 0.42);
+      ctx.lineTo(m2.x + s * 0.06, m2.y - s * 0.3);
+      ctx.lineTo(m2.x + s * 0.3, m2.y - s * 0.35);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'hill': { // rounded bump with a highlight
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y + s * 0.2, s * 0.8, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.14);
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y + s * 0.2, s * 0.6, Math.PI * 1.15, Math.PI * 1.6);
+      ctx.stroke();
+      break;
+    }
+    case 'shard': { // crystal — lit left facet + dark right facet + outline
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      // left (light) facet
+      ctx.fillStyle = light;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x - s * 0.55, m2.y);
+      ctx.lineTo(m2.x, m2.y + s);
+      ctx.closePath();
+      ctx.fill();
+      // right (dark) facet
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x + s * 0.55, m2.y);
+      ctx.lineTo(m2.x, m2.y + s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s); ctx.lineTo(m2.x + s * 0.55, m2.y);
+      ctx.lineTo(m2.x, m2.y + s); ctx.lineTo(m2.x - s * 0.55, m2.y);
+      ctx.closePath(); ctx.stroke();
+      break;
+    }
+    case 'cross': { // thorn / spike cluster
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(1, s * 0.24);
+      ctx.beginPath();
+      ctx.moveTo(m2.x - s * 0.6, m2.y + s * 0.3); ctx.lineTo(m2.x + s * 0.6, m2.y - s * 0.3);
+      ctx.moveTo(m2.x + s * 0.6, m2.y + s * 0.3); ctx.lineTo(m2.x - s * 0.6, m2.y - s * 0.3);
+      ctx.moveTo(m2.x, m2.y + s * 0.55); ctx.lineTo(m2.x, m2.y - s * 0.55);
+      ctx.stroke();
+      break;
+    }
+    case 'ring': { // bubble / crater — rim + inner shadow
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.8, s * 0.2);
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y, s * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.12);
+      ctx.beginPath();
+      ctx.arc(m2.x - s * 0.1, m2.y - s * 0.1, s * 0.5, Math.PI * 0.9, Math.PI * 1.7);
+      ctx.stroke();
+      break;
+    }
+    case 'cloud': { // soft nebula puff (layered for depth)
+      const g1 = ctx.createRadialGradient(m2.x, m2.y, 0, m2.x, m2.y, s);
+      g1.addColorStop(0, hexA(col, 0.5));
+      g1.addColorStop(1, hexA(col, 0));
+      ctx.fillStyle = g1;
+      ctx.beginPath(); ctx.arc(m2.x, m2.y, s, 0, Math.PI * 2); ctx.fill();
+      const g2 = ctx.createRadialGradient(m2.x - s * 0.2, m2.y - s * 0.2, 0, m2.x - s * 0.2, m2.y - s * 0.2, s * 0.5);
+      g2.addColorStop(0, shift(col, 0.5, 0.55));
+      g2.addColorStop(1, hexA(col, 0));
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(m2.x - s * 0.2, m2.y - s * 0.2, s * 0.5, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'dot': { // speckle / star / ember / sparkle
+      if (m2.glow) {
+        const grad = ctx.createRadialGradient(m2.x, m2.y, 0, m2.x, m2.y, Math.max(2, s * 2.4));
+        grad.addColorStop(0, hexA(col, 0.95));
+        grad.addColorStop(0.4, hexA(col, 0.5));
+        grad.addColorStop(1, hexA(col, 0));
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(m2.x, m2.y, Math.max(2, s * 2.4), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = shift(col, 0.6);
+      } else {
+        ctx.fillStyle = body;
+      }
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y, Math.max(0.8, s * 0.7), 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'crack': {
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.9, k * 1.1);
+      ctx.beginPath();
+      ctx.moveTo(m2.x1, m2.y1); ctx.lineTo(m2.x2, m2.y2);
+      ctx.stroke();
+      break;
+    }
+    case 'line': {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = m2.w || 1;
+      ctx.beginPath();
+      ctx.moveTo(m2.x1, m2.y1); ctx.lineTo(m2.x2, m2.y2);
+      ctx.stroke();
+      break;
+    }
+    case 'wave': { // ocean / dune / furrow — dark trough + light crest
+      const drawWave = (dy, color, w) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        const steps = 10;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const x = m2.x1 + (m2.x2 - m2.x1) * t;
+          const y = m2.y + dy + (m2.amp ? Math.sin(t * Math.PI * 2 + (m2.phase || 0)) * m2.amp : 0);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      };
+      drawWave(0.6, dark, (m2.w || 1.5) + 0.5);   // shadow trough
+      drawWave(-0.4, light, (m2.w || 1.5));        // bright crest
+      break;
+    }
+    default:
+      break;
+  }
+  ctx.restore();
+}
+
+// Parse a hex color (#rgb or #rrggbb) to {r,g,b}, or null.
+function hexRGB(hex) {
+  const c = safeColor(hex, '#7a8f4a');
+  const m6 = /^#([0-9a-f]{6})$/i.exec(c);
+  const m3 = /^#([0-9a-f]{3})$/i.exec(c);
+  let h = null;
+  if (m6) h = m6[1];
+  else if (m3) h = m3[1].replace(/(.)/g, '$1$1');
+  if (!h) return null;
+  const n = parseInt(h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
 function hexA(hex, alpha) {
-  const c = safeColor(hex, '#7a8f4a');
-  const m = /^#([0-9a-f]{6})$/i.exec(c);
-  if (!m) return c;
-  const num = parseInt(m[1], 16);
-  return `rgba(${(num >> 16) & 255},${(num >> 8) & 255},${num & 255},${clamp(alpha, 0, 1)})`;
+  const rgb = hexRGB(hex);
+  if (!rgb) return safeColor(hex, '#7a8f4a');
+  return `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(alpha, 0, 1)})`;
+}
+
+// Lighten (amt>0) or darken (amt<0) a color by a fraction toward white/black.
+// Used to give motifs real light/shadow so they read as 3D features, not flat
+// same-hue shapes.
+function shift(hex, amt, alpha = 1) {
+  const rgb = hexRGB(hex);
+  if (!rgb) return safeColor(hex, '#7a8f4a');
+  const mix = (c) => amt >= 0 ? Math.round(c + (255 - c) * amt) : Math.round(c * (1 + amt));
+  return `rgba(${mix(rgb.r)},${mix(rgb.g)},${mix(rgb.b)},${clamp(alpha, 0, 1)})`;
 }
 
 // ─── Pointer handling ──────────────────────────────────────────────────────────
@@ -575,6 +947,7 @@ function onPointerDown(e) {
     pushUndo();
     painting = true;
     lastPoint = pt;
+    motifLastPoint = null; // fresh stroke → first dab stamps motifs
     dab(pt, getTerrain(activeTerrain), tool === 'erase');
   } else if (tool === 'stamp' || tool === 'path') {
     painting = true;
