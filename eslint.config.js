@@ -10,7 +10,7 @@ const browserGlobals = {
   AbortController: 'readonly', Blob: 'readonly', URL: 'readonly', FileReader: 'readonly',
   CSS: 'readonly', Node: 'readonly', Element: 'readonly', Response: 'readonly',
   alert: 'readonly', confirm: 'readonly', prompt: 'readonly', getComputedStyle: 'readonly',
-  CustomEvent: 'readonly',
+  CustomEvent: 'readonly', Image: 'readonly', HTMLCanvasElement: 'readonly',
 };
 
 const commonRules = {

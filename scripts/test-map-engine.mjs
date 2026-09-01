@@ -1,0 +1,115 @@
+/**
+ * Functional tests for the Fantasy/Sci-Fi map engine (core/map-engine.js).
+ * Zero dependencies — plain asserts. Run: NODE_OPTIONS= node scripts/test-map-engine.mjs
+ */
+
+let passed = 0;
+let failed = 0;
+function assert(cond, msg) {
+  if (cond) { passed++; } else { failed++; console.error('  ✗', msg); }
+}
+const approx = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
+
+const m = await import('../src/core/map-engine.js');
+
+// ── Terrain palette (fantasy AND sci-fi) ─────────────────────────────────────
+assert(m.TERRAINS.length >= 18, `broad terrain palette (${m.TERRAINS.length})`);
+const fant = m.terrainsForStyle('fantasy');
+const sci = m.terrainsForStyle('scifi');
+assert(fant.length >= 8 && sci.length >= 8, `both styles well-stocked (fantasy ${fant.length}, scifi ${sci.length})`);
+assert(fant.every((t) => t.style === 'fantasy'), 'terrainsForStyle(fantasy) filters correctly');
+assert(sci.every((t) => t.style === 'scifi'), 'terrainsForStyle(scifi) filters correctly');
+assert(m.TERRAINS.every((t) => /^#[0-9a-f]{6}$/i.test(t.base) && /^#[0-9a-f]{6}$/i.test(t.shade)), 'every terrain has hex base+shade');
+assert(m.getTerrain('void').style === 'scifi', 'sci-fi terrain "void" resolves');
+assert(m.getTerrain('nope').id === 'grass', 'unknown terrain falls back to grass');
+
+// ── Surfaces (parchment + sci-fi) ─────────────────────────────────────────────
+assert(m.SURFACES.length >= 4, 'multiple surfaces');
+assert(m.surfacesForStyle('scifi').length >= 2 && m.surfacesForStyle('fantasy').length >= 2, 'surfaces per style');
+assert(m.defaultSurfaceForStyle('scifi') === 'starchart', 'scifi default surface is starchart');
+assert(m.defaultSurfaceForStyle('fantasy') === 'parchment', 'fantasy default surface is parchment');
+assert(m.getSurface('blueprint').kind === 'grid', 'blueprint uses grid kind');
+assert(m.getSurface('starchart').kind === 'stars', 'starchart uses stars kind');
+assert(m.getSurface('parchment').kind === 'paper', 'parchment uses paper kind');
+assert(m.getSurface('???').id === 'parchment', 'unknown surface falls back to parchment');
+assert(m.PAPER === m.SURFACES[0], 'PAPER back-compat alias points at first surface');
+// No stray non-ascii / malformed hex in surfaces (guards the earlier bug).
+assert(m.SURFACES.every((s) => /^#[0-9a-f]{6}$/i.test(s.base) && /^#[0-9a-f]{6}$/i.test(s.edge)), 'surface base/edge are clean hex');
+
+// ── RNG determinism ───────────────────────────────────────────────────────────
+const r1 = m.makeRng(42); const r2 = m.makeRng(42);
+assert(r1() === r2() && r1() === r2(), 'makeRng is deterministic for a seed');
+assert(m.makeRng(1)() !== m.makeRng(2)(), 'different seeds differ');
+const v = m.makeRng(9)();
+assert(v >= 0 && v < 1, 'rng output in [0,1)');
+
+// ── Brush dabs (stroke interpolation) ─────────────────────────────────────────
+const dabs = m.brushDabs({ x: 0, y: 0 }, { x: 100, y: 0 }, { size: 20, spacing: 0.5 });
+assert(dabs.length === 10, `spacing math: 100px / (20*0.5=10) => 10 dabs (got ${dabs.length})`);
+assert(approx(dabs[dabs.length - 1].x, 100), 'last dab reaches the endpoint');
+const tap = m.brushDabs({ x: 5, y: 5 }, { x: 5, y: 5 }, m.defaultBrush());
+assert(tap.length === 1 && tap[0].x === 5, 'zero-length stroke yields a single dab at the point');
+assert(m.clamp(5, 0, 3) === 3 && m.clamp(-1, 0, 3) === 0 && m.clamp(2, 0, 3) === 2, 'clamp works');
+
+// ── Stamp scatter ──────────────────────────────────────────────────────────────
+const path = [{ x: 0, y: 0 }, { x: 200, y: 0 }];
+const s1 = m.scatterStamps(path, { seed: 7, size: 40, density: 2, jitter: 0.5, sizeJitter: 0.3 });
+const s2 = m.scatterStamps(path, { seed: 7, size: 40, density: 2, jitter: 0.5, sizeJitter: 0.3 });
+assert(s1.length >= 1, 'scatter produces stamps');
+assert(JSON.stringify(s1) === JSON.stringify(s2), 'scatter is deterministic for a seed');
+assert(m.scatterStamps([{ x: 10, y: 10 }], { seed: 1, density: 2 }).length === 1, 'a single tap drops exactly one stamp');
+assert(s1.every((p) => p.size >= 6), 'stamp sizes are clamped to a visible minimum');
+// Depth sort: non-decreasing y.
+assert(s1.every((p, i) => i === 0 || s1[i - 1].y <= p.y), 'stamps are depth-sorted by y');
+assert(m.scatterStamps([], { seed: 1 }).length === 0, 'empty path scatters nothing');
+assert(m.scatterStamps(null, {}).length === 0, 'null path is safe');
+// pointAtLength endpoints.
+assert(approx(m.pointAtLength(path, 0).x, 0) && approx(m.pointAtLength(path, 200).x, 200), 'pointAtLength hits both ends');
+assert(approx(m.pointAtLength(path, 100).x, 100), 'pointAtLength midpoint');
+
+// ── Labels ──────────────────────────────────────────────────────────────────
+assert(m.labelStyle('region', 'fantasy').caps === true, 'fantasy region labels are caps');
+assert(m.labelStyle('water', 'scifi').color.startsWith('#'), 'scifi water label has a color');
+assert(m.labelStyle('nope', 'scifi') === m.labelStyle('place', 'scifi'), 'unknown role falls back to place');
+assert(m.labelStyle('place', 'nope').color === m.LABEL_STYLES.fantasy.place.color, 'unknown mapStyle falls back to fantasy');
+// Straight baseline: all y equal, spans the width.
+const straight = m.labelBaseline(100, 50, 80, 5, 0);
+assert(straight.length === 5 && straight.every((p) => p.y === 50), 'straight baseline keeps y constant');
+assert(approx(straight[0].x, 60) && approx(straight[4].x, 140), 'straight baseline spans the width centered');
+// Curved baseline bends and rotates.
+const curved = m.labelBaseline(100, 50, 80, 5, 0.8);
+assert(curved.some((p) => Math.abs(p.y - 50) > 1), 'curved baseline bends off the center line');
+assert(curved.some((p) => Math.abs(p.angle) > 0.01), 'curved baseline rotates glyphs');
+assert(m.labelBaseline(100, 50, 80, 1, 0.5).length === 1, 'single-char label is safe');
+
+// ── Layers ────────────────────────────────────────────────────────────────────
+assert(JSON.stringify(m.LAYER_ORDER) === JSON.stringify(['paper', 'terrain', 'stamps', 'labels']), 'layer order bottom->top');
+const layers = m.defaultLayers();
+assert(m.LAYER_ORDER.every((id) => layers[id] && layers[id].visible === true && layers[id].opacity === 1), 'default layers all visible @ full opacity');
+assert(m.LAYER_META.paper.locked === true, 'paper layer is locked');
+
+// ── Export dimensions ──────────────────────────────────────────────────────────
+const ex = m.exportDimensions(1280, 800, 2560);
+assert(ex.width === 2560 && ex.height === 1600 && approx(ex.scale, 2), 'export scales long edge to target, preserves aspect');
+const exTall = m.exportDimensions(800, 1600, 2560);
+assert(exTall.height === 2560 && exTall.width === 1280, 'export handles portrait (long edge = height)');
+assert(m.exportDimensions(0, 0, 2048).width >= 1, 'degenerate size is guarded');
+
+// ── Project serialization (style-aware) ─────────────────────────────────────
+const p = m.emptyMapProject();
+assert(p.style === 'fantasy' && p.surface === 'parchment', 'empty project defaults to fantasy/parchment');
+assert(p.schemaVersion === m.MAP_SCHEMA_VERSION && Array.isArray(p.stamps) && Array.isArray(p.labels), 'project shape is complete');
+const sp = m.emptyMapProject(1000, 700, 'scifi');
+assert(sp.style === 'scifi' && sp.surface === 'starchart', 'scifi project gets a scifi surface');
+// normalize repairs a mismatched surface for the style.
+const fixed = m.normalizeMapProject({ style: 'scifi', surface: 'parchment', stamps: 'bad', labels: null });
+assert(fixed.surface === 'starchart', 'normalize corrects a surface that doesn\'t match the style');
+assert(Array.isArray(fixed.stamps) && fixed.stamps.length === 0 && Array.isArray(fixed.labels), 'normalize coerces bad stamps/labels to arrays');
+assert(m.normalizeMapProject(null).style === 'fantasy', 'normalize(null) yields a valid default project');
+const keepSurf = m.normalizeMapProject({ style: 'scifi', surface: 'blueprint' });
+assert(keepSurf.surface === 'blueprint', 'normalize keeps a valid surface for the style');
+assert(m.normalizeStyle('scifi') === 'scifi' && m.normalizeStyle('anything') === 'fantasy', 'normalizeStyle guards input');
+assert(m.MAP_STYLES.length === 2, 'two first-class map styles (fantasy + scifi)');
+
+console.log(`\n${failed === 0 ? '✅' : '❌'} map-engine tests: ${passed} passed, ${failed} failed`);
+process.exit(failed ? 1 : 0);

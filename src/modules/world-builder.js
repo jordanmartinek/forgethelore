@@ -20,8 +20,33 @@ import { generateId } from '../core/objects.js';
 import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 import { confirmDialog } from '../ui/modal.js';
 import { SUBJECTS, shapeSVG, shapeLabel, resolveShapeId, safeColor } from '../core/world-shapes.js';
+import { renderFantasyMap } from './fantasy-map.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// World Builder has two modes: the hierarchical shape-node canvas ('shapes')
+// and the Inkarnate-style painted Map ('map'). The choice is persisted so the
+// user returns to whichever they were using.
+let wbMode = loadData('worldBuilderMode', 'shapes');
+function setWbMode(mode) {
+  wbMode = mode === 'map' ? 'map' : 'shapes';
+  persistState('worldBuilderMode', wbMode);
+  const container = document.querySelector('.main-content');
+  if (container) { container.innerHTML = ''; renderWorldBuilder(container); }
+}
+
+/** A small segmented toggle shown at the top of both modes. */
+function renderModeToggle() {
+  const tab = (id, label, icon) => h('button', {
+    class: `wb-mode-tab ${wbMode === id ? 'wb-mode-tab--active' : ''}`,
+    onclick: () => { if (wbMode !== id) setWbMode(id); },
+    title: label,
+  }, `${icon} ${label}`);
+  return h('div', { class: 'wb-mode-toggle' },
+    tab('shapes', 'Diagram', '🧩'),
+    tab('map', 'Map', '🗺️'),
+  );
+}
 const DEFAULT_SIZE = 90;
 
 // ─── Hierarchical World Data ─────────────────────────────────────────────────
@@ -125,12 +150,22 @@ function pruneSubtree(nodeId) {
 // ─── Main Render ─────────────────────────────────────────────────────────────
 
 export function renderWorldBuilder(container) {
+  // Outer flex column: a slim mode bar on top, the active mode's body below.
+  const body = h('div', { class: 'wb-mode-body' });
+  const wrap = h('div', { class: 'wb-mode-wrap' }, renderModeToggle(), body);
+  container.appendChild(wrap);
+
+  if (wbMode === 'map') {
+    renderFantasyMap(body);
+    return;
+  }
+
   const builder = h('div', { class: 'world-builder' },
     renderWorldToolbar(),
     renderPalette(),
     renderCanvas(),
   );
-  container.appendChild(builder);
+  body.appendChild(builder);
   updateWorldSidebar();
 }
 
