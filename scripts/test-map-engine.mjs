@@ -83,7 +83,7 @@ assert(curved.some((p) => Math.abs(p.angle) > 0.01), 'curved baseline rotates gl
 assert(m.labelBaseline(100, 50, 80, 1, 0.5).length === 1, 'single-char label is safe');
 
 // ── Layers ────────────────────────────────────────────────────────────────────
-assert(JSON.stringify(m.LAYER_ORDER) === JSON.stringify(['paper', 'terrain', 'stamps', 'labels']), 'layer order bottom->top');
+assert(JSON.stringify(m.LAYER_ORDER) === JSON.stringify(['paper', 'terrain', 'paths', 'stamps', 'labels', 'overlay']), 'layer order bottom->top');
 const layers = m.defaultLayers();
 assert(m.LAYER_ORDER.every((id) => layers[id] && layers[id].visible === true && layers[id].opacity === 1), 'default layers all visible @ full opacity');
 assert(m.LAYER_META.paper.locked === true, 'paper layer is locked');
@@ -110,6 +110,78 @@ const keepSurf = m.normalizeMapProject({ style: 'scifi', surface: 'blueprint' })
 assert(keepSurf.surface === 'blueprint', 'normalize keeps a valid surface for the style');
 assert(m.normalizeStyle('scifi') === 'scifi' && m.normalizeStyle('anything') === 'fantasy', 'normalizeStyle guards input');
 assert(m.MAP_STYLES.length === 2, 'two first-class map styles (fantasy + scifi)');
+
+// ── Expanded content: terrains, surfaces, fonts ──────────────────────────────
+assert(m.terrainsForStyle('fantasy').length >= 18, `many fantasy terrains (${m.terrainsForStyle('fantasy').length})`);
+assert(m.terrainsForStyle('scifi').length >= 18, `many sci-fi terrains (${m.terrainsForStyle('scifi').length})`);
+assert(m.TERRAINS.every((t) => /^#[0-9a-f]{6}$/i.test(t.base) && /^#[0-9a-f]{6}$/i.test(t.shade)), 'all terrains have valid hex base/shade');
+assert(new Set(m.TERRAINS.map((t) => t.id)).size === m.TERRAINS.length, 'terrain ids are unique');
+assert(m.surfacesForStyle('fantasy').length >= 3 && m.surfacesForStyle('scifi').length >= 3, 'more surfaces per style');
+assert(m.FONTS.length >= 3 && typeof m.fontCss('display') === 'string' && m.fontCss('display').length > 0, 'fonts + fontCss resolve');
+assert(m.fontCss('nonexistent') === m.fontCss('serif'), 'fontCss falls back to serif');
+
+// ── Path kinds ────────────────────────────────────────────────────────────────
+assert(m.PATH_KINDS.length >= 8, 'path kinds exist');
+assert(m.pathKindsForStyle('fantasy').every((p) => p.style === 'fantasy'), 'path kinds filter by fantasy');
+assert(m.pathKindsForStyle('scifi').every((p) => p.style === 'scifi'), 'path kinds filter by scifi');
+assert(m.defaultPathKindForStyle('scifi') === 'hyperlane' && m.defaultPathKindForStyle('fantasy') === 'river', 'default path kinds per style');
+assert(m.getPathKind('road').label === 'Road', 'getPathKind resolves');
+assert(m.getPathKind('nope') === m.PATH_KINDS[0], 'getPathKind falls back');
+
+// ── Path simplify + smoothing ─────────────────────────────────────────────────
+const simplified = m.simplifyPath([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 50, y: 0 }], 6);
+assert(simplified.length === 2, `simplifyPath drops near-duplicate points (got ${simplified.length})`);
+assert(simplified[simplified.length - 1].x === 50, 'simplifyPath always keeps the endpoint');
+assert(m.simplifyPath([{ x: 0, y: 0 }], 6).length === 1, 'simplifyPath handles a single point');
+assert(m.simplifyPath([], 6).length === 0, 'simplifyPath handles empty');
+const sm = m.smoothPath([{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 0 }, { x: 30, y: 10 }]);
+assert(sm.start.x === 0 && sm.start.y === 0, 'smoothPath starts at the first point');
+assert(sm.segments.length === 3, `smoothPath yields N-1 bezier segments (got ${sm.segments.length})`);
+assert(sm.segments.every((s) => s.c1 && s.c2 && s.end), 'each segment has control points + end');
+const last = sm.segments[sm.segments.length - 1].end;
+assert(last.x === 30 && last.y === 10, 'smoothPath ends at the last point');
+const sm2 = m.smoothPath([{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 0 }, { x: 30, y: 10 }]);
+assert(JSON.stringify(sm) === JSON.stringify(sm2), 'smoothPath is deterministic');
+assert(m.smoothPath([{ x: 5, y: 5 }]).segments.length === 0, 'smoothPath of a single point has no segments');
+
+// ── Grid + hex geometry ────────────────────────────────────────────────────────
+assert(m.GRID_MODES.map((g) => g.id).join(',') === 'off,square,hex', 'grid modes');
+assert(m.defaultGrid().mode === 'off', 'grid defaults off');
+const centers = m.hexCenters(200, 200, 40);
+assert(centers.length > 0 && centers.every((c) => Number.isFinite(c.cx) && Number.isFinite(c.cy)), 'hexCenters produces finite centers');
+const corners = m.hexCorners(100, 100, 40);
+assert(corners.length === 6, 'hexCorners returns 6 corners');
+assert(corners.every((p) => Math.abs(Math.hypot(p.x - 100, p.y - 100) - 40) < 1e-6), 'hex corners lie on radius 40');
+assert(m.hexCorners(0, 0, 2).every((p) => Math.hypot(p.x, p.y) >= 6 - 1e-6), 'hex size is clamped to a minimum');
+
+// ── Ornaments / compass ─────────────────────────────────────────────────────────
+const orn = m.defaultOrnaments();
+assert(orn.frame === true && orn.compass === true && orn.scale === false, 'default ornaments');
+const cp = m.compassPoints(50, 50, 30);
+assert(cp.outer.length === 8 && cp.inner.length === 8, 'compass has 8 outer + 8 inner points');
+assert(Math.abs(cp.outer[0].x - 50) < 1e-6 && cp.outer[0].y < 50, 'first compass spoke points north (up)');
+
+// ── Presets ──────────────────────────────────────────────────────────────────
+assert(m.CANVAS_PRESETS.length >= 4 && m.getCanvasPreset('portrait').height > m.getCanvasPreset('portrait').width, 'portrait preset is taller');
+assert(m.getCanvasPreset('nope').id === m.CANVAS_PRESETS[0].id, 'canvas preset falls back');
+assert(m.EXPORT_PRESETS.length >= 4 && m.getExportPreset('ultra').longEdge === 4096, 'ultra export preset');
+assert(m.getExportPreset('nope').id === 'print', 'export preset falls back to print');
+
+// ── Layers include the new paths + overlay layers ─────────────────────────────
+assert(m.LAYER_ORDER.includes('paths') && m.LAYER_ORDER.includes('overlay'), 'layer order includes paths + overlay');
+assert(m.LAYER_ORDER.indexOf('paths') < m.LAYER_ORDER.indexOf('stamps'), 'paths render under stamps');
+assert(m.LAYER_ORDER.indexOf('overlay') === m.LAYER_ORDER.length - 1, 'overlay is topmost');
+const dl = m.defaultLayers();
+assert(m.LAYER_ORDER.every((id) => dl[id] && dl[id].visible === true), 'defaultLayers covers every layer id');
+
+// ── Project carries new fields + back-compat ──────────────────────────────────
+const np = m.emptyMapProject();
+assert(Array.isArray(np.paths) && np.grid && np.ornaments, 'empty project has paths/grid/ornaments');
+const legacy = m.normalizeMapProject({ style: 'fantasy', stamps: [{ id: 'x' }] }); // no paths/grid/ornaments/layers
+assert(Array.isArray(legacy.paths) && legacy.paths.length === 0, 'legacy project gains an empty paths array');
+assert(legacy.grid.mode === 'off' && typeof legacy.ornaments.frame === 'boolean', 'legacy project gains grid + ornaments');
+assert(legacy.layers.paths && legacy.layers.overlay, 'legacy project gains new layer entries');
+assert(m.normalizeMapProject({ paths: 'bad', grid: 5, ornaments: null }).paths.length === 0, 'normalize coerces bad paths/grid/ornaments');
 
 console.log(`\n${failed === 0 ? '✅' : '❌'} map-engine tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

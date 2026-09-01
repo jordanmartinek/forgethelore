@@ -33,6 +33,14 @@ import {
   labelStyle, labelBaseline,
   normalizeMapProject,
   exportDimensions,
+  FONTS, fontCss,
+  getPathKind, pathKindsForStyle, defaultPathKindForStyle,
+  simplifyPath, smoothPath,
+  GRID_MODES, hexCenters, hexCorners,
+  compassPoints,
+  CANVAS_PRESETS, getCanvasPreset,
+  EXPORT_PRESETS, getExportPreset,
+  LAYER_ORDER, LAYER_META,
 } from '../core/map-engine.js';
 
 const STORE_KEY = 'fantasyMap';
@@ -77,22 +85,27 @@ const STAMP_COLORS = {
 // ─── State ────────────────────────────────────────────────────────────────────
 
 let project = null;
-let tool = 'brush';            // brush | erase | stamp | label | pan | select
+let tool = 'brush';            // brush | erase | stamp | label | path | select
 let activeTerrain = 'grass';
 let activeStamp = 'mountain';
+let activePathKind = 'river';
 let brush = defaultBrush();
 let stampOpts = defaultStampOptions();
 let labelRole = 'place';
+let labelFont = 'serif';       // FONTS id for new labels
+let exportPresetId = 'print';  // EXPORT_PRESETS id
+let exportTransparent = false; // omit the paper layer on export
 
 let undoStack = [];            // terrain PNG data URLs (raster history)
 let redoStack = [];
 
 let ctxTerrain = null;         // 2d context of the terrain canvas
 let painting = false;
-let strokePath = [];           // for stamp scatter
+let strokePath = [];           // for stamp scatter AND path drawing
 let lastPoint = null;
 let selectedStampId = null;
 let selectedLabelId = null;
+let selectedPathId = null;
 let dragging = null;           // { kind:'stamp'|'label', id, offX, offY }
 
 // The element this module was rendered into (so re-renders stay scoped to the
@@ -121,6 +134,14 @@ function save() {
   persistState(STORE_KEY, project);
 }
 
+// Debounced save for high-frequency edits (slider drags) so we don't thrash
+// localStorage while the user scrubs a value.
+let _saveTimer = null;
+function scheduleSave() {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => { _saveTimer = null; save(); }, 400);
+}
+
 // ─── Main render ────────────────────────────────────────────────────────────
 
 export function renderFantasyMap(container) {
@@ -139,8 +160,10 @@ export function renderFantasyMap(container) {
     setupCanvases();
     paintSurface();
     restoreTerrain();      // flips terrainReady=true when the raster is in place
+    renderPathsLayer();
     renderStampsLayer();
     renderLabelsLayer();
+    renderOverlayLayer();
   });
 }
 
@@ -149,10 +172,11 @@ export function renderFantasyMap(container) {
 function renderToolbar() {
   const tools = [
     { id: 'brush', icon: '🖌️', label: 'Terrain brush' },
+    { id: 'erase', icon: '🧽', label: 'Erase terrain' },
+    { id: 'path', icon: '〰️', label: 'Paths & routes' },
     { id: 'stamp', icon: '🌲', label: 'Stamp' },
     { id: 'label', icon: '🔤', label: 'Label' },
-    { id: 'erase', icon: '🧽', label: 'Erase terrain' },
-    { id: 'select', icon: '🖐️', label: 'Move stamps/labels' },
+    { id: 'select', icon: '🖐️', label: 'Move / select' },
   ];
   return h('div', { class: 'fmap__toolbar' },
     // Style switcher (fantasy vs sci-fi)
@@ -180,6 +204,16 @@ function renderToolbar() {
         onclick: () => setTool(t.id),
       }, t.icon)),
     ),
+    // Grid overlay
+    h('select', { class: 'input fmap__grid', title: 'Grid overlay',
+      onchange: (e) => { project.grid.mode = e.target.value; renderOverlayLayer(); save(); },
+    },
+      ...GRID_MODES.map((g) => h('option', {
+        value: g.id, selected: project.grid.mode === g.id ? 'selected' : null,
+      }, `Grid: ${g.label}`)),
+    ),
+    // Layers panel toggle
+    h('button', { class: 'btn btn--sm btn--ghost', title: 'Layers', onclick: toggleLayersPanel }, '☰ Layers'),
     // Undo/redo
     h('div', { class: 'fmap__history' },
       h('button', { class: 'btn btn--sm btn--ghost', title: 'Undo (terrain)', onclick: undo }, '↶'),
@@ -187,8 +221,9 @@ function renderToolbar() {
     ),
     // Actions
     h('div', { class: 'fmap__actions' },
-      h('button', { class: 'btn btn--sm btn--ghost', title: 'Clear map', onclick: clearMap }, '🗑 Clear'),
-      h('button', { class: 'btn btn--sm btn--primary', title: 'Export PNG', onclick: exportPNG }, '⬇ Export PNG'),
+      h('button', { class: 'btn btn--sm btn--ghost', title: 'Map settings', onclick: openSettings }, '⚙'),
+      h('button', { class: 'btn btn--sm btn--ghost', title: 'Clear map', onclick: clearMap }, '🗑'),
+      h('button', { class: 'btn btn--sm btn--primary', title: 'Export', onclick: exportMap }, '⬇ Export'),
     ),
   );
 }
@@ -207,7 +242,9 @@ function refreshPalette() {
 function paletteBody() {
   if (tool === 'stamp') return stampPalette();
   if (tool === 'label') return labelPalette();
+  if (tool === 'path') return pathPalette();
   if (tool === 'brush' || tool === 'erase') return brushPalette();
+  if (tool === 'select') return selectPalette();
   return hintPalette();
 }
 
@@ -264,12 +301,78 @@ function labelPalette() {
         onclick: () => { labelRole = r.id; refreshPalette(); },
       }, r.label)),
     ),
-    h('div', { class: 'fmap__pal-hint' }, 'Click the map to place a label, then type. Double-click a label to edit; drag to move.'),
+    h('div', { class: 'fmap__pal-sub' }, 'Font'),
+    h('select', { class: 'input', onchange: (e) => { labelFont = e.target.value; } },
+      ...FONTS.map((f) => h('option', { value: f.id, selected: labelFont === f.id ? 'selected' : null }, f.label)),
+    ),
+    // If a label is selected, expose live edit controls for it.
+    selectedLabelId ? selectedLabelControls() : null,
+    h('div', { class: 'fmap__pal-hint' }, 'Click the map to place a label, then type. Double-click a label to edit; drag to move. Select one to tweak size/curve/font.'),
+  );
+}
+
+function selectedLabelControls() {
+  const lb = project.labels.find((l) => l.id === selectedLabelId);
+  if (!lb) return null;
+  return h('div', { class: 'fmap__pal-box' },
+    h('div', { class: 'fmap__pal-sub' }, `Selected: “${lb.text}”`),
+    sliderRow('Size', Math.round(lb.size || 18), 10, 80, (v) => { lb.size = v; renderLabelsLayer(); scheduleSave(); }),
+    sliderRow('Curve', Math.round((lb.curve || 0) * 100), -100, 100, (v) => { lb.curve = v / 100; renderLabelsLayer(); scheduleSave(); }),
+    h('select', { class: 'input', onchange: (e) => { lb.font = e.target.value; renderLabelsLayer(); scheduleSave(); } },
+      ...FONTS.map((f) => h('option', { value: f.id, selected: (lb.font || 'serif') === f.id ? 'selected' : null }, f.label)),
+    ),
+    h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%', marginTop: '6px' }, onclick: () => deleteSelectedLabel() }, '🗑 Delete label'),
+  );
+}
+
+function pathPalette() {
+  const kinds = pathKindsForStyle(project.style);
+  return h('div', {},
+    h('div', { class: 'fmap__pal-title' }, 'Paths & Routes'),
+    h('div', { class: 'fmap__path-list' },
+      ...kinds.map((k) => h('button', {
+        class: `fmap__path-btn ${activePathKind === k.id ? 'fmap__path-btn--active' : ''}`,
+        title: k.label,
+        onclick: () => { activePathKind = k.id; refreshPalette(); },
+      },
+        h('span', { class: 'fmap__path-swatch', style: pathSwatchStyle(k) }),
+        h('span', {}, `${k.icon} ${k.label}`),
+      )),
+    ),
+    h('div', { class: 'fmap__pal-hint' }, 'Drag to draw a smooth route — it snaps into a flowing curve. Undo/redo covers terrain only; use the Select tool to move or delete a path.'),
+  );
+}
+
+function pathSwatchStyle(k) {
+  return {
+    background: k.color,
+    height: `${Math.max(2, Math.min(6, k.width))}px`,
+    borderRadius: '3px',
+    opacity: k.dash && k.dash.length ? '0.7' : '1',
+  };
+}
+
+function selectPalette() {
+  return h('div', {},
+    h('div', { class: 'fmap__pal-title' }, 'Select & Move'),
+    selectedLabelId ? selectedLabelControls() : null,
+    selectedStampId ? h('div', { class: 'fmap__pal-box' },
+      h('div', { class: 'fmap__pal-sub' }, 'Selected stamp'),
+      sliderRow('Size', Math.round((project.stamps.find((s) => s.id === selectedStampId) || {}).size || 46), 12, 200, (v) => { const s = project.stamps.find((x) => x.id === selectedStampId); if (s) { s.size = v; renderStampsLayer(); scheduleSave(); } }),
+      h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%', marginTop: '6px' }, onclick: () => deleteSelectedStamp() }, '🗑 Delete stamp'),
+    ) : null,
+    selectedPathId ? h('div', { class: 'fmap__pal-box' },
+      h('div', { class: 'fmap__pal-sub' }, 'Selected path'),
+      h('button', { class: 'btn btn--sm', style: { color: 'var(--danger)', width: '100%' }, onclick: () => deleteSelectedPath() }, '🗑 Delete path'),
+    ) : null,
+    (!selectedLabelId && !selectedStampId && !selectedPathId)
+      ? h('div', { class: 'fmap__pal-hint' }, 'Click a stamp, label, or path to select it. Drag to move. Selected items can be resized or deleted here.')
+      : null,
   );
 }
 
 function hintPalette() {
-  return h('div', { class: 'fmap__pal-hint' }, 'Pick a tool. Drag stamps and labels with the move tool. Scroll wheel is free — the map is fixed-size for crisp export.');
+  return h('div', { class: 'fmap__pal-hint' }, 'Pick a tool. Drag stamps and labels with the move tool. The map is fixed-size for crisp export.');
 }
 
 function sliderRow(label, value, min, max, onInput) {
@@ -291,8 +394,10 @@ function renderStage() {
     h('div', { class: 'fmap__frame', style: { width: `${w}px`, height: `${hgt}px` } },
       canvasEl('fmap-paper', w, hgt, 0),
       canvasEl('fmap-terrain', w, hgt, 1),
-      canvasEl('fmap-stamps', w, hgt, 2),
-      canvasEl('fmap-labels', w, hgt, 3),
+      canvasEl('fmap-paths', w, hgt, 2),
+      canvasEl('fmap-stamps', w, hgt, 3),
+      canvasEl('fmap-labels', w, hgt, 4),
+      canvasEl('fmap-overlay', w, hgt, 5),
       // Pointer surface on top captures all interaction.
       h('div', {
         class: 'fmap__pointer', id: 'fmap-surface',
@@ -321,7 +426,7 @@ function setupCanvases() {
 }
 
 function applyLayerOpacity() {
-  for (const id of ['paper', 'terrain', 'stamps', 'labels']) {
+  for (const id of LAYER_ORDER) {
     const c = document.getElementById(`fmap-${id}`);
     const st = project.layers[id] || { visible: true, opacity: 1 };
     if (c) { c.style.opacity = st.visible ? String(st.opacity) : '0'; }
@@ -468,9 +573,10 @@ function onPointerDown(e) {
     painting = true;
     lastPoint = pt;
     dab(pt, getTerrain(activeTerrain), tool === 'erase');
-  } else if (tool === 'stamp') {
+  } else if (tool === 'stamp' || tool === 'path') {
     painting = true;
     strokePath = [pt];
+    if (tool === 'path') snapshotPathsForPreview(); // freeze committed paths once
   } else if (tool === 'label') {
     createLabelAt(pt);
   } else if (tool === 'select') {
@@ -489,6 +595,9 @@ function onPointerMove(e) {
     lastPoint = pt;
   } else if (tool === 'stamp' && painting) {
     strokePath.push(pt);
+  } else if (tool === 'path' && painting) {
+    strokePath.push(pt);
+    previewPath();        // live preview of the route being drawn
   } else if (tool === 'select' && dragging) {
     moveDrag(pt);
   }
@@ -496,6 +605,7 @@ function onPointerMove(e) {
 
 function onPointerUp() {
   if (tool === 'stamp' && painting) commitStampStroke();
+  if (tool === 'path' && painting) commitPathStroke();
   if ((tool === 'brush' || tool === 'erase') && painting) { schedulePersistTerrain(); }
   // A drag of a stamp/label ends here — persist its new position.
   if (tool === 'select' && dragging) save();
@@ -591,6 +701,254 @@ function stampColor(shape) {
   return STAMP_COLORS[shape] || '#8a8178';
 }
 
+// ─── Paths / routes ─────────────────────────────────────────────────────────
+
+function commitPathStroke() {
+  const pts = simplifyPath(strokePath, 6);
+  strokePath = [];
+  _pathPreviewSnapshot = null;
+  if (pts.length < 2) { renderPathsLayer(); return; } // a dot isn't a path
+  project.paths.push({
+    id: `pa_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    kind: activePathKind,
+    points: pts,
+  });
+  renderPathsLayer();
+  save();
+}
+
+/** Draw a single path (smoothed) onto a 2d context using its kind's style. */
+function drawPath(ctx, path, selected) {
+  const kind = getPathKind(path.kind);
+  const pts = path.points || [];
+  if (pts.length < 2) return;
+  const sm = smoothPath(pts, 0.5);
+
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = kind.cap || 'round';
+
+  const trace = () => {
+    ctx.beginPath();
+    ctx.moveTo(sm.start.x, sm.start.y);
+    sm.segments.forEach((s) => ctx.bezierCurveTo(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.end.x, s.end.y));
+  };
+
+  // Outer glow for sci-fi lanes.
+  if (kind.glow) {
+    ctx.shadowColor = kind.color;
+    ctx.shadowBlur = kind.width * 3;
+  }
+  // A soft casing under rivers/roads makes them read on busy terrain.
+  if (!kind.glow && (kind.id === 'river' || kind.id === 'road')) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = kind.width + 3;
+    ctx.setLineDash([]);
+    trace(); ctx.stroke();
+  }
+
+  ctx.strokeStyle = path.color || kind.color;
+  ctx.lineWidth = path.width || kind.width;
+  ctx.setLineDash(kind.dash || []);
+  trace(); ctx.stroke();
+
+  if (selected) {
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(80,140,255,0.9)';
+    ctx.lineWidth = (path.width || kind.width) + 4;
+    ctx.shadowBlur = 0;
+    trace(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function renderPathsLayer() {
+  const c = document.getElementById('fmap-paths');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  project.paths.forEach((p) => drawPath(ctx, p, p.id === selectedPathId));
+}
+
+// Snapshot of the committed paths layer taken once at the start of a path drag,
+// so live preview blits an image instead of re-smoothing every committed path
+// on every pointermove.
+let _pathPreviewSnapshot = null;
+
+function snapshotPathsForPreview() {
+  const c = document.getElementById('fmap-paths');
+  _pathPreviewSnapshot = null;
+  if (!c) return;
+  const img = new Image();
+  img.onload = () => { _pathPreviewSnapshot = img; };
+  img.src = c.toDataURL('image/png');
+}
+
+/** Live preview while dragging a new path (blit committed snapshot + stroke). */
+function previewPath() {
+  const c = document.getElementById('fmap-paths');
+  if (!c || strokePath.length < 2) return;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (_pathPreviewSnapshot) ctx.drawImage(_pathPreviewSnapshot, 0, 0);
+  else renderPathsLayer(); // snapshot not ready yet — fall back to full repaint
+  drawPath(ctx, { kind: activePathKind, points: strokePath }, false);
+}
+
+/** Hit-test a point against any path (distance to its polyline). */
+function hitPath(pt) {
+  const tol = 10;
+  for (let i = project.paths.length - 1; i >= 0; i--) {
+    const p = project.paths[i];
+    const pts = p.points || [];
+    for (let j = 1; j < pts.length; j++) {
+      if (distToSegment(pt, pts[j - 1], pts[j]) <= tol + (getPathKind(p.kind).width || 3)) return p;
+    }
+  }
+  return null;
+}
+
+function distToSegment(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  t = clamp(t, 0, 1);
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+// ─── Overlay: grid / hex / ornaments ──────────────────────────────────────────
+
+function renderOverlayLayer() {
+  const c = document.getElementById('fmap-overlay');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const w = c.width, hgt = c.height;
+  ctx.clearRect(0, 0, w, hgt);
+
+  const grid = project.grid || { mode: 'off', size: 48 };
+  if (grid.mode === 'square') drawSquareGrid(ctx, w, hgt, grid);
+  else if (grid.mode === 'hex') drawHexGrid(ctx, w, hgt, grid);
+
+  const orn = project.ornaments || {};
+  const surf = getSurface(project.surface);
+  if (orn.frame) drawFrame(ctx, w, hgt, surf);
+  if (orn.compass) drawCompass(ctx, w, hgt, surf);
+  if (orn.scale) drawScaleBar(ctx, w, hgt, surf);
+}
+
+function gridColor() {
+  const surf = getSurface(project.surface);
+  // Light ink on dark surfaces, dark ink on light paper.
+  return surf.kind === 'paper' && surf.id !== 'darkfantasy'
+    ? 'rgba(60,44,20,0.28)'
+    : 'rgba(150,200,255,0.22)';
+}
+
+function drawSquareGrid(ctx, w, hgt, grid) {
+  const step = Math.max(12, grid.size || 48);
+  ctx.save();
+  ctx.strokeStyle = grid.color || gridColor();
+  ctx.lineWidth = 1;
+  for (let x = step; x < w; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, hgt); ctx.stroke(); }
+  for (let y = step; y < hgt; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawHexGrid(ctx, w, hgt, grid) {
+  const size = Math.max(14, (grid.size || 48) / 1.6);
+  ctx.save();
+  ctx.strokeStyle = grid.color || gridColor();
+  ctx.lineWidth = 1;
+  hexCenters(w, hgt, size).forEach(({ cx, cy }) => {
+    const pts = hexCorners(cx, cy, size);
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function drawFrame(ctx, w, hgt, surf) {
+  ctx.save();
+  ctx.strokeStyle = surf.ink;
+  ctx.globalAlpha = 0.8;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(10, 10, w - 20, hgt - 20);
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(18, 18, w - 36, hgt - 36);
+  // Corner ticks.
+  const t = 14;
+  ctx.lineWidth = 2;
+  [[18, 18], [w - 18, 18], [18, hgt - 18], [w - 18, hgt - 18]].forEach(([x, y], i) => {
+    const sx = i % 2 === 0 ? 1 : -1;
+    const sy = i < 2 ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + sy * t); ctx.lineTo(x, y); ctx.lineTo(x + sx * t, y);
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function drawCompass(ctx, w, hgt, surf) {
+  const r = Math.min(60, Math.min(w, hgt) * 0.09);
+  const cx = w - r - 34;
+  const cy = hgt - r - 34;
+  const { outer, inner } = compassPoints(cx, cy, r);
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  // Outer ring.
+  ctx.strokeStyle = surf.ink;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.05, 0, Math.PI * 2); ctx.stroke();
+  // Star: alternate outer spoke tip and inner notch.
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const o = outer[i], n = inner[i];
+    if (i === 0) ctx.moveTo(o.x, o.y); else ctx.lineTo(o.x, o.y);
+    ctx.lineTo(n.x, n.y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = surf.ink;
+  ctx.globalAlpha = 0.5;
+  ctx.fill();
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = surf.ink;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // "N".
+  ctx.fillStyle = surf.ink;
+  ctx.font = `bold ${Math.round(r * 0.4)}px ${fontCss('serif')}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('N', cx, cy - r * 0.62);
+  ctx.restore();
+}
+
+function drawScaleBar(ctx, w, hgt, surf) {
+  const barW = Math.min(220, w * 0.22);
+  const x = 34, y = hgt - 34;
+  const segs = 4;
+  ctx.save();
+  ctx.strokeStyle = surf.ink;
+  ctx.fillStyle = surf.ink;
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < segs; i++) {
+    const sx = x + (barW / segs) * i;
+    ctx.globalAlpha = 0.85;
+    if (i % 2 === 0) { ctx.fillRect(sx, y, barW / segs, 7); }
+    else { ctx.strokeRect(sx, y, barW / segs, 7); }
+  }
+  ctx.globalAlpha = 0.9;
+  ctx.font = `${12}px ${fontCss('serif')}`;
+  ctx.textAlign = 'left';
+  ctx.fillText('0', x - 2, y - 6);
+  ctx.textAlign = 'right';
+  ctx.fillText(project.style === 'scifi' ? '10 ly' : '100 mi', x + barW, y - 6);
+  ctx.restore();
+}
+
 // ─── Labels ────────────────────────────────────────────────────────────────────
 
 function createLabelAt(pt) {
@@ -599,7 +957,7 @@ function createLabelAt(pt) {
     id: `lb_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
     text: labelRole === 'region' ? 'New Region' : labelRole === 'water' ? (project.style === 'scifi' ? 'Sector' : 'The Sea') : 'New Place',
     x: pt.x, y: pt.y, size: preset.size, curve: 0, role: labelRole,
-    color: preset.color,
+    color: preset.color, font: labelFont,
   };
   project.labels.push(label);
   renderLabelsLayer();
@@ -620,7 +978,7 @@ function drawLabel(ctx, lb) {
   const text = preset.caps ? String(lb.text).toUpperCase() : String(lb.text);
   const size = lb.size || preset.size;
   ctx.save();
-  ctx.font = `${preset.italic ? 'italic ' : ''}600 ${size}px Georgia, 'Palatino Linotype', serif`;
+  ctx.font = `${preset.italic ? 'italic ' : ''}600 ${size}px ${fontCss(lb.font || 'serif')}`;
   ctx.fillStyle = safeColor(lb.color || preset.color, '#2a2118');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -709,15 +1067,38 @@ function editLabel(lb) {
   save();
 }
 
+function deleteSelectedLabel() {
+  if (!selectedLabelId) return;
+  project.labels = project.labels.filter((l) => l.id !== selectedLabelId);
+  selectedLabelId = null;
+  renderLabelsLayer(); refreshPalette(); save();
+}
+
+function deleteSelectedStamp() {
+  if (!selectedStampId) return;
+  project.stamps = project.stamps.filter((s) => s.id !== selectedStampId);
+  selectedStampId = null;
+  renderStampsLayer(); refreshPalette(); save();
+}
+
+function deleteSelectedPath() {
+  if (!selectedPathId) return;
+  project.paths = project.paths.filter((p) => p.id !== selectedPathId);
+  selectedPathId = null;
+  renderPathsLayer(); refreshPalette(); save();
+}
+
 // ─── Select / drag stamps & labels ──────────────────────────────────────────────
 
 function beginDrag(pt) {
   const lb = hitLabel(pt);
-  if (lb) { selectedLabelId = lb.id; selectedStampId = null; dragging = { kind: 'label', id: lb.id, offX: pt.x - lb.x, offY: pt.y - lb.y }; renderLabelsLayer(); return; }
+  if (lb) { selectedLabelId = lb.id; selectedStampId = null; selectedPathId = null; dragging = { kind: 'label', id: lb.id, offX: pt.x - lb.x, offY: pt.y - lb.y }; renderLabelsLayer(); refreshPalette(); return; }
   const st = hitStamp(pt);
-  if (st) { selectedStampId = st.id; selectedLabelId = null; dragging = { kind: 'stamp', id: st.id, offX: pt.x - st.x, offY: pt.y - st.y }; renderStampsLayer(); return; }
-  selectedStampId = null; selectedLabelId = null;
-  renderStampsLayer(); renderLabelsLayer();
+  if (st) { selectedStampId = st.id; selectedLabelId = null; selectedPathId = null; dragging = { kind: 'stamp', id: st.id, offX: pt.x - st.x, offY: pt.y - st.y }; renderStampsLayer(); refreshPalette(); return; }
+  const pa = hitPath(pt);
+  if (pa) { selectedPathId = pa.id; selectedStampId = null; selectedLabelId = null; dragging = { kind: 'path', id: pa.id, points: pa.points.map((q) => ({ ...q })), start: pt }; renderPathsLayer(); refreshPalette(); return; }
+  selectedStampId = null; selectedLabelId = null; selectedPathId = null;
+  renderStampsLayer(); renderLabelsLayer(); renderPathsLayer(); refreshPalette();
 }
 
 function moveDrag(pt) {
@@ -725,9 +1106,16 @@ function moveDrag(pt) {
   if (dragging.kind === 'label') {
     const lb = project.labels.find((l) => l.id === dragging.id);
     if (lb) { lb.x = pt.x - dragging.offX; lb.y = pt.y - dragging.offY; renderLabelsLayer(); }
-  } else {
+  } else if (dragging.kind === 'stamp') {
     const st = project.stamps.find((s) => s.id === dragging.id);
     if (st) { st.x = pt.x - dragging.offX; st.y = pt.y - dragging.offY; renderStampsLayer(); }
+  } else if (dragging.kind === 'path') {
+    const pa = project.paths.find((p) => p.id === dragging.id);
+    if (pa) {
+      const dx = pt.x - dragging.start.x, dy = pt.y - dragging.start.y;
+      pa.points = dragging.points.map((q) => ({ x: q.x + dx, y: q.y + dy }));
+      renderPathsLayer();
+    }
   }
 }
 
@@ -823,6 +1211,7 @@ function switchStyle(styleId) {
   // Adjust active terrain/stamp to belong to the new style.
   activeTerrain = terrainsForStyle(st)[0].id;
   activeStamp = (STAMP_SETS[st] || STAMP_SETS.fantasy)[0].shape;
+  activePathKind = defaultPathKindForStyle(st);
   save();
   rerender();
 }
@@ -830,12 +1219,15 @@ function switchStyle(styleId) {
 // ─── Clear / export ──────────────────────────────────────────────────────────
 
 function clearMap() {
-  if (!confirm('Clear the entire map (terrain, stamps, and labels)?')) return;
+  if (!confirm('Clear the entire map (terrain, paths, stamps, and labels)?')) return;
   if (ctxTerrain) { const c = document.getElementById('fmap-terrain'); ctxTerrain.clearRect(0, 0, c.width, c.height); }
   project.terrainDataUrl = null;
+  project.paths = [];
   project.stamps = [];
   project.labels = [];
+  selectedStampId = selectedLabelId = selectedPathId = null;
   undoStack = []; redoStack = [];
+  renderPathsLayer();
   renderStampsLayer();
   renderLabelsLayer();
   save();
@@ -843,21 +1235,22 @@ function clearMap() {
 }
 
 /**
- * Compose all visible layers onto one off-screen canvas at export resolution
- * and trigger a PNG download.
+ * Compose all visible layers onto one off-screen canvas at the chosen export
+ * resolution and trigger a PNG download. Honors the transparent-background
+ * option (skips the paper layer).
  */
 function exportPNG() {
-  const { width, height, scale } = exportDimensions(project.width, project.height, 2560);
+  const preset = getExportPreset(exportPresetId);
+  const { width, height, scale } = exportDimensions(project.width, project.height, preset.longEdge);
   const out = document.createElement('canvas');
   out.width = width; out.height = height;
   const octx = out.getContext('2d');
   octx.scale(scale, scale);
 
-  const layers = ['fmap-paper', 'fmap-terrain', 'fmap-stamps', 'fmap-labels'];
-  const key = ['paper', 'terrain', 'stamps', 'labels'];
-  layers.forEach((id, i) => {
-    const c = document.getElementById(id);
-    const st = project.layers[key[i]] || { visible: true, opacity: 1 };
+  LAYER_ORDER.forEach((key) => {
+    if (key === 'paper' && exportTransparent) return; // transparent bg
+    const c = document.getElementById(`fmap-${key}`);
+    const st = project.layers[key] || { visible: true, opacity: 1 };
     if (c && st.visible) {
       octx.globalAlpha = st.opacity;
       octx.drawImage(c, 0, 0);
@@ -867,17 +1260,194 @@ function exportPNG() {
 
   out.toBlob((blob) => {
     if (!blob) { toastInfo('Export failed'); return; }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `loreforge-map-${project.style}-${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, `loreforge-map-${project.style}-${Date.now()}.png`);
     toastSuccess(`Exported ${width}×${height} PNG`);
   }, 'image/png');
 }
+
+/** Export the project as a JSON file (re-importable, portable). */
+function exportJSON() {
+  try {
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `loreforge-map-${project.style}-${Date.now()}.json`);
+    toastSuccess('Exported map JSON');
+  } catch (_) { toastInfo('Export failed'); }
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Export chooser: PNG (with resolution/transparency) or JSON. */
+function exportMap() {
+  const existing = document.querySelector('.modal-overlay');
+  if (existing) existing.remove();
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' },
+      h('div', { class: 'modal__header' },
+        h('span', { class: 'modal__title' }, 'Export map'),
+        h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕'),
+      ),
+      h('div', { class: 'modal__body' },
+        h('div', { style: { marginBottom: '12px' } },
+          h('label', { style: labelCss() }, 'Resolution'),
+          h('select', { class: 'input', onchange: (e) => { exportPresetId = e.target.value; } },
+            ...EXPORT_PRESETS.map((p) => h('option', { value: p.id, selected: exportPresetId === p.id ? 'selected' : null }, p.label)),
+          ),
+        ),
+        h('label', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '13px', color: 'var(--text-secondary)' } },
+          h('input', { type: 'checkbox', checked: exportTransparent, onchange: (e) => { exportTransparent = e.target.checked; } }),
+          'Transparent background (omit paper)',
+        ),
+      ),
+      h('div', { class: 'modal__footer' },
+        h('button', { class: 'btn', onclick: () => { exportJSON(); overlay.remove(); } }, '⬇ JSON'),
+        h('button', { class: 'btn btn--primary', onclick: () => { exportPNG(); overlay.remove(); } }, '⬇ PNG'),
+      ),
+    ),
+  );
+  document.body.appendChild(overlay);
+}
+
+function labelCss() {
+  return { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' };
+}
+
+// ─── Layers panel ─────────────────────────────────────────────────────────────
+
+function toggleLayersPanel() {
+  const existing = document.getElementById('fmap-layers-panel');
+  if (existing) { existing.remove(); return; }
+  const panel = h('div', { id: 'fmap-layers-panel', class: 'fmap__layers-panel' },
+    h('div', { class: 'fmap__layers-head' }, 'Layers'),
+    ...LAYER_ORDER.slice().reverse().map((id) => {
+      const meta = LAYER_META[id];
+      const st = project.layers[id] || { visible: true, opacity: 1 };
+      return h('div', { class: 'fmap__layer-row' },
+        h('button', {
+          class: 'fmap__layer-eye', title: st.visible ? 'Hide' : 'Show',
+          onclick: (e) => {
+            st.visible = !st.visible; project.layers[id] = st;
+            applyLayerOpacity(); save();
+            // Update just this button in place (no full-panel rebuild/flicker).
+            const btn = e.currentTarget;
+            btn.textContent = st.visible ? '👁' : '🚫';
+            btn.title = st.visible ? 'Hide' : 'Show';
+          },
+        }, st.visible ? '👁' : '🚫'),
+        h('span', { class: 'fmap__layer-name' }, meta.label),
+        h('input', {
+          type: 'range', min: '0', max: '100', value: String(Math.round(st.opacity * 100)),
+          class: 'fmap__layer-op', title: 'Opacity',
+          oninput: (e) => { st.opacity = parseInt(e.target.value, 10) / 100; project.layers[id] = st; applyLayerOpacity(); scheduleSave(); },
+        }),
+      );
+    }),
+  );
+  // Append into the module container (not document.body) so the panel is torn
+  // down with the map DOM when the user navigates away or switches WB mode.
+  (hostContainer || document.body).appendChild(panel);
+}
+
+// ─── Settings modal (canvas size + ornaments) ──────────────────────────────────
+
+function openSettings() {
+  const existing = document.querySelector('.modal-overlay');
+  if (existing) existing.remove();
+  const orn = project.ornaments;
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal' },
+      h('div', { class: 'modal__header' },
+        h('span', { class: 'modal__title' }, 'Map settings'),
+        h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕'),
+      ),
+      h('div', { class: 'modal__body' },
+        h('div', { style: { marginBottom: '12px' } },
+          h('label', { style: labelCss() }, 'Canvas size'),
+          h('select', { class: 'input', id: 'fmap-preset-select' },
+            ...CANVAS_PRESETS.map((p) => {
+              const match = p.width === project.width && p.height === project.height;
+              return h('option', { value: p.id, selected: match ? 'selected' : null }, p.label);
+            }),
+          ),
+          h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Everything (terrain, stamps, labels & paths) is rescaled proportionally to the new size.'),
+        ),
+        h('div', { style: labelCss() }, 'Ornaments'),
+        ornToggle('Decorative frame', 'frame', orn),
+        ornToggle('Compass rose', 'compass', orn),
+        ornToggle('Scale bar', 'scale', orn),
+      ),
+      h('div', { class: 'modal__footer' },
+        h('button', { class: 'btn', onclick: () => overlay.remove() }, 'Close'),
+        h('button', { class: 'btn btn--primary', onclick: () => {
+          const sel = document.getElementById('fmap-preset-select');
+          if (sel) applyCanvasPreset(sel.value);
+          overlay.remove();
+        } }, 'Apply size'),
+      ),
+    ),
+  );
+  document.body.appendChild(overlay);
+}
+
+function ornToggle(label, key, orn) {
+  return h('label', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '13px', color: 'var(--text-secondary)' } },
+    h('input', {
+      type: 'checkbox', checked: !!orn[key],
+      onchange: (e) => { orn[key] = e.target.checked; renderOverlayLayer(); save(); },
+    }),
+    label,
+  );
+}
+
+function applyCanvasPreset(id) {
+  const p = getCanvasPreset(id);
+  if (p.width === project.width && p.height === project.height) return;
+  const oldW = project.width, oldH = project.height;
+  const sx = p.width / oldW, sy = p.height / oldH;
+
+  // Rescale everything proportionally so the composition survives a resize
+  // instead of bunching in a corner: stamps, labels, and path points all move
+  // and scale with the canvas.
+  project.stamps.forEach((s) => { s.x *= sx; s.y *= sy; s.size *= (sx + sy) / 2; });
+  project.labels.forEach((l) => { l.x *= sx; l.y *= sy; l.size = (l.size || 18) * (sx + sy) / 2; });
+  project.paths.forEach((pa) => { pa.points = (pa.points || []).map((q) => ({ x: q.x * sx, y: q.y * sy })); });
+
+  project.width = p.width; project.height = p.height;
+
+  // Preserve the terrain raster by re-drawing it scaled into the new size.
+  const old = document.getElementById('fmap-terrain');
+  const snapshot = old ? old.toDataURL('image/png') : project.terrainDataUrl;
+  if (snapshot) {
+    const img = new Image();
+    img.onload = () => {
+      const tmp = document.createElement('canvas');
+      tmp.width = p.width; tmp.height = p.height;
+      tmp.getContext('2d').drawImage(img, 0, 0, oldW, oldH, 0, 0, p.width, p.height);
+      // Stage the scaled raster and tell rerender() NOT to re-snapshot the
+      // still-old on-screen canvas (which would clobber this scaled result).
+      project.terrainDataUrl = tmp.toDataURL('image/png');
+      _terrainStaged = true;
+      save();
+      rerender();
+    };
+    img.src = snapshot;
+  } else {
+    save();
+    rerender();
+  }
+}
+
+// Set when a caller (e.g. resize) has already staged the exact terrainDataUrl it
+// wants; rerender() then skips its own re-snapshot of the on-screen canvas.
+let _terrainStaged = false;
 
 // ─── Re-render helper ──────────────────────────────────────────────────────────
 
@@ -887,13 +1457,18 @@ function rerender() {
   // the Diagram/Map mode toggle that lives above us.
   const container = hostContainer || document.querySelector('.wb-mode-body') || document.querySelector('.main-content');
   if (!container) return;
+  // Drop any floating layers panel so it doesn't outlive the rebuilt DOM.
+  const lp = document.getElementById('fmap-layers-panel');
+  if (lp) lp.remove();
   // Preserve the raster terrain across the DOM rebuild (unless it was just
-  // cleared, e.g. by a style switch, in which case terrainDataUrl is null).
-  if (project.terrainDataUrl !== null) {
+  // cleared, e.g. by a style switch → null, or a caller staged an exact raster
+  // e.g. a resize re-fit → _terrainStaged, in which case leave it untouched).
+  if (project.terrainDataUrl !== null && !_terrainStaged) {
     const c = document.getElementById('fmap-terrain');
     const snapshot = c ? c.toDataURL('image/png') : project.terrainDataUrl;
     project.terrainDataUrl = snapshot || project.terrainDataUrl;
   }
+  _terrainStaged = false; // consume the one-shot staging flag
   container.innerHTML = '';
   renderFantasyMap(container);
 }
