@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node scripts/smoke-import.mjs && node scripts/test-data-layer.mjs && node scripts/test-export-roundtrip.mjs && node scripts/test-sync.mjs && node scripts/test-timeline.mjs && node scripts/test-knowledge.mjs && node scripts/test-family-tree.mjs && node scripts/test-confrontation.mjs && node scripts/test-interview-bible.mjs && node scripts/test-writing-spatial.mjs",
+    "test": "node scripts/smoke-import.mjs && node scripts/test-data-layer.mjs && node scripts/test-export-roundtrip.mjs && node scripts/test-sync.mjs && node scripts/test-timeline.mjs && node scripts/test-knowledge.mjs && node scripts/test-family-tree.mjs && node scripts/test-confrontation.mjs && node scripts/test-interview-bible.mjs && node scripts/test-writing-spatial.mjs && node scripts/test-world-shapes.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint ."
   },

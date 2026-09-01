@@ -85,6 +85,7 @@ const modules = [
   '../src/core/ai-settings.js',
   '../src/core/ai.js',
   '../src/core/templates.js',
+  '../src/core/world-shapes.js',
   '../src/core/knowledge.js',
   '../src/modules/knowledge-matrix.js',
   '../src/modules/family-tree.js',
