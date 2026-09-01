@@ -53,8 +53,8 @@ assert(m.clamp(5, 0, 3) === 3 && m.clamp(-1, 0, 3) === 0 && m.clamp(2, 0, 3) ===
 
 // ── Stamp scatter ──────────────────────────────────────────────────────────────
 const path = [{ x: 0, y: 0 }, { x: 200, y: 0 }];
-const s1 = m.scatterStamps(path, { seed: 7, size: 40, density: 2, jitter: 0.5, sizeJitter: 0.3 });
-const s2 = m.scatterStamps(path, { seed: 7, size: 40, density: 2, jitter: 0.5, sizeJitter: 0.3 });
+const s1 = m.scatterStamps(path, { seed: 7, size: 40, density: 2, jitter: 0.15, sizeJitter: 0.3 });
+const s2 = m.scatterStamps(path, { seed: 7, size: 40, density: 2, jitter: 0.15, sizeJitter: 0.3 });
 assert(s1.length >= 1, 'scatter produces stamps');
 assert(JSON.stringify(s1) === JSON.stringify(s2), 'scatter is deterministic for a seed');
 assert(m.scatterStamps([{ x: 10, y: 10 }], { seed: 1, density: 2 }).length === 1, 'a single tap drops exactly one stamp');
@@ -63,6 +63,35 @@ assert(s1.every((p) => p.size >= 6), 'stamp sizes are clamped to a visible minim
 assert(s1.every((p, i) => i === 0 || s1[i - 1].y <= p.y), 'stamps are depth-sorted by y');
 assert(m.scatterStamps([], { seed: 1 }).length === 0, 'empty path scatters nothing');
 assert(m.scatterStamps(null, {}).length === 0, 'null path is safe');
+
+// Stamps FOLLOW the path: perpendicular offset from a horizontal drag stays
+// within the (small) jitter band, not scattered across a big box.
+const hugging = m.scatterStamps(path, { seed: 4, size: 40, jitter: 0.15 });
+const maxPerp = Math.max(...hugging.map((p) => Math.abs(p.y - 0)));
+assert(maxPerp <= 40 * 0.15 + 0.001, `stamps hug the path (max perpendicular ${maxPerp.toFixed(1)}px <= jitter band)`);
+// And they span the whole drag, not clump at one spot.
+assert(Math.min(...hugging.map((p) => p.x)) < 60 && Math.max(...hugging.map((p) => p.x)) > 140, 'stamps cover the length of the drag');
+
+// Variation: rotation present, sizes vary, and shape variants are distributed.
+const varied = m.scatterStamps(path, { seed: 9, size: 40, density: 4, sizeJitter: 0.4, rotJitter: 0.6, variants: ['a', 'b', 'c'] });
+assert(varied.some((p) => p.rot !== 0), 'stamps carry rotation variation');
+assert(new Set(varied.map((p) => Math.round(p.size))).size > 1, 'stamp sizes vary within a stroke');
+assert(varied.every((p) => ['a', 'b', 'c'].includes(p.shape)), 'each placement picks a shape from the variant pool');
+assert(new Set(varied.map((p) => p.shape)).size > 1, 'variant shapes are actually mixed across the stroke');
+// No variants -> shape is undefined (caller falls back to the active shape).
+assert(m.scatterStamps(path, { seed: 9 }).every((p) => p.shape === undefined), 'no variants => undefined shape');
+// A tap still gets size/rotation variation (not always the base size).
+const taps = Array.from({ length: 6 }, (_, i) => m.scatterStamps([{ x: 5, y: 5 }], { seed: i + 1, size: 40, sizeJitter: 0.4 })[0]);
+assert(new Set(taps.map((t) => Math.round(t.size))).size > 1, 'repeated taps produce varied sizes');
+assert(taps.every((t) => approx(t.x, 5) && approx(t.y, 5)), 'a tap lands exactly under the cursor');
+
+// tangentAtLength: unit direction of the path.
+const tan = m.tangentAtLength(path, 100);
+assert(approx(tan.x, 1) && approx(tan.y, 0), 'tangent of a horizontal path points +x');
+const diag = m.tangentAtLength([{ x: 0, y: 0 }, { x: 10, y: 10 }], 5);
+assert(approx(Math.hypot(diag.x, diag.y), 1), 'tangent is a unit vector');
+assert(m.tangentAtLength([{ x: 0, y: 0 }], 0).x === 1, 'tangent of a single point is safe');
+
 // pointAtLength endpoints.
 assert(approx(m.pointAtLength(path, 0).x, 0) && approx(m.pointAtLength(path, 200).x, 200), 'pointAtLength hits both ends');
 assert(approx(m.pointAtLength(path, 100).x, 100), 'pointAtLength midpoint');
