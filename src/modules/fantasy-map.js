@@ -41,6 +41,7 @@ import {
   CANVAS_PRESETS, getCanvasPreset,
   EXPORT_PRESETS, getExportPreset,
   LAYER_ORDER, LAYER_META,
+  defaultView, normalizeView, clampZoom, zoomAt, worldSurfaceSeed,
 } from '../core/map-engine.js';
 
 const STORE_KEY = 'fantasyMap';
@@ -49,28 +50,143 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // Stamp catalog per style — a curated subset of world-shapes that read well as
 // map icons. (The full 61-shape library is available; these are the map-useful
 // ones grouped for the palette.)
+// Stamps are organized into named GROUPS so hundreds of elements stay browsable
+// (the palette renders collapsible sections + a search filter). Each group:
+// { group: 'Label', items: [{ shape, label }] }. The full 200-shape library is
+// available; these curate the map-useful ones by style.
 const STAMP_SETS = {
   fantasy: [
-    { shape: 'mountain', label: 'Mountains' }, { shape: 'volcano', label: 'Volcano' },
-    { shape: 'hill', label: 'Hills' }, { shape: 'forest', label: 'Forest' },
-    { shape: 'pine_tree', label: 'Pines' }, { shape: 'tree', label: 'Tree' },
-    { shape: 'metropolis', label: 'City' }, { shape: 'town', label: 'Town' },
-    { shape: 'village', label: 'Village' }, { shape: 'castle', label: 'Castle' },
-    { shape: 'tower', label: 'Tower' }, { shape: 'temple', label: 'Temple' },
-    { shape: 'ruins', label: 'Ruins' }, { shape: 'cave', label: 'Cave' },
-    { shape: 'lake', label: 'Lake' }, { shape: 'waterfall', label: 'Falls' },
+    { group: 'Terrain', items: [
+      { shape: 'mountain', label: 'Mountains' }, { shape: 'volcano', label: 'Volcano' },
+      { shape: 'hill', label: 'Hills' }, { shape: 'forest', label: 'Forest' },
+      { shape: 'pine_tree', label: 'Pines' }, { shape: 'tree', label: 'Tree' },
+      { shape: 'cave', label: 'Cave' }, { shape: 'canyon', label: 'Canyon' },
+    ]},
+    { group: 'Water', items: [
+      { shape: 'lake', label: 'Lake' }, { shape: 'waterfall', label: 'Falls' },
+      { shape: 'ocean', label: 'Ocean' }, { shape: 'river', label: 'River' },
+    ]},
+    { group: 'Settlements', items: [
+      { shape: 'metropolis', label: 'City' }, { shape: 'town', label: 'Town' },
+      { shape: 'village', label: 'Village' }, { shape: 'district', label: 'District' },
+    ]},
+    { group: 'Structures', items: [
+      { shape: 'castle', label: 'Castle' }, { shape: 'fortress', label: 'Fortress' },
+      { shape: 'tower', label: 'Tower' }, { shape: 'temple', label: 'Temple' },
+      { shape: 'ruins', label: 'Ruins' }, { shape: 'house', label: 'House' },
+      { shape: 'hut', label: 'Hut' }, { shape: 'tent', label: 'Tent' },
+      { shape: 'bridge', label: 'Bridge' }, { shape: 'wall', label: 'Wall' },
+      { shape: 'monument', label: 'Monument' },
+    ]},
+    { group: 'Building Parts', items: [
+      { shape: 'wall_straight', label: 'Wall' }, { shape: 'wall_corner', label: 'Corner' },
+      { shape: 'door_single', label: 'Door' }, { shape: 'gate', label: 'Gate' },
+      { shape: 'stairs', label: 'Stairs' }, { shape: 'stairs_spiral', label: 'Spiral' },
+      { shape: 'column', label: 'Column' }, { shape: 'archway', label: 'Arch' },
+      { shape: 'fence', label: 'Fence' }, { shape: 'roof_gable', label: 'Roof' },
+      { shape: 'chimney', label: 'Chimney' }, { shape: 'balcony', label: 'Balcony' },
+    ]},
+    { group: 'Rooms', items: [
+      { shape: 'room_square', label: 'Square' }, { shape: 'room_wide', label: 'Wide' },
+      { shape: 'room_tall', label: 'Tall' }, { shape: 'room_l', label: 'L-Room' },
+      { shape: 'room_t', label: 'T-Room' }, { shape: 'room_round', label: 'Round' },
+      { shape: 'room_oct', label: 'Octagon' }, { shape: 'corridor_h', label: 'Hall (H)' },
+      { shape: 'corridor_v', label: 'Hall (V)' }, { shape: 'corridor_cross', label: 'Cross' },
+      { shape: 'corridor_corner', label: 'Bend' }, { shape: 'vault_room', label: 'Vault' },
+    ]},
+    { group: 'Furniture', items: [
+      { shape: 'bed', label: 'Bed' }, { shape: 'table_round', label: 'Table' },
+      { shape: 'table_long', label: 'Long Table' }, { shape: 'chair', label: 'Chair' },
+      { shape: 'desk', label: 'Desk' }, { shape: 'shelf', label: 'Shelf' },
+      { shape: 'crate', label: 'Crate' }, { shape: 'barrel', label: 'Barrel' },
+      { shape: 'statue', label: 'Statue' }, { shape: 'fountain', label: 'Fountain' },
+      { shape: 'pillar', label: 'Pillar' }, { shape: 'planter', label: 'Planter' },
+    ]},
+    { group: 'Markers', items: [
+      { shape: 'pin', label: 'Pin' }, { shape: 'marker_star', label: 'Star' },
+      { shape: 'marker_flag', label: 'Flag' }, { shape: 'marker_shield', label: 'Shield' },
+      { shape: 'marker_x', label: 'X' }, { shape: 'marker_skull', label: 'Skull' },
+      { shape: 'marker_danger', label: 'Danger' }, { shape: 'marker_diamond', label: 'Diamond' },
+      { shape: 'marker_cross', label: 'Cross' }, { shape: 'marker_anchor', label: 'Anchor' },
+    ]},
   ],
   scifi: [
-    { shape: 'sun', label: 'Star' }, { shape: 'planet', label: 'Planet' },
-    { shape: 'ringed_planet', label: 'Ringed World' }, { shape: 'gas_giant', label: 'Gas Giant' },
-    { shape: 'moon', label: 'Moon' }, { shape: 'asteroid_belt', label: 'Belt' },
-    { shape: 'space_station', label: 'Station' }, { shape: 'spaceship', label: 'Ship' },
-    { shape: 'fleet', label: 'Fleet' }, { shape: 'satellite', label: 'Satellite' },
-    { shape: 'megastructure', label: 'Megastructure' }, { shape: 'portal', label: 'Jump Gate' },
-    { shape: 'metropolis', label: 'Colony' }, { shape: 'anomaly', label: 'Anomaly' },
-    { shape: 'void_conduit', label: 'Wormhole' }, { shape: 'nebula', label: 'Nebula' },
+    { group: 'Cosmic', items: [
+      { shape: 'sun', label: 'Star' }, { shape: 'planet', label: 'Planet' },
+      { shape: 'ringed_planet', label: 'Ringed World' }, { shape: 'gas_giant', label: 'Gas Giant' },
+      { shape: 'moon', label: 'Moon' }, { shape: 'asteroid_belt', label: 'Belt' },
+      { shape: 'nebula', label: 'Nebula' }, { shape: 'anomaly', label: 'Anomaly' },
+      { shape: 'void_conduit', label: 'Wormhole' },
+    ]},
+    { group: 'Fleets & Craft', items: [
+      { shape: 'spaceship', label: 'Ship' }, { shape: 'fleet', label: 'Fleet' },
+      { shape: 'shuttle', label: 'Shuttle' }, { shape: 'fighter', label: 'Fighter' },
+      { shape: 'freighter', label: 'Freighter' }, { shape: 'gunship', label: 'Gunship' },
+      { shape: 'probe', label: 'Probe' }, { shape: 'drone', label: 'Drone' },
+      { shape: 'hovercar', label: 'Hovercar' }, { shape: 'rover', label: 'Rover' },
+      { shape: 'tank', label: 'Tank' }, { shape: 'transport', label: 'Transport' },
+      { shape: 'mech', label: 'Mech' },
+    ]},
+    { group: 'Stations', items: [
+      { shape: 'space_station', label: 'Station' }, { shape: 'satellite', label: 'Satellite' },
+      { shape: 'megastructure', label: 'Megastructure' }, { shape: 'portal', label: 'Jump Gate' },
+      { shape: 'module_hub', label: 'Hub' }, { shape: 'module_ring', label: 'Ring' },
+      { shape: 'module_cylinder', label: 'Cylinder' }, { shape: 'module_solar', label: 'Solar Wing' },
+      { shape: 'module_dock', label: 'Dock' }, { shape: 'module_habitat', label: 'Habitat' },
+      { shape: 'module_comms', label: 'Comms' }, { shape: 'truss', label: 'Truss' },
+      { shape: 'cupola', label: 'Cupola' }, { shape: 'gravity_ring', label: 'Gravity Ring' },
+      { shape: 'drydock', label: 'Drydock' }, { shape: 'refinery', label: 'Refinery' },
+    ]},
+    { group: 'Ship Parts', items: [
+      { shape: 'hull_fore', label: 'Fore Hull' }, { shape: 'hull_mid', label: 'Mid Hull' },
+      { shape: 'hull_aft', label: 'Aft Hull' }, { shape: 'cockpit', label: 'Cockpit' },
+      { shape: 'wing_left', label: 'Wing L' }, { shape: 'wing_right', label: 'Wing R' },
+      { shape: 'thruster', label: 'Thruster' }, { shape: 'engine_pod', label: 'Engine' },
+      { shape: 'nacelle', label: 'Nacelle' }, { shape: 'reactor_core', label: 'Reactor' },
+      { shape: 'fuel_tank', label: 'Fuel Tank' }, { shape: 'cargo_pod', label: 'Cargo Pod' },
+      { shape: 'landing_gear', label: 'Landing Gear' }, { shape: 'weapon_turret', label: 'Turret' },
+      { shape: 'shield_gen', label: 'Shield Gen' }, { shape: 'docking_ring', label: 'Docking Ring' },
+      { shape: 'escape_pod', label: 'Escape Pod' }, { shape: 'sensor_array', label: 'Sensors' },
+    ]},
+    { group: 'Rooms', items: [
+      { shape: 'room_square', label: 'Room' }, { shape: 'room_round', label: 'Round Room' },
+      { shape: 'corridor_h', label: 'Hall (H)' }, { shape: 'corridor_v', label: 'Hall (V)' },
+      { shape: 'corridor_cross', label: 'Cross' }, { shape: 'corridor_corner', label: 'Bend' },
+      { shape: 'airlock', label: 'Airlock' }, { shape: 'bridge_room', label: 'Bridge' },
+      { shape: 'medbay', label: 'Medbay' }, { shape: 'armory', label: 'Armory' },
+      { shape: 'cargo_bay', label: 'Cargo Bay' }, { shape: 'engine_room', label: 'Engine Room' },
+      { shape: 'reactor_room', label: 'Reactor Room' }, { shape: 'quarters', label: 'Quarters' },
+      { shape: 'lab_room', label: 'Lab' }, { shape: 'hangar', label: 'Hangar' },
+      { shape: 'vault_room', label: 'Vault' }, { shape: 'observatory', label: 'Observatory' },
+    ]},
+    { group: 'Furniture & Tech', items: [
+      { shape: 'bed', label: 'Bed' }, { shape: 'bunk', label: 'Bunk' },
+      { shape: 'console', label: 'Console' }, { shape: 'terminal', label: 'Terminal' },
+      { shape: 'workbench', label: 'Workbench' }, { shape: 'server_rack', label: 'Servers' },
+      { shape: 'screen', label: 'Screen' }, { shape: 'locker', label: 'Locker' },
+      { shape: 'container', label: 'Container' }, { shape: 'cryopod', label: 'Cryopod' },
+      { shape: 'hydroponics', label: 'Hydroponics' }, { shape: 'holotable', label: 'Holotable' },
+      { shape: 'data_core', label: 'Data Core' }, { shape: 'generator', label: 'Generator' },
+      { shape: 'scanner', label: 'Scanner' },
+    ]},
+    { group: 'Props & POI', items: [
+      { shape: 'beacon', label: 'Beacon' }, { shape: 'relay', label: 'Relay' },
+      { shape: 'turret_gun', label: 'Gun Turret' }, { shape: 'power_node', label: 'Power Node' },
+      { shape: 'jump_gate', label: 'Jump Gate' }, { shape: 'satellite_dish', label: 'Dish' },
+      { shape: 'mine', label: 'Mine' }, { shape: 'crate_supply', label: 'Supply Crate' },
+      { shape: 'solar_panel', label: 'Solar Panel' }, { shape: 'antenna_dish', label: 'Antenna' },
+      { shape: 'waypoint', label: 'Waypoint' }, { shape: 'flag', label: 'Flag' },
+    ]},
+    { group: 'Markers', items: [
+      { shape: 'pin', label: 'Pin' }, { shape: 'marker_star', label: 'Star' },
+      { shape: 'marker_target', label: 'Target' }, { shape: 'marker_diamond', label: 'Diamond' },
+      { shape: 'marker_danger', label: 'Danger' }, { shape: 'marker_dot', label: 'Dot' },
+      { shape: 'marker_x', label: 'X' }, { shape: 'marker_cross', label: 'Cross' },
+    ]},
   ],
 };
+
+
 
 const STAMP_COLORS = {
   mountain: '#8a8178', volcano: '#a8785c', hill: '#84a35a', forest: '#3f7d4f', pine_tree: '#2f6b45',
@@ -80,6 +196,52 @@ const STAMP_COLORS = {
   asteroid_belt: '#9ca3af', space_station: '#7fd0ff', spaceship: '#cfe3ff', fleet: '#9fb8d0',
   satellite: '#a5c4ff', megastructure: '#8fa8ff', portal: '#c07fff', anomaly: '#c084fc', void_conduit: '#8b7cf6',
   nebula: '#b06fd0',
+  // Fantasy structures & geography extras
+  fortress: '#a89878', house: '#c0a878', hut: '#b89a63', tent: '#c9b382', bridge: '#9a8f7a',
+  wall: '#9a8f7a', monument: '#c8bda0', district: '#9c8a63', canyon: '#b0764e',
+  ocean: '#3f6b8a', river: '#4f86a8',
+  // Rooms / corridors (neutral hull grey)
+  room_square: '#8b93a0', room_wide: '#8b93a0', room_tall: '#8b93a0', room_l: '#8b93a0',
+  room_t: '#8b93a0', room_round: '#8b93a0', room_oct: '#8b93a0',
+  corridor_h: '#7d8590', corridor_v: '#7d8590', corridor_cross: '#7d8590', corridor_corner: '#7d8590',
+  airlock: '#96a0ad', bridge_room: '#8aa0b8', medbay: '#c8d4dc', armory: '#8a8f96',
+  cargo_bay: '#9a8f6a', engine_room: '#a08a6a', reactor_room: '#b0906a', quarters: '#96a0ad',
+  lab_room: '#9ec8d0', hangar: '#7d8590', vault_room: '#9aa0a8', observatory: '#8aa0c0',
+  // Furniture / fixtures (warm neutral)
+  bed: '#b7a488', bunk: '#a89880', table_round: '#b89a70', table_long: '#b89a70', desk: '#a88f68',
+  chair: '#a88f68', sofa: '#8a7f9a', console: '#7d8fa0', terminal: '#7d8fa0', workbench: '#98907e',
+  shelf: '#a88f68', locker: '#8f96a0', crate: '#a8895c', barrel: '#8a6f4a', container: '#8a9a6a',
+  planter: '#7a8f5a', lamp: '#c8b878', screen: '#6f8296', server_rack: '#7d8590', toilet: '#d8e0e6',
+  sink: '#d0dce4', stove: '#9096a0', fridge: '#c0ccd4', statue: '#c8c0a8', fountain: '#8fb0c0',
+  pillar: '#c8c0a8', hydroponics: '#6f9a5a', cryopod: '#9ec4dc',
+  // Building parts
+  wall_straight: '#9a9088', wall_corner: '#9a9088', door_single: '#a08a68', door_double: '#a08a68',
+  blast_door: '#8f96a0', window_row: '#a0b0bc', stairs: '#a09888', stairs_spiral: '#a09888',
+  ladder: '#98907e', elevator: '#8f96a0', ramp: '#9a9088', column: '#c8c0a8', archway: '#b8b09a',
+  gate: '#9a8f7a', fence: '#98907e', roof_gable: '#a06850', chimney: '#8a7f76', balcony: '#b8b09a',
+  solar_panel: '#3a6bbf', antenna_dish: '#b0b8c0', turbine: '#c0c8d0',
+  // Ship parts (cool metallic)
+  hull_fore: '#9aa4b0', hull_mid: '#9aa4b0', hull_aft: '#9aa4b0', cockpit: '#8fb0d0',
+  wing_left: '#8f98a4', wing_right: '#8f98a4', thruster: '#a08f8a', engine_pod: '#8a94a0',
+  nacelle: '#8fa0b8', reactor_core: '#7fd0c0', fuel_tank: '#a0a8b0', cargo_pod: '#9a8f6a',
+  landing_gear: '#8f96a0', weapon_turret: '#8a8f96', shield_gen: '#7fb8e0', docking_ring: '#a0a8b0',
+  escape_pod: '#c8b878', sensor_array: '#8fa0b8',
+  // Station modules
+  module_hub: '#9aa4b0', module_ring: '#9aa4b0', module_cylinder: '#9aa4b0', module_solar: '#7d8fa0',
+  module_dock: '#8f96a0', module_habitat: '#96a4b0', module_comms: '#8fa0b8', truss: '#8f96a0',
+  cupola: '#8fb0d0', gravity_ring: '#9aa4b0', drydock: '#8a9096', refinery: '#a08f70',
+  // Sci-fi props
+  beacon: '#ffcf6a', relay: '#8fb8e0', turret_gun: '#8a8f96', generator: '#e0b060', power_node: '#7fd0ff',
+  scanner: '#7fd0c0', holotable: '#7fd0ff', data_core: '#8fa0e0', jump_gate: '#c07fff', drone: '#9aa4b0',
+  mech: '#8f96a0', rover: '#b0a070', satellite_dish: '#b0b8c0', mine: '#8a8f96', crate_supply: '#a8895c',
+  waypoint: '#7fd0ff', flag: '#e05a5a',
+  // Vehicles
+  shuttle: '#b0bcc8', fighter: '#9aa4b0', freighter: '#9a8f6a', hovercar: '#8fb0d0', tank: '#7d8560',
+  transport: '#9aa0a8', gunship: '#8a9096', probe: '#b0b8c0',
+  // Markers
+  pin: '#e05a5a', marker_x: '#e05a5a', marker_star: '#f5b73c', marker_diamond: '#7fd0ff',
+  marker_flag: '#e05a5a', marker_shield: '#6f9ae0', marker_skull: '#d8d0c0', marker_danger: '#f5a623',
+  marker_target: '#e05a5a', marker_dot: '#7fd0ff', marker_cross: '#e05a5a', marker_anchor: '#8fa0b8',
 };
 
 // When you paint a stroke of one element, mix in related shapes so a "forest"
@@ -125,6 +287,10 @@ let selectedStampId = null;
 let selectedLabelId = null;
 let selectedPathId = null;
 let dragging = null;           // { kind:'stamp'|'label', id, offX, offY }
+let panState = null;           // { startX, startY, panX, panY } while panning
+let spaceHeld = false;         // spacebar held → drag-to-pan
+let _panKeysBound = false;     // guard so we only bind the space listeners once
+let stampFilter = '';          // stamp palette search query (case-insensitive)
 
 // The element this module was rendered into (so re-renders stay scoped to the
 // World Builder's mode body instead of clobbering the whole #main-content and
@@ -217,6 +383,34 @@ export function renderFantasyMap(container) {
     renderStampsLayer();
     renderLabelsLayer();
     renderOverlayLayer();
+    applyViewTransform();  // restore any saved zoom/pan
+  });
+  bindPanKeys();
+}
+
+/** Bind spacebar → temporary pan mode (like design tools). Bound once. */
+function bindPanKeys() {
+  if (_panKeysBound) return;
+  _panKeysBound = true;
+  window.addEventListener('keydown', (e) => {
+    // Ignore when typing into an input/textarea (e.g. editing a label).
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (e.code === 'Space' && !spaceHeld) {
+      // Only engage if the map is actually on screen.
+      if (!document.getElementById('fmap-surface')) return;
+      spaceHeld = true;
+      const surf = document.getElementById('fmap-surface');
+      if (surf && !panState) surf.style.cursor = 'grab';
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+      spaceHeld = false;
+      const surf = document.getElementById('fmap-surface');
+      if (surf && !panState) surf.style.cursor = '';
+    }
   });
 }
 
@@ -346,24 +540,78 @@ function paintSwatch(canvas, terrain) {
 }
 
 function stampPalette() {
-  const set = STAMP_SETS[project.style] || STAMP_SETS.fantasy;
+  const groups = STAMP_SETS[project.style] || STAMP_SETS.fantasy;
+  const q = stampFilter.trim().toLowerCase();
+
+  // Build a stamp button.
+  const stampBtn = (it) => h('button', {
+    class: `fmap__stamp ${activeStamp === it.shape ? 'fmap__stamp--active' : ''}`,
+    title: it.label,
+    onclick: () => { activeStamp = it.shape; refreshPalette(); },
+  },
+    h('span', { class: 'fmap__stamp-art', innerHTML: stampSVG(it.shape, stampColor(it.shape), 34) }),
+    h('span', { class: 'fmap__stamp-label' }, it.label),
+  );
+
+  // When searching, show a single flat filtered grid across all groups.
+  let sections;
+  if (q) {
+    const hits = groups.flatMap((g) => g.items).filter(
+      (it) => it.label.toLowerCase().includes(q) || it.shape.replace(/_/g, ' ').includes(q),
+    );
+    sections = hits.length
+      ? [h('div', { class: 'fmap__stamp-grid' }, ...hits.map(stampBtn))]
+      : [h('div', { class: 'fmap__pal-hint' }, `No stamps match “${stampFilter}”.`)];
+  } else {
+    // Grouped, collapsible sections. Collapsed set tracked in module state.
+    sections = groups.map((g) => {
+      const open = !collapsedStampGroups.has(g.group);
+      return h('div', { class: 'fmap__stamp-group' },
+        h('button', { class: 'fmap__stamp-group-head', onclick: () => { toggleStampGroup(g.group); } },
+          h('span', {}, `${open ? '▾' : '▸'} ${g.group}`),
+          h('span', { class: 'fmap__stamp-group-count' }, String(g.items.length)),
+        ),
+        open ? h('div', { class: 'fmap__stamp-grid' }, ...g.items.map(stampBtn)) : null,
+      );
+    });
+  }
+
   return h('div', {},
     h('div', { class: 'fmap__pal-title' }, 'Stamps'),
-    h('div', { class: 'fmap__stamp-grid' },
-      ...set.map((it) => h('button', {
-        class: `fmap__stamp ${activeStamp === it.shape ? 'fmap__stamp--active' : ''}`,
-        title: it.label,
-        onclick: () => { activeStamp = it.shape; refreshPalette(); },
-      },
-        h('span', { class: 'fmap__stamp-art', innerHTML: stampSVG(it.shape, stampColor(it.shape), 34) }),
-        h('span', { class: 'fmap__stamp-label' }, it.label),
-      )),
-    ),
+    h('input', {
+      class: 'input fmap__stamp-search', type: 'search', placeholder: 'Search elements…',
+      value: stampFilter,
+      oninput: (e) => { stampFilter = e.target.value; refreshStampGridOnly(); },
+    }),
+    h('div', { class: 'fmap__stamp-scroll' }, ...sections),
     sliderRow('Size', stampOpts.size, 16, 140, (v) => { stampOpts.size = v; }),
     sliderRow('Density', Math.round(stampOpts.density * 10), 5, 80, (v) => { stampOpts.density = v / 10; }),
     sliderRow('Jitter', Math.round(stampOpts.jitter * 100), 0, 100, (v) => { stampOpts.jitter = v / 100; }),
     h('div', { class: 'fmap__pal-hint' }, 'Drag on the map to scatter, or click to place one.'),
   );
+}
+
+// Collapsed stamp groups (by group label). Persists for the session only.
+const collapsedStampGroups = new Set();
+function toggleStampGroup(name) {
+  if (collapsedStampGroups.has(name)) collapsedStampGroups.delete(name);
+  else collapsedStampGroups.add(name);
+  refreshStampGridOnly();
+}
+
+// Re-render just the stamp palette body without stealing focus from the search
+// box (a full refreshPalette() rebuilds the input and drops the caret).
+function refreshStampGridOnly() {
+  const el = document.getElementById('fmap-palette');
+  if (!el) return;
+  const active = document.activeElement;
+  const wasSearch = active && active.classList && active.classList.contains('fmap__stamp-search');
+  el.innerHTML = '';
+  el.appendChild(stampPalette());
+  if (wasSearch) {
+    const box = el.querySelector('.fmap__stamp-search');
+    if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+  }
 }
 
 function labelPalette() {
@@ -501,25 +749,53 @@ function sliderRow(label, value, min, max, onInput) {
 function renderStage() {
   const w = project.width;
   const hgt = project.height;
-  return h('div', { class: 'fmap__stage', id: 'fmap-stage' },
-    h('div', { class: 'fmap__frame', style: { width: `${w}px`, height: `${hgt}px` } },
-      canvasEl('fmap-paper', w, hgt, 0),
-      canvasEl('fmap-terrain', w, hgt, 1),
-      canvasEl('fmap-paths', w, hgt, 2),
-      canvasEl('fmap-stamps', w, hgt, 3),
-      canvasEl('fmap-labels', w, hgt, 4),
-      canvasEl('fmap-overlay', w, hgt, 5),
-      // Pointer surface on top captures all interaction.
-      h('div', {
-        class: 'fmap__pointer', id: 'fmap-surface',
-        style: { width: `${w}px`, height: `${hgt}px` },
-        onpointerdown: onPointerDown,
-        onpointermove: onPointerMove,
-        onpointerup: onPointerUp,
-        onpointerleave: onPointerUp,
-        ondblclick: onDoubleClick,
-      }),
+  // A positioned wrapper holds the scrolling canvas viewport AND a zoom dock
+  // that stays pinned to the corner (the dock is a sibling of the scroller so
+  // it doesn't scroll away with a large/zoomed map).
+  return h('div', { class: 'fmap__stage-wrap' },
+    h('div', { class: 'fmap__stage', id: 'fmap-stage', onwheel: onStageWheel },
+      h('div', { class: 'fmap__frame', id: 'fmap-frame', style: frameStyle(w, hgt) },
+        canvasEl('fmap-paper', w, hgt, 0),
+        canvasEl('fmap-terrain', w, hgt, 1),
+        canvasEl('fmap-paths', w, hgt, 2),
+        canvasEl('fmap-stamps', w, hgt, 3),
+        canvasEl('fmap-labels', w, hgt, 4),
+        canvasEl('fmap-overlay', w, hgt, 5),
+        // Pointer surface on top captures all interaction.
+        h('div', {
+          class: 'fmap__pointer', id: 'fmap-surface',
+          style: { width: `${w}px`, height: `${hgt}px` },
+          onpointerdown: onPointerDown,
+          onpointermove: onPointerMove,
+          onpointerup: onPointerUp,
+          onpointerleave: onPointerUp,
+          ondblclick: onDoubleClick,
+        }),
+      ),
     ),
+    zoomControls(),
+  );
+}
+
+/** Inline style for the map frame, applying the current view transform. */
+function frameStyle(w, hgt) {
+  const v = view();
+  return {
+    width: `${w}px`,
+    height: `${hgt}px`,
+    transform: `translate(${v.panX}px, ${v.panY}px) scale(${v.zoom})`,
+    transformOrigin: '0 0',
+  };
+}
+
+/** Floating zoom controls docked in the stage corner. */
+function zoomControls() {
+  const pct = Math.round(view().zoom * 100);
+  return h('div', { class: 'fmap__zoom', id: 'fmap-zoom' },
+    h('button', { class: 'fmap__zoom-btn', title: 'Zoom out (−)', onclick: () => zoomBy(1 / 1.2) }, '−'),
+    h('button', { class: 'fmap__zoom-label', title: 'Reset view (fit 100%)', onclick: resetView }, `${pct}%`),
+    h('button', { class: 'fmap__zoom-btn', title: 'Zoom in (+)', onclick: () => zoomBy(1.2) }, '+'),
+    h('button', { class: 'fmap__zoom-btn fmap__zoom-fit', title: 'Fit to screen', onclick: fitView }, '⤢'),
   );
 }
 
@@ -544,6 +820,83 @@ function applyLayerOpacity() {
   }
 }
 
+// ─── View (zoom + pan) ────────────────────────────────────────────────────
+
+/** Current viewport transform (always normalized). */
+function view() {
+  if (!project.view) project.view = defaultView();
+  return project.view;
+}
+
+/** Apply the current view transform to the frame + refresh the zoom readout. */
+function applyViewTransform() {
+  const frame = document.getElementById('fmap-frame');
+  if (frame) frame.style.transform = `translate(${view().panX}px, ${view().panY}px) scale(${view().zoom})`;
+  // Update only the percentage text — cheap enough to run on every pan move
+  // without tearing down and rebuilding the whole dock each frame.
+  const label = document.querySelector('#fmap-zoom .fmap__zoom-label');
+  if (label) label.textContent = `${Math.round(view().zoom * 100)}%`;
+}
+
+/** Set a new view (normalized), reflect it in the DOM, and persist. */
+function setView(next) {
+  project.view = normalizeView(next);
+  applyViewTransform();
+  scheduleSave();
+}
+
+/** Zoom toward the center of the visible stage by a factor. */
+function zoomBy(factor) {
+  const stage = document.getElementById('fmap-stage');
+  const frame = document.getElementById('fmap-frame');
+  if (!stage || !frame) { setView({ ...view(), zoom: clampZoom(view().zoom * factor) }); return; }
+  // Anchor at the center of the stage viewport, expressed relative to the
+  // frame's laid-out (untransformed) origin.
+  const sRect = stage.getBoundingClientRect();
+  const fRect = frame.getBoundingClientRect();
+  const anchor = {
+    x: (sRect.left + sRect.width / 2 - fRect.left) / view().zoom,
+    y: (sRect.top + sRect.height / 2 - fRect.top) / view().zoom,
+  };
+  setView(zoomAt(view(), factor, anchor));
+}
+
+/** Reset to 100% and no pan. */
+function resetView() {
+  setView(defaultView());
+}
+
+/** Fit the whole map inside the visible stage. */
+function fitView() {
+  const stage = document.getElementById('fmap-stage');
+  if (!stage) return;
+  const pad = 48;
+  const availW = stage.clientWidth - pad;
+  const availH = stage.clientHeight - pad;
+  const zoom = clampZoom(Math.min(availW / project.width, availH / project.height));
+  // Center the scaled map in the stage.
+  const panX = Math.max(0, (stage.clientWidth - project.width * zoom) / 2);
+  const panY = Math.max(0, (stage.clientHeight - project.height * zoom) / 2);
+  setView({ zoom, panX, panY });
+}
+
+/** Ctrl/Cmd + wheel (or trackpad pinch) zooms toward the cursor. */
+function onStageWheel(e) {
+  // Only hijack the wheel for zoom when modified, so plain scroll still pans
+  // the overflow container naturally on large canvases.
+  if (!(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault();
+  const frame = document.getElementById('fmap-frame');
+  if (!frame) return;
+  const fRect = frame.getBoundingClientRect();
+  const anchor = {
+    x: (e.clientX - fRect.left) / view().zoom,
+    y: (e.clientY - fRect.top) / view().zoom,
+  };
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  setView(zoomAt(view(), factor, anchor));
+}
+
 // ─── Procedural surface ─────────────────────────────────────────────────────
 
 function paintSurface() {
@@ -563,6 +916,7 @@ function paintSurface() {
 
   if (surf.kind === 'stars') paintStarfield(ctx, w, hgt, surf);
   else if (surf.kind === 'grid') paintGrid(ctx, w, hgt, surf);
+  else if (surf.kind === 'world') paintWorldSurface(ctx, w, hgt, surf);
   else paintPaperGrain(ctx, w, hgt, surf);
 
   // Vignette.
@@ -625,11 +979,130 @@ function paintGrid(ctx, w, hgt, surf) {
   for (let y = step * 5; y < hgt; y += step * 5) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
 }
 
+// Per-world-type look: [feature blotch colors], speckle color, and how the
+// surface texture reads (mottled/banded/patchy). Drives paintWorldSurface().
+const WORLD_LOOKS = {
+  barren:     { blots: ['rgba(120,108,92,0.30)', 'rgba(70,60,48,0.28)'], speck: 'rgba(40,32,22,0.35)', craters: true },
+  lush:       { blots: ['rgba(80,150,90,0.32)', 'rgba(40,100,55,0.30)', 'rgba(120,170,80,0.22)'], speck: 'rgba(20,60,28,0.30)' },
+  industrial: { blots: ['rgba(90,96,108,0.34)', 'rgba(60,64,72,0.30)'], speck: 'rgba(255,180,90,0.20)', circuits: true },
+  oceanic:    { blots: ['rgba(90,170,210,0.30)', 'rgba(40,110,160,0.28)', 'rgba(150,200,170,0.16)'], speck: 'rgba(220,245,255,0.22)' },
+  ice:        { blots: ['rgba(220,235,245,0.42)', 'rgba(150,180,205,0.30)'], speck: 'rgba(255,255,255,0.40)', cracks: true },
+  desert:     { blots: ['rgba(210,170,110,0.30)', 'rgba(160,110,60,0.28)'], speck: 'rgba(90,60,26,0.28)', dunes: true },
+  volcanic:   { blots: ['rgba(150,50,30,0.34)', 'rgba(80,20,12,0.32)'], speck: 'rgba(255,120,40,0.28)', lava: true },
+  toxic:      { blots: ['rgba(140,170,60,0.32)', 'rgba(90,120,30,0.30)'], speck: 'rgba(200,255,120,0.24)' },
+  gas:        { blots: ['rgba(220,180,130,0.30)', 'rgba(170,120,70,0.30)', 'rgba(240,220,190,0.22)'], speck: 'rgba(255,240,220,0.14)', bands: true },
+  crystal:    { blots: ['rgba(150,120,220,0.32)', 'rgba(90,70,160,0.30)'], speck: 'rgba(220,200,255,0.30)', shards: true },
+};
+
+/**
+ * Paint a planetary "world type" surface: a mottled terrain backdrop the author
+ * places elements onto. Deterministic (seeded by canvas size + world id) so it
+ * doesn't reshuffle every repaint, and offline (pure canvas gradients/shapes).
+ */
+function paintWorldSurface(ctx, w, hgt, surf) {
+  const look = WORLD_LOOKS[surf.world] || WORLD_LOOKS.barren;
+  const rng = mulberry(worldSurfaceSeed(surf.world, w, hgt));
+
+  // Gas giants read as horizontal cloud bands; everything else as mottled blotches.
+  if (look.bands) {
+    let y = 0;
+    while (y < hgt) {
+      const band = hgt * (0.05 + rng() * 0.09);
+      ctx.fillStyle = look.blots[Math.floor(rng() * look.blots.length)];
+      ctx.fillRect(0, y, w, band + 2);
+      y += band;
+    }
+  } else {
+    const n = Math.floor((w * hgt) / 26000) + 14;
+    for (let i = 0; i < n; i++) {
+      const x = rng() * w, cy = rng() * hgt, r = Math.min(w, hgt) * (0.08 + rng() * 0.22);
+      const g = ctx.createRadialGradient(x, cy, 0, x, cy, r);
+      const col = look.blots[Math.floor(rng() * look.blots.length)];
+      g.addColorStop(0, col);
+      g.addColorStop(1, col.replace(/[\d.]+\)$/, '0)'));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Feature accents per world type.
+  ctx.save();
+  if (look.craters) {
+    for (let i = 0; i < 22; i++) {
+      const x = rng() * w, cy = rng() * hgt, r = 6 + rng() * 26;
+      ctx.strokeStyle = 'rgba(30,22,14,0.35)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,240,220,0.06)';
+      ctx.beginPath(); ctx.arc(x - r * 0.2, cy - r * 0.2, r * 0.7, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (look.cracks || look.lava) {
+    ctx.strokeStyle = look.lava ? 'rgba(255,110,40,0.5)' : 'rgba(120,150,180,0.45)';
+    ctx.lineWidth = look.lava ? 2.4 : 1.2;
+    for (let i = 0; i < 16; i++) {
+      let x = rng() * w, cy = rng() * hgt;
+      ctx.beginPath(); ctx.moveTo(x, cy);
+      const steps = 4 + Math.floor(rng() * 5);
+      for (let s = 0; s < steps; s++) { x += (rng() - 0.5) * 120; cy += (rng() - 0.5) * 120; ctx.lineTo(x, cy); }
+      ctx.stroke();
+    }
+  }
+  if (look.dunes) {
+    ctx.strokeStyle = 'rgba(90,60,26,0.22)'; ctx.lineWidth = 2;
+    for (let y = 20; y < hgt; y += 26) {
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 24) ctx.lineTo(x, y + Math.sin((x / w) * Math.PI * 6 + y) * 8);
+      ctx.stroke();
+    }
+  }
+  if (look.circuits) {
+    ctx.strokeStyle = 'rgba(255,190,100,0.25)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 40; i++) {
+      const x = rng() * w, cy = rng() * hgt, len = 20 + rng() * 90;
+      ctx.beginPath();
+      if (rng() > 0.5) { ctx.moveTo(x, cy); ctx.lineTo(x + len, cy); ctx.lineTo(x + len, cy + 14); }
+      else { ctx.moveTo(x, cy); ctx.lineTo(x, cy + len); ctx.lineTo(x + 14, cy + len); }
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,210,120,0.4)';
+      ctx.fillRect(x - 1.5, cy - 1.5, 3, 3);
+    }
+  }
+  if (look.shards) {
+    for (let i = 0; i < 30; i++) {
+      const x = rng() * w, cy = rng() * hgt, s = 8 + rng() * 22;
+      ctx.fillStyle = 'rgba(220,200,255,0.22)';
+      ctx.beginPath(); ctx.moveTo(x, cy - s); ctx.lineTo(x + s * 0.4, cy); ctx.lineTo(x, cy + s); ctx.lineTo(x - s * 0.4, cy); ctx.closePath(); ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // Fine surface speckle for texture.
+  const grains = Math.floor(w * hgt * (surf.grain || 0.4) * 0.004);
+  ctx.fillStyle = look.speck;
+  for (let i = 0; i < grains; i++) ctx.fillRect(rng() * w, rng() * hgt, 1.4, 1.4);
+}
+
+/** Tiny local PRNG (mulberry32) for deterministic surface texture. */
+function mulberry(seed) {
+  let a = seed >>> 0 || 1;
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // ─── Terrain painting ─────────────────────────────────────────────────────────
 
 function pointFromEvent(e) {
   const surface = document.getElementById('fmap-surface');
   const rect = surface.getBoundingClientRect();
+  // The pointer surface lives INSIDE the transformed frame, so its bounding
+  // rect already reflects the current zoom (rect.width == project.width*zoom)
+  // and pan (rect.left/top move with the pan). Mapping the cursor into the
+  // rect and scaling by project/rect therefore un-projects zoom AND pan in one
+  // step — no need to touch the view math here.
   const scaleX = project.width / rect.width;
   const scaleY = project.height / rect.height;
   return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
@@ -982,6 +1455,17 @@ function shift(hex, amt, alpha = 1) {
 // ─── Pointer handling ──────────────────────────────────────────────────────────
 
 function onPointerDown(e) {
+  // Pan gesture: middle mouse button, or space held while dragging. This lets
+  // you reposition a large/zoomed map without switching tools.
+  if (e.button === 1 || spaceHeld) {
+    e.preventDefault();
+    panState = { startX: e.clientX, startY: e.clientY, panX: view().panX, panY: view().panY };
+    document.getElementById('fmap-surface').setPointerCapture?.(e.pointerId);
+    const surf = document.getElementById('fmap-surface');
+    if (surf) surf.style.cursor = 'grabbing';
+    return;
+  }
+
   e.preventDefault();
   const pt = pointFromEvent(e);
   document.getElementById('fmap-surface').setPointerCapture?.(e.pointerId);
@@ -1007,6 +1491,15 @@ function onPointerDown(e) {
 }
 
 function onPointerMove(e) {
+  // Live pan.
+  if (panState) {
+    setView({
+      zoom: view().zoom,
+      panX: panState.panX + (e.clientX - panState.startX),
+      panY: panState.panY + (e.clientY - panState.startY),
+    });
+    return;
+  }
   // Hover feedback: show a resize cursor over the handle when idle in Select mode.
   if (!painting && !dragging) {
     if (tool === 'select') {
@@ -1034,6 +1527,13 @@ function onPointerMove(e) {
 }
 
 function onPointerUp() {
+  if (panState) {
+    panState = null;
+    const surf = document.getElementById('fmap-surface');
+    if (surf) surf.style.cursor = spaceHeld ? 'grab' : '';
+    save();
+    return;
+  }
   if (tool === 'stamp' && painting) commitStampStroke();
   if (tool === 'path' && painting) commitPathStroke();
   if ((tool === 'brush' || tool === 'erase') && painting) { schedulePersistTerrain(); }

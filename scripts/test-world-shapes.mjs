@@ -17,8 +17,8 @@ const {
 
 // ── Catalog integrity ────────────────────────────────────────────────────────
 const ids = allShapeIds();
-assert(ids.length >= 55, `wide catalog of shapes (${ids.length} >= 55)`);
-assert(SUBJECTS.length >= 8, `many canvas subjects (${SUBJECTS.length} >= 8)`);
+assert(ids.length >= 190, `wide catalog of shapes (${ids.length} >= 190)`);
+assert(SUBJECTS.length >= 16, `many canvas subjects (${SUBJECTS.length} >= 16)`);
 
 // Every shape renders non-trivial SVG.
 let empties = 0;
@@ -41,7 +41,27 @@ for (const subj of SUBJECTS) {
   }
 }
 assert(missing === 0, 'every palette item maps to a real shape');
-assert(seen.size >= 55, `palette exposes the full catalog (${seen.size} items)`);
+assert(seen.size >= 180, `palette exposes the full catalog (${seen.size} items)`);
+
+// ── New element families (rooms, ships, stations, furniture, markers…) ────────
+for (const subjId of ['rooms', 'furniture', 'building_parts', 'ship_parts', 'station_modules', 'scifi_props', 'vehicles', 'markers']) {
+  assert(SUBJECTS.some((s) => s.id === subjId), `new subject exists: ${subjId}`);
+}
+// A representative sample of the new named elements the user asked for.
+for (const named of [
+  'room_square', 'corridor_cross', 'airlock', 'medbay', 'cargo_bay', 'engine_room',
+  'bed', 'console', 'server_rack', 'cryopod',
+  'hull_fore', 'cockpit', 'reactor_core', 'docking_ring',
+  'module_ring', 'gravity_ring', 'drydock',
+  'shuttle', 'fighter', 'mech', 'beacon', 'jump_gate', 'pin', 'marker_target',
+]) {
+  assert(!!SHAPES[named], `named element exists: ${named}`);
+  assert(shapeSVG(named, '-t').length >= 20, `named element renders SVG: ${named}`);
+}
+// New shapes with internal clip ids keep them unique per instance (like gas_giant).
+const rsA = shapeSVG('room_square', '-a');
+const rsB = shapeSVG('room_square', '-b');
+assert(rsA.includes('id="rs-a"') && !rsB.includes('rs-a'), 'room_square clip id honors the uid + does not collide');
 
 // ── Subject coverage (the user asked for a wide berth per subject) ────────────
 for (const subj of SUBJECTS) {
