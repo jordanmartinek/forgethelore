@@ -19,6 +19,8 @@
  *     antique-map look needs no external image assets and works offline.
  */
 
+import { safeColor } from './world-shapes.js';
+
 /* ─── Seeded RNG (mulberry32) ─────────────────────────────────────────────── */
 
 /** Deterministic PRNG so brushed scatter/jitter is reproducible per stroke. */
@@ -1070,4 +1072,288 @@ export function normalizeMapProject(raw) {
     backdrop: normalizeBackdrop(raw.backdrop),
     terrainDataUrl: typeof raw.terrainDataUrl === 'string' ? raw.terrainDataUrl : null,
   };
+}
+
+/* ─── Terrain motif renderer (2D canvas) ─────────────────────────────────── */
+
+/**
+ * Draw a single terrain-motif primitive with real light/shadow/outline so it
+ * reads as a distinct feature (a tree, a peak, a wave) rather than a same-hue
+ * blob. `col` is the motif accent; we derive a darker body, lighter highlight,
+ * and dark outline from it for depth.
+ */
+export function drawMotif(ctx, m2, k = 1) {
+  const col = safeColor(m2.color, '#4a6b3a');
+  const dark = shift(col, -0.4);        // shadow / outline
+  const body = col;                     // main tone
+  const light = shift(col, 0.4);        // sunlit highlight
+  const s = (m2.s || 4) * k;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  switch (m2.type) {
+    case 'tree': { // conifer: trunk + two-tone triangular canopy + outline
+      // trunk
+      ctx.fillStyle = shift('#5b3a1e', 0);
+      ctx.fillRect(m2.x - s * 0.11, m2.y + s * 0.45, s * 0.22, s * 0.5);
+      // canopy (dark body)
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.12);
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s * 1.05);
+      ctx.lineTo(m2.x - s * 0.72, m2.y + s * 0.6);
+      ctx.lineTo(m2.x + s * 0.72, m2.y + s * 0.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // sunlit left face
+      ctx.fillStyle = light;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s * 1.05);
+      ctx.lineTo(m2.x - s * 0.72, m2.y + s * 0.6);
+      ctx.lineTo(m2.x - s * 0.1, m2.y + s * 0.6);
+      ctx.lineTo(m2.x - s * 0.04, m2.y - s * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'blob': { // canopy / bush / rock — shaded round mass + highlight
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      ctx.beginPath();
+      if (m2.poly) {
+        const n = 7;
+        for (let i = 0; i < n; i++) {
+          const a = (Math.PI * 2 / n) * i + (m2.x % 1);
+          const rr = s * (0.72 + ((i % 2) ? 0.22 : 0));
+          const px = m2.x + Math.cos(a) * rr, py = m2.y + Math.sin(a) * rr;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+      } else {
+        ctx.arc(m2.x, m2.y, s * 0.8, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.stroke();
+      // top-left highlight
+      ctx.fillStyle = shift(col, 0.35, 0.85);
+      ctx.beginPath();
+      ctx.arc(m2.x - s * 0.25, m2.y - s * 0.25, s * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'tuft': { // grass — dark back blades + lighter front blades
+      ctx.lineWidth = Math.max(0.8, s * 0.22);
+      ctx.strokeStyle = dark;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(m2.x + i * s * 0.3, m2.y + s * 0.55);
+        ctx.quadraticCurveTo(m2.x + i * s * 0.42, m2.y - s * 0.2, m2.x + i * s * 0.62, m2.y - s * 0.75);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.16);
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(m2.x + i * s * 0.32, m2.y + s * 0.5);
+        ctx.quadraticCurveTo(m2.x + i * s * 0.3, m2.y - s * 0.1, m2.x + i * s * 0.4, m2.y - s * 0.6);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'peak': { // mountain — dark rock, shadowed right face, snow cap
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x - s * 0.85, m2.y + s * 0.62);
+      ctx.lineTo(m2.x + s * 0.85, m2.y + s * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // shadowed right face
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x + s * 0.85, m2.y + s * 0.62);
+      ctx.lineTo(m2.x, m2.y + s * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      // snow cap
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x - s * 0.3, m2.y - s * 0.35);
+      ctx.lineTo(m2.x - s * 0.12, m2.y - s * 0.42);
+      ctx.lineTo(m2.x + s * 0.06, m2.y - s * 0.3);
+      ctx.lineTo(m2.x + s * 0.3, m2.y - s * 0.35);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'hill': { // rounded bump with a highlight
+      ctx.fillStyle = body;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y + s * 0.2, s * 0.8, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.14);
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y + s * 0.2, s * 0.6, Math.PI * 1.15, Math.PI * 1.6);
+      ctx.stroke();
+      break;
+    }
+    case 'shard': { // crystal — lit left facet + dark right facet + outline
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.6, s * 0.1);
+      // left (light) facet
+      ctx.fillStyle = light;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x - s * 0.55, m2.y);
+      ctx.lineTo(m2.x, m2.y + s);
+      ctx.closePath();
+      ctx.fill();
+      // right (dark) facet
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s);
+      ctx.lineTo(m2.x + s * 0.55, m2.y);
+      ctx.lineTo(m2.x, m2.y + s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(m2.x, m2.y - s); ctx.lineTo(m2.x + s * 0.55, m2.y);
+      ctx.lineTo(m2.x, m2.y + s); ctx.lineTo(m2.x - s * 0.55, m2.y);
+      ctx.closePath(); ctx.stroke();
+      break;
+    }
+    case 'cross': { // thorn / spike cluster
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(1, s * 0.24);
+      ctx.beginPath();
+      ctx.moveTo(m2.x - s * 0.6, m2.y + s * 0.3); ctx.lineTo(m2.x + s * 0.6, m2.y - s * 0.3);
+      ctx.moveTo(m2.x + s * 0.6, m2.y + s * 0.3); ctx.lineTo(m2.x - s * 0.6, m2.y - s * 0.3);
+      ctx.moveTo(m2.x, m2.y + s * 0.55); ctx.lineTo(m2.x, m2.y - s * 0.55);
+      ctx.stroke();
+      break;
+    }
+    case 'ring': { // bubble / crater — rim + inner shadow
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.8, s * 0.2);
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y, s * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = light;
+      ctx.lineWidth = Math.max(0.6, s * 0.12);
+      ctx.beginPath();
+      ctx.arc(m2.x - s * 0.1, m2.y - s * 0.1, s * 0.5, Math.PI * 0.9, Math.PI * 1.7);
+      ctx.stroke();
+      break;
+    }
+    case 'cloud': { // soft nebula puff (layered for depth)
+      const g1 = ctx.createRadialGradient(m2.x, m2.y, 0, m2.x, m2.y, s);
+      g1.addColorStop(0, hexA(col, 0.5));
+      g1.addColorStop(1, hexA(col, 0));
+      ctx.fillStyle = g1;
+      ctx.beginPath(); ctx.arc(m2.x, m2.y, s, 0, Math.PI * 2); ctx.fill();
+      const g2 = ctx.createRadialGradient(m2.x - s * 0.2, m2.y - s * 0.2, 0, m2.x - s * 0.2, m2.y - s * 0.2, s * 0.5);
+      g2.addColorStop(0, shift(col, 0.5, 0.55));
+      g2.addColorStop(1, hexA(col, 0));
+      ctx.fillStyle = g2;
+      ctx.beginPath(); ctx.arc(m2.x - s * 0.2, m2.y - s * 0.2, s * 0.5, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'dot': { // speckle / star / ember / sparkle
+      if (m2.glow) {
+        const grad = ctx.createRadialGradient(m2.x, m2.y, 0, m2.x, m2.y, Math.max(2, s * 2.4));
+        grad.addColorStop(0, hexA(col, 0.95));
+        grad.addColorStop(0.4, hexA(col, 0.5));
+        grad.addColorStop(1, hexA(col, 0));
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(m2.x, m2.y, Math.max(2, s * 2.4), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = shift(col, 0.6);
+      } else {
+        ctx.fillStyle = body;
+      }
+      ctx.beginPath();
+      ctx.arc(m2.x, m2.y, Math.max(0.8, s * 0.7), 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'crack': {
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = Math.max(0.9, k * 1.1);
+      ctx.beginPath();
+      ctx.moveTo(m2.x1, m2.y1); ctx.lineTo(m2.x2, m2.y2);
+      ctx.stroke();
+      break;
+    }
+    case 'line': {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = m2.w || 1;
+      ctx.beginPath();
+      ctx.moveTo(m2.x1, m2.y1); ctx.lineTo(m2.x2, m2.y2);
+      ctx.stroke();
+      break;
+    }
+    case 'wave': { // ocean / dune / furrow — dark trough + light crest
+      const drawWave = (dy, color, w) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        const steps = 10;
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const x = m2.x1 + (m2.x2 - m2.x1) * t;
+          const y = m2.y + dy + (m2.amp ? Math.sin(t * Math.PI * 2 + (m2.phase || 0)) * m2.amp : 0);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      };
+      drawWave(0.6, dark, (m2.w || 1.5) + 0.5);   // shadow trough
+      drawWave(-0.4, light, (m2.w || 1.5));        // bright crest
+      break;
+    }
+    default:
+      break;
+  }
+  ctx.restore();
+}
+
+// Parse a hex color (#rgb or #rrggbb) to {r,g,b}, or null.
+function hexRGB(hex) {
+  const c = safeColor(hex, '#7a8f4a');
+  const m6 = /^#([0-9a-f]{6})$/i.exec(c);
+  const m3 = /^#([0-9a-f]{3})$/i.exec(c);
+  let h = null;
+  if (m6) h = m6[1];
+  else if (m3) h = m3[1].replace(/(.)/g, '$1$1');
+  if (!h) return null;
+  const n = parseInt(h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+export function hexA(hex, alpha) {
+  const rgb = hexRGB(hex);
+  if (!rgb) return safeColor(hex, '#7a8f4a');
+  return `rgba(${rgb.r},${rgb.g},${rgb.b},${clamp(alpha, 0, 1)})`;
+}
+
+// Lighten (amt>0) or darken (amt<0) a color by a fraction toward white/black.
+// Used to give motifs real light/shadow so they read as 3D features, not flat
+// same-hue shapes.
+function shift(hex, amt, alpha = 1) {
+  const rgb = hexRGB(hex);
+  if (!rgb) return safeColor(hex, '#7a8f4a');
+  const mix = (c) => amt >= 0 ? Math.round(c + (255 - c) * amt) : Math.round(c * (1 + amt));
+  return `rgba(${mix(rgb.r)},${mix(rgb.g)},${mix(rgb.b)},${clamp(alpha, 0, 1)})`;
 }
