@@ -15,8 +15,8 @@ let passed = 0, failed = 0;
 function assert(cond, msg) { if (cond) passed++; else { failed++; console.error('  ✗', msg); } }
 
 // ── Minimal fake IndexedDB ───────────────────────────────────────────────────
-const STORES = ['objects', 'relationships', 'boards', 'snapshots', 'appState'];
-const KEYPATH = { objects: 'id', relationships: 'id', boards: 'id', snapshots: 'id', appState: 'key' };
+const STORES = ['objects', 'relationships', 'boards', 'snapshots', 'appState', 'blobs'];
+const KEYPATH = { objects: 'id', relationships: 'id', boards: 'id', snapshots: 'id', appState: 'key', blobs: 'key' };
 
 function makeRequest(resultFactory) {
   const req = { onsuccess: null, onerror: null, result: undefined };
@@ -133,6 +133,48 @@ const secondRels = await db.getAll('relationships');
 assert(secondApply.length === 2, `replaceAll is idempotent: still 2 objects after re-apply (got ${secondApply.length})`);
 assert(secondRels.length === 1, `replaceAll is idempotent: still 1 relationship after re-apply (got ${secondRels.length})`);
 assert(secondApply.find((o) => o.id === 'sync_obj_1'), 'replaceAll re-apply keeps stable ids');
+
+// ── Blob store: large image data URLs live in IndexedDB, not localStorage ────
+// put/get/delete round-trip.
+assert(await db.putBlob('proj1:planetPainter:texture', 'data:image/png;base64,AAA') === true, 'putBlob stores a blob');
+assert(await db.getBlob('proj1:planetPainter:texture') === 'data:image/png;base64,AAA', 'getBlob reads it back');
+assert(await db.getBlob('nope') === null, 'getBlob returns null for a missing key');
+await db.deleteBlob('proj1:planetPainter:texture');
+assert(await db.getBlob('proj1:planetPainter:texture') === null, 'deleteBlob removes it');
+
+// Seed two projects' blobs to prove per-project scoping.
+await db.putBlob('proj1:planetPainter:texture', 'P1-TEX');
+await db.putBlob('proj1:fantasyMap:terrain', 'P1-TERRAIN');
+await db.putBlob('proj2:planetPainter:texture', 'P2-TEX');
+
+// exportAll(projectId) includes ONLY that project's blobs.
+const exp1 = await db.exportAll('proj1');
+assert(Array.isArray(exp1.blobs), 'exportAll includes a blobs array');
+assert(exp1.blobs.length === 2 && exp1.blobs.every((b) => b.key.startsWith('proj1:')), 'exportAll(projectId) scopes blobs to that project');
+const expAll = await db.exportAll();
+assert(expAll.blobs.length === 3, 'exportAll() with no projectId returns all blobs');
+
+// getBlobsByPrefix filters by project.
+assert((await db.getBlobsByPrefix('proj1:')).length === 2, 'getBlobsByPrefix scopes to a project');
+
+// replaceAll only replaces the incoming project's blobs — must NOT wipe proj2.
+await db.replaceAll({ objects: [], relationships: [], boards: [], blobs: [{ key: 'proj1:planetPainter:texture', value: 'P1-TEX-v2' }] });
+assert(await db.getBlob('proj1:planetPainter:texture') === 'P1-TEX-v2', 'replaceAll updates the project blob');
+assert(await db.getBlob('proj1:fantasyMap:terrain') === null, 'replaceAll cleared the project\'s OTHER blob (authoritative snapshot)');
+assert(await db.getBlob('proj2:planetPainter:texture') === 'P2-TEX', 'replaceAll did NOT touch a different project\'s blobs');
+
+// importAll re-keys blobs to a NEW project id (file import creates a new project).
+await db.importAll({ objects: [], relationships: [], blobs: [{ key: 'proj9:planetPainter:texture', value: 'IMPORTED' }] }, 'projNEW');
+assert(await db.getBlob('projNEW:planetPainter:texture') === 'IMPORTED', 'importAll re-keys imported blobs to the target project');
+assert(await db.getBlob('proj9:planetPainter:texture') === null, 'importAll did not keep the original blob key');
+
+// ── snapshotHash folds in blob identity (so a texture-only edit still syncs) ──
+const { snapshotHash } = await import('../src/core/project-data.js');
+const base = { data: { fantasyMap: { style: 'fantasy' } }, indexeddb: { blobs: [{ key: 'p:planetPainter:texture', value: 'AAAA' }] } };
+const same = { data: { fantasyMap: { style: 'fantasy' } }, indexeddb: { blobs: [{ key: 'p:planetPainter:texture', value: 'AAAA' }] } };
+const changed = { data: { fantasyMap: { style: 'fantasy' } }, indexeddb: { blobs: [{ key: 'p:planetPainter:texture', value: 'BBBB-different' }] } };
+assert(snapshotHash(base) === snapshotHash(same), 'snapshotHash is stable for identical snapshots');
+assert(snapshotHash(base) !== snapshotHash(changed), 'snapshotHash changes when ONLY a blob changes (blob-only edits still sync)');
 
 console.log(`\n${failed === 0 ? '✅' : '❌'} export round-trip tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
