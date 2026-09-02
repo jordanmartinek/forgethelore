@@ -19,6 +19,7 @@ import { renderConflictBoard } from '../modules/conflict-board.js';
 import { renderConfrontations } from '../modules/confrontations.js';
 import { renderWorldBuilder } from '../modules/world-builder.js';
 import { renderCharacterPlanner } from '../modules/character-planner.js';
+import { renderCharacterBuilder } from '../modules/character-builder.js';
 import { renderMysteryPlanner } from '../modules/mystery-planner.js';
 import { renderTimeline } from '../modules/timeline.js';
 import { renderKnowledgeGraph } from '../modules/knowledge-graph.js';
@@ -79,6 +80,7 @@ export const MODULES = [
   // ── World ──────────────────────────────────────────────────────────────
   { id: 'world-builder',   label: 'World Builder',   icon: '🌌', group: 'world',    render: renderWorldBuilder },
   { id: 'characters',      label: 'Characters',      icon: '👤', group: 'world',    render: renderCharacterPlanner },
+  { id: 'character-builder', label: 'Character Builder', icon: '🪪', group: 'world', render: renderCharacterBuilder },
   { id: 'factions',        label: 'Factions',        icon: '⚔️', group: 'world',    render: renderFactionPlanner },
   { id: 'locations',       label: 'Locations',       icon: '📍', group: 'world',    render: renderLocationPlanner },
   { id: 'world-map',       label: 'Interactive Map', icon: '🗺️', group: 'world',    render: renderWorldMap },

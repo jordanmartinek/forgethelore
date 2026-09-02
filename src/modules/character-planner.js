@@ -7,6 +7,7 @@ import { loadData, saveData, persistState, getActiveProjectId } from '../core/pe
 import { expandableText } from '../ui/expandable-text.js';
 import { showModal, formField, confirmDialog } from '../ui/modal.js';
 import { getBoardFactions, getFactionData } from '../core/entities.js';
+import { reconcileCharacters } from '../core/character-merge.js';
 
 // Combined faction list from both the strategic board and the faction planner,
 // read live through the entity layer (replaces window.__loreforge_* globals).
@@ -38,6 +39,33 @@ if (_savedChars) {
 } else {
   // New/non-demo projects start empty rather than inheriting demo characters.
   demoCharacters.length = 0;
+}
+
+/**
+ * Persist the in-memory character list WITHOUT clobbering fields this module
+ * doesn't manage. The Character Builder writes a `traitTags` array onto the same
+ * `characters` records (via the repo layer), and this planner historically
+ * re-persisted its whole import-time snapshot on every edit — silently dropping
+ * any field it didn't know about and any record created elsewhere since load.
+ *
+ * To keep the two workspaces coexisting, we reconcile against live storage right
+ * before writing: each in-memory record is merged UNDER the stored one (stored
+ * fields like `traitTags` win for keys this module didn't touch, in-memory wins
+ * for the fields it edits), and records that exist only in storage (e.g.
+ * Builder-created characters) are preserved rather than deleted.
+ *
+ * @param {Set<string>} [deletedIds] ids intentionally removed here, so they are
+ *        NOT resurrected from the stored copy.
+ */
+function persistCharacters(deletedIds = new Set()) {
+  const merged = reconcileCharacters(demoCharacters, loadData('characters', []), deletedIds);
+
+  // Keep the module's in-memory list in sync with what we just wrote so the
+  // next render/save sees foreign records and fields too.
+  demoCharacters.length = 0;
+  demoCharacters.push(...merged);
+
+  persistState('characters', merged);
 }
 
 export function renderCharacterPlanner(container, mode = 'characters') {
@@ -213,7 +241,7 @@ function openEditCharacterModal(char) {
     Object.assign(char, state);
     const container = document.querySelector('.main-content');
     if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); });
-    persistState("characters", demoCharacters);
+    persistCharacters();
   });
 }
 
@@ -224,7 +252,7 @@ async function deleteCharacter(char) {
   if (idx !== -1) demoCharacters.splice(idx, 1);
   const container = document.querySelector('.main-content');
   if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); });
-  persistState("characters", demoCharacters);
+  persistCharacters(new Set([char.id]));
 }
 
 
@@ -364,7 +392,7 @@ function openAddCharacterModal() {
     demoCharacters.push({ id: `c${Date.now()}`, name: state.name, role: state.role, faction: state.faction, color: '#6366f1', momentum: 'stable', status: 'active', description: state.description });
     const container = document.querySelector('.main-content');
     if (container) renderPreservingScroll(container, () => { container.innerHTML = ''; renderCharacterPlanner(container, 'characters'); });
-    persistState("characters", demoCharacters);
+    persistCharacters();
   });
 }
 
