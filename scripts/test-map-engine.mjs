@@ -72,9 +72,12 @@ assert(maxPerp <= 40 * 0.15 + 0.001, `stamps hug the path (max perpendicular ${m
 // And they span the whole drag, not clump at one spot.
 assert(Math.min(...hugging.map((p) => p.x)) < 60 && Math.max(...hugging.map((p) => p.x)) > 140, 'stamps cover the length of the drag');
 
-// Variation: rotation present, sizes vary, and shape variants are distributed.
+// Default keeps stamps upright: no rotation unless rotJitter is explicitly set.
+assert(m.defaultStampOptions().rotJitter === 0, 'default rotJitter is 0 (stamps stay upright)');
+assert(m.scatterStamps(path, { seed: 9, size: 40, density: 4 }).every((p) => p.rot === 0), 'default scatter produces upright stamps (rot === 0)');
+// The engine can STILL produce rotation when a caller opts in via rotJitter.
 const varied = m.scatterStamps(path, { seed: 9, size: 40, density: 4, sizeJitter: 0.4, rotJitter: 0.6, variants: ['a', 'b', 'c'] });
-assert(varied.some((p) => p.rot !== 0), 'stamps carry rotation variation');
+assert(varied.some((p) => p.rot !== 0), 'opting into rotJitter still yields rotation');
 assert(new Set(varied.map((p) => Math.round(p.size))).size > 1, 'stamp sizes vary within a stroke');
 assert(varied.every((p) => ['a', 'b', 'c'].includes(p.shape)), 'each placement picks a shape from the variant pool');
 assert(new Set(varied.map((p) => p.shape)).size > 1, 'variant shapes are actually mixed across the stroke');

@@ -317,7 +317,9 @@ export function brushDabs(from, to, brush) {
  */
 
 export function defaultStampOptions() {
-  return { size: 46, density: 3, jitter: 0.15, sizeJitter: 0.4, rotJitter: 0.5, seed: 1 };
+  // rotJitter defaults to 0: stamps stay upright (no per-element tilt). Size
+  // variety still keeps a stroke from looking like identical clones.
+  return { size: 46, density: 3, jitter: 0.15, sizeJitter: 0.4, rotJitter: 0, seed: 1 };
 }
 
 /**
