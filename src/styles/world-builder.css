@@ -954,6 +954,26 @@
   z-index: 20;
   backdrop-filter: blur(4px);
 }
+
+/* Always-visible navigation reminder, pinned bottom-left of the stage. */
+.fmap__navhint {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  max-width: 60%;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-md);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.3;
+  z-index: 20;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
 .fmap__zoom-btn,
 .fmap__zoom-label {
   border: none;
