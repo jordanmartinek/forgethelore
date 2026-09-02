@@ -194,6 +194,56 @@ export function screenToSurfaceUV(px, py, cam, yaw, pitch) {
   return pointToUV(local);
 }
 
+/**
+ * Project a point on the planet's SURFACE (given as its equirectangular UV) to
+ * screen pixels, honoring the current orbit + perspective. This is the inverse
+ * direction of screenToSurfaceUV and is used to billboard element stamps onto
+ * the globe: a stamp is stored at a fixed surface UV and re-projected every
+ * frame so it rotates with the planet and hides when it swings to the far side.
+ *
+ * @param {number} u
+ * @param {number} v
+ * @param {{width:number,height:number,fov:number,distance:number}} cam
+ * @param {number} yaw
+ * @param {number} pitch
+ * @returns {{x:number,y:number,visible:boolean,scale:number,depth:number}}
+ *   x,y are screen pixels; visible is false when the point faces AWAY from the
+ *   camera (back hemisphere); scale is a relative size factor for perspective;
+ *   depth is view-space distance from the camera (smaller = nearer/in front).
+ */
+export function projectSurfacePoint(u, v, cam, yaw, pitch) {
+  const w = cam.width > 0 ? cam.width : 1;
+  const hgt = cam.height > 0 ? cam.height : 1;
+  const fov = cam.fov || (Math.PI / 4);
+  const distance = cam.distance || 3;
+  const aspect = w / hgt;
+
+  // Local surface point → rotate by the orbit model matrix → view space.
+  const world = applyMat3(orbitMatrix(yaw, pitch), uvToPoint(u, v));
+  // Camera sits at (0,0,distance) looking down −Z; the vertex path offsets z by
+  // −distance, so a view-space point is (world.x, world.y, world.z − distance).
+  const vz = world.z - distance;              // negative in front of the camera
+  const camDist = distance - world.z;         // positive distance camera→point
+
+  // Front hemisphere test: the point's outward normal (== its position on the
+  // unit sphere) must face the camera. The camera direction from the point is
+  // (0,0,distance) − world; visible when their dot product is positive.
+  const toCam = { x: -world.x, y: -world.y, z: distance - world.z };
+  const visible = dot(world, toCam) > 0;
+
+  // Perspective projection to NDC then to pixels (matches the render matrix).
+  const f = 1 / Math.tan(fov / 2);
+  const ndcX = (world.x * (f / aspect)) / -vz;  // divide by −vz (positive)
+  const ndcY = (world.y * f) / -vz;
+  const x = (ndcX * 0.5 + 0.5) * w;
+  const y = (1 - (ndcY * 0.5 + 0.5)) * hgt;
+
+  // Relative size: a unit-height object at the sphere front scales ~ f/(−vz).
+  const scale = f / Math.max(0.001, -vz);
+
+  return { x, y, visible, scale, depth: camDist };
+}
+
 /* ─── Paint palette ────────────────────────────────────────────────────────── */
 
 /** Default palette for painting a planet surface. */
@@ -222,9 +272,32 @@ export function defaultPlanet() {
     texW: 2048,
     texH: 1024,
     textureDataUrl: null,   // painted equirect texture (PNG data URL)
+    stamps: [],             // [{ id, shape, color, size, u, v }] surface billboards
     view: { yaw: 0.6, pitch: 0.3, distance: 3 },
     updatedAt: Date.now(),
   };
+}
+
+/** Coerce/validate the stamps array so bad or partial entries can't break rendering. */
+export function normalizeStamps(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const s of raw) {
+    if (!s || typeof s !== 'object') continue;
+    if (typeof s.shape !== 'string' || !s.shape) continue;
+    const u = Number.isFinite(s.u) ? ((s.u % 1) + 1) % 1 : null;
+    const v = Number.isFinite(s.v) ? clamp(s.v, 0, 1) : null;
+    if (u === null || v === null) continue;
+    out.push({
+      id: typeof s.id === 'string' && s.id ? s.id : `ps_${Math.random().toString(36).slice(2, 9)}`,
+      shape: s.shape,
+      color: /^#[0-9a-fA-F]{3,8}$/.test(s.color) ? s.color : '#c9b58a',
+      size: Number.isFinite(s.size) ? clamp(s.size, 12, 200) : 48,
+      u,
+      v,
+    });
+  }
+  return out;
 }
 
 /** Normalize/upgrade a loaded planet so partial or old data is safe to use. */
@@ -241,6 +314,7 @@ export function normalizePlanet(raw) {
     texH: Number.isFinite(raw.texH) && raw.texH >= 128 ? Math.min(2048, raw.texH | 0) : base.texH,
     textureDataUrl: typeof raw.textureDataUrl === 'string' && /^data:image\//i.test(raw.textureDataUrl)
       ? raw.textureDataUrl : null,
+    stamps: normalizeStamps(raw.stamps),
     view: {
       yaw: wrapYaw(view.yaw),
       pitch: clampPitch(view.pitch),

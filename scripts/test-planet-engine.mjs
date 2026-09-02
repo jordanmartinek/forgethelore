@@ -128,5 +128,72 @@ assert(Math.abs(fixed.view.pitch) <= m.MAX_PITCH && fixed.view.distance <= m.MAX
 assert(m.normalizePlanet({ textureDataUrl: 'data:image/png;base64,AAAA' }).textureDataUrl.startsWith('data:image/'), 'normalize keeps a valid texture data URL');
 assert(m.normalizePlanet({ textureDataUrl: 'data:text/html,<script>' }).textureDataUrl === null, 'normalize rejects a non-image texture URL');
 
+// ── projectSurfacePoint (billboard stamps onto the globe) ─────────────────────
+const pcam = { width: 800, height: 600, fov: Math.PI / 4, distance: 3 };
+// With no rotation, the +z surface point (the front of the globe facing the
+// camera) is uv of (0,0,1). It must project near the screen center and be visible.
+const frontUV = m.pointToUV(m.vec3(0, 0, 1));
+const front = m.projectSurfacePoint(frontUV.u, frontUV.v, pcam, 0, 0);
+assert(front.visible, 'the front-facing surface point is visible');
+assert(approx(front.x, 400, 0.5) && approx(front.y, 300, 0.5), 'front point projects to the screen center');
+assert(front.scale > 0, 'front point has a positive perspective scale');
+// The opposite side (−z) is on the far hemisphere → not visible.
+const backUV = m.pointToUV(m.vec3(0, 0, -1));
+const farPt = m.projectSurfacePoint(backUV.u, backUV.v, pcam, 0, 0);
+assert(!farPt.visible, 'the back-of-globe surface point is hidden');
+// The near point is closer to the camera than the far point.
+assert(front.depth < farPt.depth, 'front point is nearer the camera than the back point');
+// A point to the +x side of the front projects to the right of center and stays visible.
+const rightUV = m.pointToUV(m.vec3(0.5, 0, 0.87));
+const rightPt = m.projectSurfacePoint(rightUV.u, rightUV.v, pcam, 0, 0);
+assert(rightPt.visible && rightPt.x > 400, 'a point on the +x side projects right of center');
+// A point above the front projects above center (screen y is top-down).
+const upUV = m.pointToUV(m.vec3(0, 0.5, 0.87));
+const upPt = m.projectSurfacePoint(upUV.u, upUV.v, pcam, 0, 0);
+assert(upPt.visible && upPt.y < 300, 'a point on the +y side projects above center');
+// Deterministic for the same inputs.
+const q1 = m.projectSurfacePoint(0.3, 0.4, pcam, 0.6, 0.3);
+const q2 = m.projectSurfacePoint(0.3, 0.4, pcam, 0.6, 0.3);
+assert(JSON.stringify(q1) === JSON.stringify(q2), 'projectSurfacePoint is deterministic');
+// Orbiting brings a formerly-back point around to the front: yaw by π flips
+// which hemisphere the −z point sits on.
+const backThenFront = m.projectSurfacePoint(backUV.u, backUV.v, pcam, Math.PI, 0);
+assert(backThenFront.visible, 'orbiting 180° brings the far point to the visible front');
+// project ∘ (screenToSurfaceUV) round-trips a front click back to near the pixel.
+const clickUV = m.screenToSurfaceUV(430, 320, pcam, 0.6, 0.3);
+const reproj = m.projectSurfacePoint(clickUV.u, clickUV.v, pcam, 0.6, 0.3);
+assert(reproj.visible && approx(reproj.x, 430, 0.5) && approx(reproj.y, 320, 0.5),
+  'projecting a clicked surface UV lands back on the original pixel');
+// The round-trip must hold across the whole zoom range + a non-square viewport,
+// so billboards stay glued to their surface point when zoomed in/out.
+for (const dist of [1.5, 3, 8]) {
+  const zcam = { width: 1200, height: 500, fov: Math.PI / 4, distance: dist };
+  // Center pixel reliably hits the globe at every zoom; a bit off-center too.
+  const cx = 600, cy = 250;
+  const uv = m.screenToSurfaceUV(cx, cy, zcam, 0.9, -0.4);
+  assert(uv, `a center click hits the globe at distance ${dist}`);
+  const rp = m.projectSurfacePoint(uv.u, uv.v, zcam, 0.9, -0.4);
+  assert(rp.visible && approx(rp.x, cx, 0.5) && approx(rp.y, cy, 0.5),
+    `project∘screenToSurfaceUV round-trips at distance ${dist} on a wide viewport`);
+}
+
+// ── Stamps serialization ──────────────────────────────────────────────────────
+assert(Array.isArray(m.defaultPlanet().stamps) && m.defaultPlanet().stamps.length === 0, 'default planet has an empty stamps array');
+assert(m.normalizeStamps(null).length === 0 && m.normalizeStamps('x').length === 0, 'normalizeStamps guards non-arrays');
+const cleaned = m.normalizeStamps([
+  { shape: 'mountain', u: 0.3, v: 0.4, color: '#8a8178', size: 60 },   // valid
+  { shape: '', u: 0.5, v: 0.5 },                                       // dropped (no shape)
+  { shape: 'tree', u: 2.5, v: 5, color: 'evil"', size: 9999 },        // coerced/clamped
+  { u: 0.1, v: 0.1 },                                                  // dropped (no shape)
+  null,                                                                // dropped
+]);
+assert(cleaned.length === 2, 'normalizeStamps drops entries without a valid shape/position');
+assert(cleaned[0].id && cleaned[0].shape === 'mountain', 'valid stamp keeps its shape + gets an id');
+assert(cleaned[1].u >= 0 && cleaned[1].u < 1 && cleaned[1].v >= 0 && cleaned[1].v <= 1, 'stamp u wraps and v clamps to [0,1]');
+assert(cleaned[1].color === '#c9b58a', 'a bad color falls back to a default');
+assert(cleaned[1].size <= 200, 'stamp size is clamped');
+assert(m.normalizePlanet({ stamps: [{ shape: 'city', u: 0.2, v: 0.6 }] }).stamps.length === 1, 'normalizePlanet carries valid stamps');
+assert(m.normalizePlanet({ stamps: 'bad' }).stamps.length === 0, 'normalizePlanet repairs a bad stamps field');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} planet-engine tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
