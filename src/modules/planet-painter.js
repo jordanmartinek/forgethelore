@@ -17,12 +17,60 @@
 import { h } from '../core/renderer.js';
 import { loadData, persistState } from '../core/persist.js';
 import { toastSuccess, toastInfo } from '../ui/toast.js';
-import { safeColor } from '../core/world-shapes.js';
+import { safeColor, shapeMarkup } from '../core/world-shapes.js';
 import {
   PLANET_PALETTE, normalizePlanet,
   orbitMatrix, screenToSurfaceUV, uvToPixel,
   clampPitch, wrapYaw, clampDistance,
+  projectSurfacePoint,
 } from '../core/planet-engine.js';
+
+// A curated set of element stamps that read well on a planet, grouped for the
+// palette. Reuses the world-shapes silhouette library. Each has a default tint.
+const PLANET_STAMPS = [
+  { group: 'Terrain', items: [
+    { shape: 'mountain', label: 'Mountains', color: '#8a8178' },
+    { shape: 'volcano', label: 'Volcano', color: '#a8785c' },
+    { shape: 'hill', label: 'Hills', color: '#84a35a' },
+    { shape: 'forest', label: 'Forest', color: '#356b3f' },
+    { shape: 'pine_tree', label: 'Pines', color: '#2f6b45' },
+    { shape: 'tree', label: 'Tree', color: '#3f7d4f' },
+    { shape: 'cave', label: 'Cave', color: '#57534e' },
+  ] },
+  { group: 'Settlements', items: [
+    { shape: 'metropolis', label: 'City', color: '#8a7a5a' },
+    { shape: 'town', label: 'Town', color: '#8a7a5a' },
+    { shape: 'village', label: 'Village', color: '#9c8a63' },
+    { shape: 'castle', label: 'Castle', color: '#b0a080' },
+    { shape: 'tower', label: 'Tower', color: '#b0a080' },
+    { shape: 'temple', label: 'Temple', color: '#c8bda0' },
+    { shape: 'ruins', label: 'Ruins', color: '#9a8f7a' },
+  ] },
+  { group: 'Sci-Fi', items: [
+    { shape: 'space_station', label: 'Station', color: '#7fd0ff' },
+    { shape: 'spaceship', label: 'Ship', color: '#cfe3ff' },
+    { shape: 'satellite', label: 'Satellite', color: '#a5c4ff' },
+    { shape: 'portal', label: 'Portal', color: '#c07fff' },
+    { shape: 'beacon', label: 'Beacon', color: '#ffcf6a' },
+    { shape: 'reactor_core', label: 'Reactor', color: '#7fd0c0' },
+  ] },
+  { group: 'Markers', items: [
+    { shape: 'pin', label: 'Pin', color: '#e05a5a' },
+    { shape: 'marker_star', label: 'Star', color: '#f5b73c' },
+    { shape: 'marker_flag', label: 'Flag', color: '#e05a5a' },
+    { shape: 'marker_danger', label: 'Danger', color: '#f5a623' },
+    { shape: 'marker_target', label: 'Target', color: '#e05a5a' },
+  ] },
+];
+
+/** Look up a stamp's default color from the catalog (falls back to sand). */
+function stampColor(shape) {
+  for (const g of PLANET_STAMPS) {
+    const it = g.items.find((i) => i.shape === shape);
+    if (it) return it.color;
+  }
+  return '#c9b58a';
+}
 
 const STORE_KEY = 'planetPainter';
 // Vertical field of view shared by BOTH the render projection and the ray
@@ -32,9 +80,12 @@ const CAMERA_FOV = Math.PI / 4;
 
 // ─── Module state ──────────────────────────────────────────────────────────
 let planet = null;         // persisted planet state (view + texture)
-let tool = 'orbit';        // 'orbit' | 'paint'
+let tool = 'orbit';        // 'orbit' | 'paint' | 'stamp' | 'erase'
 let activeColor = '#5f8f4f';
 let brushSize = 60;        // paint dab radius in TEXTURE pixels
+let activeStamp = 'mountain';
+let stampSize = 54;        // stamp billboard size in screen px (at the globe front)
+const stampNodes = new Map(); // stamp id -> overlay DOM node (reused across frames)
 
 let gl = null;             // WebGL context
 let glProgram = null;      // compiled shader program
@@ -92,6 +143,9 @@ export function renderPlanetPainter(container) {
     renderToolbar(),
     h('div', { class: 'planet__stage', id: 'planet-stage' },
       h('canvas', { id: 'planet-canvas', class: 'planet__canvas' }),
+      // Billboard overlay: element stamps are HTML nodes positioned each frame
+      // over the globe. Behind the pointer layer so it doesn't eat events.
+      h('div', { class: 'planet__overlay', id: 'planet-overlay' }),
       h('div', {
         class: 'planet__pointer', id: 'planet-pointer',
         onpointerdown: onPointerDown,
@@ -100,8 +154,7 @@ export function renderPlanetPainter(container) {
         onpointerleave: onPointerUp,
         onwheel: onWheel,
       }),
-      h('div', { class: 'planet__hint' },
-        `🌐 ${tool === 'orbit' ? 'Drag to spin the planet' : 'Drag to paint'} · scroll to zoom · switch tools above`),
+      h('div', { class: 'planet__hint' }, hintText()),
     ),
   );
   container.appendChild(root);
@@ -117,7 +170,23 @@ function renderToolbar() {
     h('div', { class: 'planet__tools' },
       toolBtn('orbit', '🖐', 'Orbit · drag to spin'),
       toolBtn('paint', '🖌️', 'Paint · drag to paint the surface'),
+      toolBtn('stamp', '🌲', 'Place elements · click the globe to drop the selected element'),
+      toolBtn('erase', '🧽', 'Remove elements · click one to delete it'),
     ),
+    // The context row swaps with the active tool.
+    tool === 'stamp' ? stampBar() : paintBar(),
+    h('div', { class: 'planet__actions' },
+      h('button', { class: 'btn btn--sm btn--ghost', title: 'Reset view', onclick: resetView }, '⤢'),
+      h('button', { class: 'btn btn--sm btn--ghost', title: 'Clear planet', onclick: clearPlanet }, '🗑'),
+      h('button', { class: 'btn btn--sm btn--ghost', title: 'Export the flat surface texture (equirectangular map, no elements)', onclick: exportSurfaceMap }, '🗺'),
+      h('button', { class: 'btn btn--sm btn--primary', title: 'Export the planet view as a PNG (globe + placed elements)', onclick: exportTexture }, '⬇ Export'),
+    ),
+  );
+}
+
+/** Paint controls (swatches + brush) — shown for Orbit/Paint/Erase. */
+function paintBar() {
+  return h('div', { class: 'planet__ctxbar' },
     h('div', { class: 'planet__swatches' },
       ...PLANET_PALETTE.map((p) => h('button', {
         class: `planet__swatch ${activeColor === p.color ? 'planet__swatch--active' : ''}`,
@@ -137,10 +206,26 @@ function renderToolbar() {
         oninput: (e) => { brushSize = Number(e.target.value); },
       }),
     ),
-    h('div', { class: 'planet__actions' },
-      h('button', { class: 'btn btn--sm btn--ghost', title: 'Reset view', onclick: resetView }, '⤢'),
-      h('button', { class: 'btn btn--sm btn--ghost', title: 'Clear planet', onclick: clearPlanet }, '🗑'),
-      h('button', { class: 'btn btn--sm btn--primary', title: 'Export PNG (equirectangular map)', onclick: exportTexture }, '⬇ Export'),
+  );
+}
+
+/** Stamp controls (element picker + size) — shown for the Stamp tool. */
+function stampBar() {
+  return h('div', { class: 'planet__ctxbar' },
+    h('div', { class: 'planet__stamp-grid' },
+      ...PLANET_STAMPS.flatMap((g) => g.items).map((it) => h('button', {
+        class: `planet__stamp-btn ${activeStamp === it.shape ? 'planet__stamp-btn--active' : ''}`,
+        title: it.label,
+        onclick: () => { activeStamp = it.shape; refreshToolbar(); },
+        innerHTML: shapeMarkup(it.shape, 26, it.color),
+      })),
+    ),
+    h('label', { class: 'planet__brush', title: 'Element size' },
+      h('span', {}, '⬍'),
+      h('input', {
+        type: 'range', min: '20', max: '140', value: String(stampSize),
+        oninput: (e) => { stampSize = Number(e.target.value); },
+      }),
     ),
   );
 }
@@ -159,9 +244,17 @@ function refreshToolbar() {
   updateHint();
 }
 
+function hintText() {
+  const verb = tool === 'orbit' ? 'Drag to spin the planet'
+    : tool === 'paint' ? 'Drag to paint the surface'
+      : tool === 'stamp' ? 'Click the globe to place the selected element'
+        : 'Click an element to remove it';
+  return `🌐 ${verb} · scroll to zoom · right-drag always spins`;
+}
+
 function updateHint() {
   const hint = document.querySelector('.planet__hint');
-  if (hint) hint.textContent = `🌐 ${tool === 'orbit' ? 'Drag to spin the planet' : 'Drag to paint'} · scroll to zoom · switch tools above`;
+  if (hint) hint.textContent = hintText();
 }
 
 // ─── WebGL setup ─────────────────────────────────────────────────────────────
@@ -216,7 +309,10 @@ function initGL() {
   const canvas = document.getElementById('planet-canvas');
   if (!canvas) return;
   sizeCanvas(canvas);
-  gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  // preserveDrawingBuffer lets us read the rendered globe back for the "view"
+  // export (globe + stamps as seen), which a default WebGL context clears.
+  const glOpts = { preserveDrawingBuffer: true, antialias: true };
+  gl = canvas.getContext('webgl', glOpts) || canvas.getContext('experimental-webgl', glOpts);
   if (!gl) { toastInfo('Your browser could not start WebGL for the 3D planet.'); return; }
 
   try {
@@ -384,6 +480,7 @@ function startLoop() {
     rafId = requestAnimationFrame(frame);
     if (!gl || !glProgram) return;
     drawScene(canvas);
+    renderStampsOverlay(canvas);
   };
   rafId = requestAnimationFrame(frame);
 }
@@ -406,6 +503,97 @@ function teardown() {
   }
   gl = null; glProgram = null; glTexture = null; sphere = null;
   dragging = null; hostContainer = null;
+  stampNodes.clear();
+  _overlaySig = ''; // force a fresh overlay layout on the next mount
+}
+
+// ─── Element stamps (billboard overlay) ──────────────────────────────────────
+
+/**
+ * Position every stamp over the globe each frame. Each stamp is stored at a
+ * fixed surface UV; we project it through the current orbit so it tracks the
+ * spinning planet, scale it by the perspective factor, hide it when it rotates
+ * to the far hemisphere, and set z-index by depth so nearer stamps sit on top.
+ */
+let _overlaySig = '';
+function renderStampsOverlay(canvas) {
+  const overlay = document.getElementById('planet-overlay');
+  if (!overlay) return;
+  // Skip the whole pass when nothing that affects billboard layout changed
+  // (view + stamp set + canvas size). Keeps idle frames free even with many stamps.
+  const sig = `${planet.view.yaw.toFixed(4)}|${planet.view.pitch.toFixed(4)}|${planet.view.distance.toFixed(4)}|${canvas.width}x${canvas.height}|${planet.stamps.map((s) => s.id + s.size).join(',')}`;
+  if (sig === _overlaySig) return;
+  _overlaySig = sig;
+  const rect = canvas.getBoundingClientRect();
+  const cam = { width: rect.width, height: rect.height, fov: CAMERA_FOV, distance: planet.view.distance };
+  const live = new Set();
+
+  for (const s of planet.stamps) {
+    live.add(s.id);
+    let node = stampNodes.get(s.id);
+    if (!node) {
+      node = document.createElement('div');
+      node.className = 'planet__stamp';
+      node.innerHTML = shapeMarkup(s.shape, 100, safeColor(s.color, '#c9b58a'));
+      overlay.appendChild(node);
+      stampNodes.set(s.id, node);
+    }
+    const pr = projectSurfacePoint(s.u, s.v, cam, planet.view.yaw, planet.view.pitch);
+    if (!pr.visible) { node.style.display = 'none'; continue; }
+    const px = s.size * pr.scale;
+    node.style.display = 'block';
+    node.style.width = `${px}px`;
+    node.style.height = `${px}px`;
+    // Anchor the stamp's BOTTOM-center on the surface point so it "stands" on it.
+    node.style.transform = `translate(${pr.x - px / 2}px, ${pr.y - px}px)`;
+    node.style.zIndex = String(1000 - Math.round(pr.depth * 100));
+    node.style.opacity = String(0.35 + 0.65 * Math.min(1, pr.scale)); // fade tiny/edge ones slightly
+  }
+
+  // Drop DOM nodes for stamps that no longer exist.
+  for (const [id, node] of stampNodes) {
+    if (!live.has(id)) { node.remove(); stampNodes.delete(id); }
+  }
+}
+
+/** Place the active element stamp at the surface point under the cursor. */
+function placeStampAt(p) {
+  const uv = screenToSurfaceUV(p.x, p.y, camFromCanvas(), planet.view.yaw, planet.view.pitch);
+  if (!uv) return;
+  planet.stamps.push({
+    id: `ps_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    shape: activeStamp,
+    color: stampColor(activeStamp),
+    size: stampSize,
+    u: uv.u,
+    v: uv.v,
+  });
+  scheduleSave();
+}
+
+/**
+ * Remove the visible stamp nearest to the cursor (within a small radius).
+ * Only front-facing stamps are candidates so you can't delete one hidden on the
+ * back of the globe.
+ */
+function eraseStampAt(p) {
+  const canvas = document.getElementById('planet-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const cam = { width: rect.width, height: rect.height, fov: CAMERA_FOV, distance: planet.view.distance };
+  let best = -1; let bestD = 30 * 30; // 30px pick radius (squared)
+  planet.stamps.forEach((s, i) => {
+    const pr = projectSurfacePoint(s.u, s.v, cam, planet.view.yaw, planet.view.pitch);
+    if (!pr.visible) return;
+    const dx = pr.x - p.x, dy = pr.y - p.y;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  if (best >= 0) {
+    const [removed] = planet.stamps.splice(best, 1);
+    const node = stampNodes.get(removed.id);
+    if (node) { node.remove(); stampNodes.delete(removed.id); }
+    scheduleSave();
+  }
 }
 
 function drawScene(canvas) {
@@ -481,10 +669,12 @@ function onPointerDown(e) {
   e.preventDefault();
   document.getElementById('planet-pointer').setPointerCapture?.(e.pointerId);
   const p = localXY(e);
-  // Right button or the Orbit tool → spin; otherwise paint.
-  const mode = (tool === 'orbit' || e.button === 2) ? 'orbit' : 'paint';
+  // Right button always spins. Otherwise the active tool decides.
+  const mode = (e.button === 2) ? 'orbit' : (tool === 'orbit' ? 'orbit' : tool);
   dragging = { mode, lastX: e.clientX, lastY: e.clientY };
   if (mode === 'paint') paintAt(p);
+  else if (mode === 'stamp') placeStampAt(p);
+  else if (mode === 'erase') eraseStampAt(p);
 }
 
 function onPointerMove(e) {
@@ -496,9 +686,12 @@ function onPointerMove(e) {
     dragging.lastX = e.clientX; dragging.lastY = e.clientY;
     planet.view.yaw = wrapYaw(planet.view.yaw - dx * 0.008);
     planet.view.pitch = clampPitch(planet.view.pitch + dy * 0.008);
-  } else {
+  } else if (dragging.mode === 'paint') {
     paintAt(p);
+  } else if (dragging.mode === 'erase') {
+    eraseStampAt(p);
   }
+  // 'stamp' places once on pointerdown (dragging it would spray dozens).
 }
 
 function onPointerUp() {
@@ -526,29 +719,79 @@ function resetView() {
 }
 
 function clearPlanet() {
-  if (!confirm('Clear the planet back to a blank ocean?')) return;
+  if (!confirm('Clear the planet back to a blank ocean (removes painting AND placed elements)?')) return;
   if (texCtx) {
     texCtx.fillStyle = safeColor(planet.base, '#2f6f9e');
     texCtx.fillRect(0, 0, texCanvas.width, texCanvas.height);
     textureDirty = true;
   }
   planet.textureDataUrl = null;
+  planet.stamps = [];
+  for (const [, node] of stampNodes) node.remove();
+  stampNodes.clear();
   save();
   toastInfo('Planet cleared.');
 }
 
-function exportTexture() {
-  if (!texCanvas) return;
-  texCanvas.toBlob((blob) => {
+function downloadCanvas(canvas, name, message) {
+  canvas.toBlob((blob) => {
     if (!blob) { toastInfo('Export failed'); return; }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `loreforge-planet-${Date.now()}.png`;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toastSuccess('Exported the planet surface (equirectangular PNG).');
+    toastSuccess(message);
   }, 'image/png');
+}
+
+/**
+ * Export the current 3D VIEW (the globe with placed elements, exactly as seen).
+ * Composites the rendered WebGL frame with the element billboards drawn on top
+ * so nothing the user placed is silently dropped — the previous surface-only
+ * export omitted stamps entirely.
+ */
+function exportTexture() {
+  const canvas = document.getElementById('planet-canvas');
+  if (!canvas || !gl) return;
+  // Force one fresh render so the preserved buffer is current, then read it.
+  drawScene(canvas);
+  const W = canvas.width, H = canvas.height;      // device pixels
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const octx = out.getContext('2d');
+  octx.drawImage(canvas, 0, 0);
+
+  // Draw the visible stamps on top, at the same device-pixel scale as the canvas.
+  const rect = canvas.getBoundingClientRect();
+  const dpr = rect.width > 0 ? W / rect.width : 1;
+  const cam = { width: rect.width, height: rect.height, fov: CAMERA_FOV, distance: planet.view.distance };
+  const visible = planet.stamps
+    .map((s) => ({ s, pr: projectSurfacePoint(s.u, s.v, cam, planet.view.yaw, planet.view.pitch) }))
+    .filter((e) => e.pr.visible)
+    .sort((a, b) => b.pr.depth - a.pr.depth); // far → near so nearer draw on top
+
+  let pending = visible.length;
+  const finish = () => downloadCanvas(out, `loreforge-planet-${Date.now()}.png`, 'Exported the planet view (globe + elements).');
+  if (pending === 0) { finish(); return; }
+  visible.forEach(({ s, pr }) => {
+    const img = new Image();
+    const px = s.size * pr.scale * dpr;
+    img.onload = () => {
+      octx.drawImage(img, (pr.x * dpr) - px / 2, (pr.y * dpr) - px, px, px); // bottom-center anchor
+      if (--pending === 0) finish();
+    };
+    img.onerror = () => { if (--pending === 0) finish(); };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(shapeMarkup(s.shape, 100, safeColor(s.color, '#c9b58a')));
+  });
+}
+
+/** Export the flat painted surface as an equirectangular texture map (no elements). */
+function exportSurfaceMap() {
+  if (!texCanvas) return;
+  captureTexture();
+  downloadCanvas(texCanvas, `loreforge-planet-surface-${Date.now()}.png`, 'Exported the surface texture (equirectangular map).');
 }
