@@ -7,6 +7,7 @@ const browserGlobals = {
   indexedDB: 'readonly', navigator: 'readonly', console: 'readonly',
   setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly',
   clearInterval: 'readonly', fetch: 'readonly', requestAnimationFrame: 'readonly',
+  cancelAnimationFrame: 'readonly',
   AbortController: 'readonly', Blob: 'readonly', URL: 'readonly', FileReader: 'readonly',
   CSS: 'readonly', Node: 'readonly', Element: 'readonly', Response: 'readonly',
   alert: 'readonly', confirm: 'readonly', prompt: 'readonly', getComputedStyle: 'readonly',

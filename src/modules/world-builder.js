@@ -21,21 +21,24 @@ import { loadData, persistState, getActiveProjectId } from '../core/persist.js';
 import { confirmDialog } from '../ui/modal.js';
 import { SUBJECTS, shapeSVG, shapeLabel, resolveShapeId, safeColor } from '../core/world-shapes.js';
 import { renderFantasyMap } from './fantasy-map.js';
+import { renderPlanetPainter } from './planet-painter.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-// World Builder has two modes: the hierarchical shape-node canvas ('shapes')
-// and the Inkarnate-style painted Map ('map'). The choice is persisted so the
-// user returns to whichever they were using.
+// World Builder has three modes: the hierarchical shape-node canvas ('shapes'),
+// the Inkarnate-style painted Map ('map'), and a 3D Planet you orbit and paint
+// ('planet'). The choice is persisted so the user returns to whichever they
+// were using.
+const WB_MODES = ['shapes', 'map', 'planet'];
 let wbMode = loadData('worldBuilderMode', 'shapes');
 function setWbMode(mode) {
-  wbMode = mode === 'map' ? 'map' : 'shapes';
+  wbMode = WB_MODES.includes(mode) ? mode : 'shapes';
   persistState('worldBuilderMode', wbMode);
   const container = document.querySelector('.main-content');
   if (container) { container.innerHTML = ''; renderWorldBuilder(container); }
 }
 
-/** A small segmented toggle shown at the top of both modes. */
+/** A small segmented toggle shown at the top of all modes. */
 function renderModeToggle() {
   const tab = (id, label, icon) => h('button', {
     class: `wb-mode-tab ${wbMode === id ? 'wb-mode-tab--active' : ''}`,
@@ -45,6 +48,7 @@ function renderModeToggle() {
   return h('div', { class: 'wb-mode-toggle' },
     tab('shapes', 'Diagram', '🧩'),
     tab('map', 'Map', '🗺️'),
+    tab('planet', '3D Planet', '🌐'),
   );
 }
 const DEFAULT_SIZE = 90;
@@ -157,6 +161,11 @@ export function renderWorldBuilder(container) {
 
   if (wbMode === 'map') {
     renderFantasyMap(body);
+    return;
+  }
+
+  if (wbMode === 'planet') {
+    renderPlanetPainter(body);
     return;
   }
 
