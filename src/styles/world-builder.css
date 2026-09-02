@@ -563,6 +563,93 @@
  * Fantasy / Sci-Fi Map Painter
  * ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── 3D Planet painter ─────────────────────────────────────────────────────── */
+.planet {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.planet__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.planet__tools { display: flex; gap: 4px; }
+.planet__tool {
+  padding: 6px 9px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 15px;
+}
+.planet__tool:hover { background: var(--bg-hover); }
+.planet__tool--active {
+  border-color: var(--accent-primary);
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+.planet__swatches { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.planet__swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border-subtle);
+  cursor: pointer;
+  padding: 0;
+}
+.planet__swatch:hover { transform: scale(1.1); }
+.planet__swatch--active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent-primary); }
+.planet__color {
+  width: 26px; height: 26px; padding: 0; border: 1px solid var(--border-subtle);
+  border-radius: 6px; background: none; cursor: pointer;
+}
+.planet__brush { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.planet__brush input { width: 90px; }
+.planet__actions { display: flex; gap: 4px; margin-left: auto; }
+
+.planet__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  /* A subtle starry void so the globe reads as floating in space. */
+  background:
+    radial-gradient(circle at 30% 20%, #14203a 0%, #070912 60%, #04050a 100%);
+}
+.planet__canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.planet__pointer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: grab;
+  touch-action: none;
+}
+.planet__pointer:active { cursor: grabbing; }
+.planet__hint {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  z-index: 6;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
 .fmap {
   width: 100%;
   height: 100%;
