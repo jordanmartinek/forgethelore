@@ -16,6 +16,8 @@
 
 import { h } from '../core/renderer.js';
 import { loadData, persistState } from '../core/persist.js';
+import { putProjectBlob, getProjectBlob, deleteProjectBlob } from '../core/blob-store.js';
+import { registerPreSnapshotFlush } from '../core/project-data.js';
 import { toastSuccess, toastInfo } from '../ui/toast.js';
 import { safeColor, shapeMarkup } from '../core/world-shapes.js';
 import { STAMP_SETS, stampColor, stampItemsForStyle } from '../core/stamp-catalog.js';
@@ -64,36 +66,67 @@ let hostContainer = null;
 
 // ─── Load / save ─────────────────────────────────────────────────────────────
 
+// The painted surface (a multi-MB PNG data URL) is NOT stored in the planet
+// JSON anymore — it lives in IndexedDB (see blob-store). We keep the current
+// data URL here in memory and persist only slim JSON to localStorage.
+let _textureDataUrl = null;
+const TEX_NS = 'planetPainter';
+const TEX_FIELD = 'texture';
+
 function load() {
   planet = normalizePlanet(loadData(STORE_KEY, null));
+  // A legacy planet may still carry an inline textureDataUrl (pre-migration);
+  // seed the in-memory copy from it so nothing is lost before migration runs.
+  _textureDataUrl = planet.textureDataUrl || null;
   activeColor = activeColor || planet.base;
 }
 
-let _quotaWarned = false;
-function save() {
+let _blobWarned = false;
+/**
+ * Persist the planet. DURABLE ORDER MATTERS: write the big texture to IndexedDB
+ * FIRST and only then persist slim JSON, so a reload can never see slim JSON
+ * (texture nulled) with no blob behind it. If the IDB write fails (quota/error)
+ * we fall back to persisting the texture INLINE in localStorage so the work is
+ * never silently lost — and warn once.
+ */
+async function save() {
   planet.updatedAt = Date.now();
-  const ok = persistState(STORE_KEY, planet);
-  // The whole planet is one large PNG data URL; if it exceeds localStorage
-  // quota the write fails. Surface a planet-specific hint once so the user
-  // knows their surface may not survive a reload (rather than only the global
-  // save indicator flipping to "offline").
-  if (ok === false && !_quotaWarned) {
-    _quotaWarned = true;
-    toastInfo('This planet is too large to auto-save (storage full). Export a PNG to keep it.');
-  } else if (ok !== false) {
-    _quotaWarned = false;
+  let blobOk = true;
+  if (_textureDataUrl) {
+    blobOk = await putProjectBlob(TEX_NS, TEX_FIELD, _textureDataUrl);
+  }
+  // Blob durable -> slim JSON. Blob failed -> keep it inline as a fallback.
+  const toPersist = blobOk ? { ...planet, textureDataUrl: null } : { ...planet, textureDataUrl: _textureDataUrl };
+  persistState(STORE_KEY, toPersist);
+  if (!blobOk && !_blobWarned) {
+    _blobWarned = true;
+    toastInfo('Could not save the planet surface to local storage (it may be full). Export a PNG to keep it.');
+  } else if (blobOk) {
+    _blobWarned = false;
   }
 }
 
 let _saveTimer = null;
 function scheduleSave() {
   if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => { _saveTimer = null; captureTexture(); save(); }, 500);
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    captureTexture();
+    save();
+  }, 500);
 }
 
-/** Snapshot the painted texture canvas into the planet state as a data URL. */
+/** Snapshot the painted texture canvas into the in-memory data URL. */
 function captureTexture() {
-  if (texCanvas) planet.textureDataUrl = texCanvas.toDataURL('image/png');
+  if (texCanvas) {
+    _textureDataUrl = texCanvas.toDataURL('image/png');
+    planet.textureDataUrl = null; // keep it out of the persisted JSON
+  }
+}
+
+/** Await any pending debounced save (used before building a sync snapshot). */
+export async function flushPlanetSave() {
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; captureTexture(); await save(); }
 }
 
 // ─── Render entry ─────────────────────────────────────────────────────────────
@@ -496,12 +529,27 @@ function initTextureCanvas() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-  if (planet.textureDataUrl) {
-    const img = new Image();
-    img.onload = () => { texCtx.drawImage(img, 0, 0, texCanvas.width, texCanvas.height); textureDirty = true; };
-    img.src = planet.textureDataUrl;
-  }
+  // Restore the painted surface from IndexedDB (async). Falls back to a legacy
+  // inline data URL from the JSON (pre-migration planets) and, if found there,
+  // migrates it into the blob store so localStorage gets slimmed on next save.
+  restoreTexture();
   textureDirty = true;
+}
+
+async function restoreTexture() {
+  let dataUrl = await getProjectBlob(TEX_NS, TEX_FIELD);
+  if (!dataUrl && planet.textureDataUrl) {
+    // Legacy: texture still inline in localStorage → migrate it to IndexedDB.
+    dataUrl = planet.textureDataUrl;
+    await putProjectBlob(TEX_NS, TEX_FIELD, dataUrl);
+    planet.textureDataUrl = null;
+    save(); // re-persist slimmed JSON (frees the localStorage space)
+  }
+  if (!dataUrl || !texCtx) return;
+  _textureDataUrl = dataUrl;
+  const img = new Image();
+  img.onload = () => { texCtx.drawImage(img, 0, 0, texCanvas.width, texCanvas.height); textureDirty = true; };
+  img.src = dataUrl;
 }
 
 function uploadTexture() {
@@ -852,6 +900,8 @@ function clearPlanet() {
     textureDirty = true;
   }
   planet.textureDataUrl = null;
+  _textureDataUrl = null;
+  deleteProjectBlob(TEX_NS, TEX_FIELD); // drop the stored surface from IndexedDB
   planet.stamps = [];
   for (const [, node] of stampNodes) node.remove();
   stampNodes.clear();
@@ -921,3 +971,8 @@ function exportSurfaceMap() {
   captureTexture();
   downloadCanvas(texCanvas, `loreforge-planet-surface-${Date.now()}.png`, 'Exported the surface texture (equirectangular map).');
 }
+
+
+// Ensure a pending planet save (incl. its IndexedDB texture write) is durable
+// before a cloud-sync snapshot is built.
+registerPreSnapshotFlush(flushPlanetSave);

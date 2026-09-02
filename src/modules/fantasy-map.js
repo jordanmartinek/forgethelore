@@ -22,6 +22,8 @@
 
 import { h } from '../core/renderer.js';
 import { loadData, persistState } from '../core/persist.js';
+import { putProjectBlob, getProjectBlob, deleteProjectBlob } from '../core/blob-store.js';
+import { registerPreSnapshotFlush } from '../core/project-data.js';
 import { toastSuccess, toastInfo } from '../ui/toast.js';
 import { shapeSVG, safeColor } from '../core/world-shapes.js';
 import { STAMP_SETS, STAMP_VARIANTS, stampColor, stampItemsForStyle } from '../core/stamp-catalog.js';
@@ -97,13 +99,82 @@ const stampImgCache = new Map();
 
 // ─── Load / save ──────────────────────────────────────────────────────────────
 
+// The two big images — the painted terrain raster and an imported backdrop —
+// live in IndexedDB (blob store), not localStorage, so a detailed map can't
+// blow the tiny localStorage quota. They stay on the in-memory `project` for
+// rendering; `save()` just strips them from the PERSISTED JSON.
+const MAP_NS = 'fantasyMap';
+
 function load() {
   project = normalizeMapProject(loadData(STORE_KEY, null));
+  // Blobs are restored asynchronously from IndexedDB before first paint (see
+  // restoreMapBlobs, called from the deferred setup in renderFantasyMap).
 }
 
-function save() {
+/**
+ * Restore the terrain + backdrop blobs from IndexedDB onto the in-memory
+ * project. Falls back to any legacy inline data URL (pre-migration) and, when
+ * found, migrates it into the blob store so the next save slims localStorage.
+ */
+async function restoreMapBlobs() {
+  // IMPORTANT: only load from IndexedDB when the in-memory value is ABSENT.
+  // On a rerender() (backdrop toggle, style switch, resize) the live canvas is
+  // snapshotted onto project.terrainDataUrl BEFORE this runs — reading a
+  // possibly-stale blob back would clobber that fresh snapshot, so we skip it
+  // whenever the in-memory copy is already present (true only on a cold load).
+  let migrated = false;
+
+  if (!project.terrainDataUrl) {
+    const terrain = await getProjectBlob(MAP_NS, 'terrain');
+    if (terrain) project.terrainDataUrl = terrain;
+  } else {
+    // Legacy inline terrain present in JSON → migrate it into the blob store.
+    const existing = await getProjectBlob(MAP_NS, 'terrain');
+    if (!existing) { await putProjectBlob(MAP_NS, 'terrain', project.terrainDataUrl); migrated = true; }
+  }
+
+  if (project.backdrop) {
+    if (!project.backdrop.dataUrl) {
+      const bd = await getProjectBlob(MAP_NS, 'backdrop');
+      if (bd) project.backdrop.dataUrl = bd;
+    } else {
+      const existing = await getProjectBlob(MAP_NS, 'backdrop');
+      if (!existing) { await putProjectBlob(MAP_NS, 'backdrop', project.backdrop.dataUrl); migrated = true; }
+    }
+  }
+  // Re-persist slim JSON ONLY if we just migrated legacy inline blobs out —
+  // avoids a redundant localStorage write on every map open/rerender.
+  if (migrated) save();
+}
+
+let _mapBlobWarned = false;
+/**
+ * Persist the map. DURABLE ORDER: write the big blobs to IndexedDB FIRST, then
+ * slim JSON — so a reload can't see slim JSON with the images gone. If a blob
+ * write fails, keep that image INLINE in localStorage as a fallback so work is
+ * never silently lost.
+ */
+async function save() {
   project.updatedAt = Date.now();
-  persistState(STORE_KEY, project);
+  let terrainOk = true;
+  let backdropOk = true;
+  if (project.terrainDataUrl) terrainOk = await putProjectBlob(MAP_NS, 'terrain', project.terrainDataUrl);
+  if (project.backdrop && project.backdrop.dataUrl) backdropOk = await putProjectBlob(MAP_NS, 'backdrop', project.backdrop.dataUrl);
+  const slim = {
+    ...project,
+    // Keep an image inline only when its blob write failed (fallback).
+    terrainDataUrl: terrainOk ? null : project.terrainDataUrl,
+    backdrop: project.backdrop
+      ? { ...project.backdrop, dataUrl: backdropOk ? null : project.backdrop.dataUrl }
+      : null,
+  };
+  persistState(STORE_KEY, slim);
+  if ((!terrainOk || !backdropOk) && !_mapBlobWarned) {
+    _mapBlobWarned = true;
+    toastInfo('Could not save a map image to local storage (it may be full). Export your map to keep it.');
+  } else if (terrainOk && backdropOk) {
+    _mapBlobWarned = false;
+  }
 }
 
 // Debounced save for high-frequency edits (slider drags) so we don't thrash
@@ -112,6 +183,11 @@ let _saveTimer = null;
 function scheduleSave() {
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => { _saveTimer = null; save(); }, 400);
+}
+
+/** Await any pending debounced save (used before building a sync snapshot). */
+export async function flushMapSave() {
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; await save(); }
 }
 
 // ─── Main render ────────────────────────────────────────────────────────────
@@ -162,9 +238,12 @@ export function renderFantasyMap(container) {
   );
   container.appendChild(root);
 
-  // Canvases exist now; paint the procedural surface + restore terrain.
-  requestAnimationFrame(() => {
+  // Canvases exist now; restore the big blobs from IndexedDB, then paint the
+  // procedural surface + terrain. Blob reads are async so the callback awaits
+  // them before painting (surface uses the backdrop, terrain uses the raster).
+  requestAnimationFrame(async () => {
     setupCanvases();
+    await restoreMapBlobs();
     paintSurface();
     restoreTerrain();      // flips terrainReady=true when the raster is in place
     renderPathsLayer();
@@ -368,6 +447,7 @@ function setBackdropFit(fit) {
 function removeBackdrop() {
   project.backdrop = null;
   _backdropImg = null; _backdropSrc = null;
+  deleteProjectBlob(MAP_NS, 'backdrop');
   save();
   rerender();       // rebuilds the toolbar (backdrop button state) + repaints
   toastInfo('Backdrop removed.');
@@ -1982,6 +2062,7 @@ function switchStyle(styleId) {
   project.style = st;
   project.surface = defaultSurfaceForStyle(st);
   project.terrainDataUrl = null;
+  deleteProjectBlob(MAP_NS, 'terrain');
   if (ctxTerrain) { const c = document.getElementById('fmap-terrain'); ctxTerrain.clearRect(0, 0, c.width, c.height); }
   undoStack = []; redoStack = [];
   // Adjust active terrain/stamp to belong to the new style.
@@ -1998,6 +2079,7 @@ function clearMap() {
   if (!confirm('Clear the entire map (terrain, paths, stamps, and labels)?')) return;
   if (ctxTerrain) { const c = document.getElementById('fmap-terrain'); ctxTerrain.clearRect(0, 0, c.width, c.height); }
   project.terrainDataUrl = null;
+  deleteProjectBlob(MAP_NS, 'terrain');
   project.paths = [];
   project.stamps = [];
   project.labels = [];
@@ -2285,3 +2367,8 @@ function rerender() {
   container.innerHTML = '';
   renderFantasyMap(container);
 }
+
+
+// Ensure a pending map save (incl. its IndexedDB terrain/backdrop writes) is
+// durable before a cloud-sync snapshot is built.
+registerPreSnapshotFlush(flushMapSave);

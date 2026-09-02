@@ -39,12 +39,27 @@ export function readLocalData(projectId) {
  * @param {object} project  { id, name, icon, description }
  * @returns {Promise<object>} snapshot payload
  */
+// Modules with debounced saves (the map + planet, whose big images are written
+// to IndexedDB asynchronously) register a flush here so a sync snapshot is
+// never built while a blob write is still pending — otherwise the snapshot
+// could capture a stale image and the peer's authoritative apply would drop the
+// newest paint. Kept as a tiny registry to avoid the core importing UI modules.
+const _preSnapshotFlushers = new Set();
+export function registerPreSnapshotFlush(fn) {
+  if (typeof fn === 'function') _preSnapshotFlushers.add(fn);
+  return () => _preSnapshotFlushers.delete(fn);
+}
+
 export async function buildProjectSnapshot(project) {
+  // Flush any pending debounced saves + in-flight blob writes first.
+  for (const fn of _preSnapshotFlushers) {
+    try { await fn(); } catch (_) { /* a flusher failing must not block sync */ }
+  }
   const projectId = project.id;
   const data = readLocalData(projectId);
 
   let indexeddb = {};
-  try { indexeddb = await db.exportAll(); }
+  try { indexeddb = await db.exportAll(projectId); }
   catch (e) { console.warn('[LoreForge] IndexedDB snapshot skipped:', e.message); }
 
   return {
@@ -105,10 +120,35 @@ export function snapshotHash(snapshot) {
   // FNV-1a over the stable serialization — cheap, dependency-free, good enough
   // to detect "did anything change" (not a cryptographic guarantee).
   let hash = 0x811c9dc5;
-  const str = keys.map((k) => `${k}:${JSON.stringify(data[k])}`).join('|');
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
+  const feed = (s) => {
+    for (let i = 0; i < s.length; i++) {
+      hash ^= s.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+  };
+  feed(keys.map((k) => `${k}:${JSON.stringify(data[k])}`).join('|'));
+  // Fold in the blob store's identity too — the big images (planet texture, map
+  // terrain/backdrop) now live in IndexedDB, so a texture-only edit wouldn't
+  // change `data`. Hash each blob's key + value length + a cheap content digest
+  // so a paint that only touches a blob still marks the project dirty for sync.
+  const blobs = (snapshot && snapshot.indexeddb && snapshot.indexeddb.blobs) || [];
+  if (Array.isArray(blobs) && blobs.length) {
+    const parts = blobs
+      .filter((b) => b && typeof b.key === 'string')
+      .map((b) => {
+        const v = typeof b.value === 'string' ? b.value : '';
+        // Full-coverage rolling checksum over the (multi-MB) value. O(n) but
+        // branch-free and cheap; unlike sparse sampling it can't miss a
+        // same-length edit that changes bytes anywhere in the image.
+        let d = 0x811c9dc5;
+        for (let i = 0; i < v.length; i++) {
+          d ^= v.charCodeAt(i);
+          d = Math.imul(d, 0x01000193);
+        }
+        return `${b.key}#${v.length}#${d >>> 0}`;
+      })
+      .sort();
+    feed('|blobs|' + parts.join('|'));
   }
   return (hash >>> 0).toString(16);
 }

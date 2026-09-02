@@ -36,9 +36,9 @@ async function gatherExportData() {
     }
   }
 
-  // IndexedDB object stores (objects/relationships/boards/snapshots/appState).
+  // IndexedDB object stores + this project's blobs (large image data URLs).
   let indexeddb = {};
-  try { indexeddb = await db.exportAll(); }
+  try { indexeddb = await db.exportAll(projectId); }
   catch (e) { console.warn('[LoreForge] IndexedDB export skipped:', e.message); }
 
   const payload = {
@@ -193,7 +193,9 @@ export function importProject() {
 
         // Restore the IndexedDB object stores, if the export included them.
         if (payload.indexeddb) {
-          try { await db.importAll(payload.indexeddb); }
+          // Pass the new project id so imported blobs (planet/map images) are
+          // re-keyed into this freshly-created project.
+          try { await db.importAll(payload.indexeddb, newProjectId); }
           catch (e) { console.warn('[LoreForge] IndexedDB import skipped:', e.message); }
         }
 

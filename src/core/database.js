@@ -4,7 +4,10 @@
  */
 
 const DB_NAME = 'loreforge-planner';
-const DB_VERSION = 1;
+// v2 adds the `blobs` store — large image data URLs (planet texture, map
+// terrain/backdrop) live here instead of localStorage, which has a tiny ~5-10MB
+// quota. IndexedDB's quota is far larger (typically hundreds of MB to GBs).
+const DB_VERSION = 2;
 
 class LoreForgeDB {
   constructor() {
@@ -61,8 +64,57 @@ class LoreForgeDB {
         if (!db.objectStoreNames.contains('appState')) {
           db.createObjectStore('appState', { keyPath: 'key' });
         }
+
+        // Blobs — large binary payloads (image data URLs) kept OUT of the tiny
+        // localStorage quota. Keyed by `${projectId}:namespace:field`, e.g.
+        // 'proj1:planetPainter:texture'. Value: { key, value, updatedAt }.
+        if (!db.objectStoreNames.contains('blobs')) {
+          db.createObjectStore('blobs', { keyPath: 'key' });
+        }
       };
     });
+  }
+
+  /* ─── Blob store (large image data URLs) ──────────────────────────────────
+   * A simple key→value store for big strings (PNG data URLs) that would blow
+   * the localStorage quota. Keys are namespaced by project so they travel with
+   * export/sync and never collide across projects.
+   */
+
+  /** Store a blob string under `key`. Resolves true on success, false on error. */
+  async putBlob(key, value) {
+    if (!this.db || !key) return false;
+    try {
+      await this.put('blobs', { key, value });
+      return true;
+    } catch (e) {
+      console.warn('[LoreForge] putBlob failed for', key, e && e.message);
+      return false;
+    }
+  }
+
+  /** Read a blob string by `key`, or null if absent/on error. */
+  async getBlob(key) {
+    if (!this.db || !key) return null;
+    try {
+      const rec = await this.get('blobs', key);
+      return rec && typeof rec.value === 'string' ? rec.value : null;
+    } catch (_) { return null; }
+  }
+
+  /** Remove a blob by `key`. */
+  async deleteBlob(key) {
+    if (!this.db || !key) return;
+    try { await this.delete('blobs', key); } catch (_) { /* ignore */ }
+  }
+
+  /** All blob records whose key starts with `prefix` (e.g. a project's blobs). */
+  async getBlobsByPrefix(prefix) {
+    if (!this.db) return [];
+    try {
+      const all = await this.getAll('blobs');
+      return (all || []).filter((b) => b && typeof b.key === 'string' && b.key.startsWith(prefix));
+    } catch (_) { return []; }
   }
 
   // Generic CRUD operations
@@ -214,13 +266,23 @@ class LoreForgeDB {
    * projects. We only back up the content stores.
    * @returns {Promise<Record<string, any[]>>}
    */
-  async exportAll() {
+  async exportAll(projectId = null) {
     if (!this.db) return {};
     const stores = ['objects', 'relationships', 'boards'];
     const dump = {};
     for (const name of stores) {
       try { dump[name] = await this.getAll(name); }
       catch (_) { dump[name] = []; }
+    }
+    // Blobs are per-project. When a projectId is given, export only that
+    // project's blobs (keyed `${projectId}:...`); otherwise export them all.
+    if (this.db.objectStoreNames.contains('blobs')) {
+      try {
+        const all = await this.getAll('blobs');
+        dump.blobs = projectId
+          ? (all || []).filter((b) => b && typeof b.key === 'string' && b.key.startsWith(`${projectId}:`))
+          : (all || []);
+      } catch (_) { dump.blobs = []; }
     }
     return dump;
   }
@@ -238,7 +300,7 @@ class LoreForgeDB {
    * @param {Record<string, any[]>} dump
    * @returns {Promise<number>} number of records imported
    */
-  async importAll(dump) {
+  async importAll(dump, targetProjectId = null) {
     if (!this.db || !dump || typeof dump !== 'object') return 0;
 
     const idMap = new Map(); // oldId -> newId
@@ -280,6 +342,22 @@ class LoreForgeDB {
       }
     }
 
+    // Blobs: re-key from their original project prefix to the NEW project id so
+    // an imported planet/map's texture lands in the freshly-created project
+    // (file import always creates a new project). If no target id is given we
+    // keep keys verbatim (still additive — put won't collide across projects).
+    if (this.db.objectStoreNames.contains('blobs') && Array.isArray(dump.blobs)) {
+      for (const b of dump.blobs) {
+        if (!b || typeof b.key !== 'string') continue;
+        let key = b.key;
+        if (targetProjectId) {
+          const rest = b.key.split(':').slice(1).join(':'); // drop old projectId
+          key = `${targetProjectId}:${rest}`;
+        }
+        try { await this.put('blobs', { key, value: b.value }); count++; } catch (_) { /* skip */ }
+      }
+    }
+
     return count;
   }
 
@@ -307,6 +385,24 @@ class LoreForgeDB {
       for (const rec of records) {
         if (!rec || typeof rec !== 'object') continue;
         try { await this.put(name, rec); count++; } catch (_) { /* skip bad record */ }
+      }
+    }
+    // Blobs are per-project (keyed `${projectId}:...`). Replace ONLY the blobs
+    // for the project ids present in this snapshot — clearing the whole store
+    // would wipe other projects' textures. Keys are preserved verbatim.
+    if (this.db.objectStoreNames.contains('blobs') && Array.isArray(dump.blobs)) {
+      const incomingPids = new Set(
+        dump.blobs
+          .map((b) => (b && typeof b.key === 'string' ? b.key.split(':')[0] : null))
+          .filter(Boolean),
+      );
+      for (const pid of incomingPids) {
+        const existing = await this.getBlobsByPrefix(`${pid}:`);
+        for (const b of existing) { try { await this.delete('blobs', b.key); } catch (_) { /* ignore */ } }
+      }
+      for (const b of dump.blobs) {
+        if (!b || typeof b.key !== 'string') continue;
+        try { await this.put('blobs', { key: b.key, value: b.value }); count++; } catch (_) { /* skip */ }
       }
     }
     return count;
