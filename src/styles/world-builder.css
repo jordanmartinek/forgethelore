@@ -652,15 +652,68 @@
 
 /* Context row that swaps between paint controls and the stamp picker. */
 .planet__ctxbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.planet__ctxbar--stamp { align-items: flex-start; }
 
-/* Element-stamp picker (a compact horizontal strip of silhouettes). */
+/* Style switcher (fantasy / sci-fi) — swaps the catalog + terrain set. */
+.planet__styles { display: flex; gap: 4px; }
+.planet__style {
+  padding: 5px 9px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+.planet__style:hover { background: var(--bg-hover); }
+.planet__style--active { border-color: var(--accent-primary); background: var(--bg-active); color: var(--text-primary); font-weight: 600; }
+
+/* Paint-mode toggle (textured Terrain vs flat Color). */
+.planet__paintmode { display: inline-flex; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.planet__mode { padding: 5px 10px; border: none; background: var(--surface-2); color: var(--text-secondary); cursor: pointer; font-size: 12px; }
+.planet__mode:hover { background: var(--bg-hover); }
+.planet__mode--active { background: var(--bg-active); color: var(--text-primary); font-weight: 600; }
+
+/* Textured terrain swatches (each shows the real look via a preview canvas). */
+.planet__swatches--dots { max-width: 340px; }
+.planet__swatch-t {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.planet__swatch-t:hover { background: var(--bg-hover); }
+.planet__swatch-t--active { border-color: var(--accent-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 22%, transparent); }
+.planet__swatch-canvas { display: block; border-radius: 3px; width: 132px; height: 26px; }
+.planet__swatch-label { font-size: 9px; color: var(--text-secondary); }
+/* Terrain swatches sit in a horizontal scroller so many fit the toolbar row. */
+.planet__ctxbar .planet__swatches { max-width: 420px; max-height: 68px; overflow: auto; }
+
+/* Element-stamp picker: searchable + collapsible groups in a scroll box. */
+.planet__stamp-search { width: 220px; }
+.planet__stamp-scroll { max-width: 360px; max-height: 132px; overflow-y: auto; }
+.planet__stamp-group { margin-bottom: 4px; }
+.planet__stamp-group-head {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 3px 6px; margin-bottom: 3px;
+  border: none; border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text-secondary);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer;
+}
+.planet__stamp-group-head:hover { background: var(--bg-hover); color: var(--text-primary); }
+.planet__stamp-group-count { font-weight: 600; color: var(--text-muted); background: var(--surface-1); border-radius: 8px; padding: 0 6px; font-size: 9px; }
+.planet__pal-hint { font-size: 11px; color: var(--text-muted); padding: 6px; }
+
+/* Element-stamp picker grid of silhouettes. */
 .planet__stamp-grid {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
-  max-width: 460px;
-  max-height: 40px;
-  overflow: hidden;
 }
 .planet__stamp-btn {
   width: 32px;

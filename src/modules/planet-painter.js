@@ -18,59 +18,16 @@ import { h } from '../core/renderer.js';
 import { loadData, persistState } from '../core/persist.js';
 import { toastSuccess, toastInfo } from '../ui/toast.js';
 import { safeColor, shapeMarkup } from '../core/world-shapes.js';
+import { STAMP_SETS, stampColor, stampItemsForStyle } from '../core/stamp-catalog.js';
 import {
   PLANET_PALETTE, normalizePlanet,
   orbitMatrix, screenToSurfaceUV, uvToPixel,
   clampPitch, wrapYaw, clampDistance,
   projectSurfacePoint,
 } from '../core/planet-engine.js';
-
-// A curated set of element stamps that read well on a planet, grouped for the
-// palette. Reuses the world-shapes silhouette library. Each has a default tint.
-const PLANET_STAMPS = [
-  { group: 'Terrain', items: [
-    { shape: 'mountain', label: 'Mountains', color: '#8a8178' },
-    { shape: 'volcano', label: 'Volcano', color: '#a8785c' },
-    { shape: 'hill', label: 'Hills', color: '#84a35a' },
-    { shape: 'forest', label: 'Forest', color: '#356b3f' },
-    { shape: 'pine_tree', label: 'Pines', color: '#2f6b45' },
-    { shape: 'tree', label: 'Tree', color: '#3f7d4f' },
-    { shape: 'cave', label: 'Cave', color: '#57534e' },
-  ] },
-  { group: 'Settlements', items: [
-    { shape: 'metropolis', label: 'City', color: '#8a7a5a' },
-    { shape: 'town', label: 'Town', color: '#8a7a5a' },
-    { shape: 'village', label: 'Village', color: '#9c8a63' },
-    { shape: 'castle', label: 'Castle', color: '#b0a080' },
-    { shape: 'tower', label: 'Tower', color: '#b0a080' },
-    { shape: 'temple', label: 'Temple', color: '#c8bda0' },
-    { shape: 'ruins', label: 'Ruins', color: '#9a8f7a' },
-  ] },
-  { group: 'Sci-Fi', items: [
-    { shape: 'space_station', label: 'Station', color: '#7fd0ff' },
-    { shape: 'spaceship', label: 'Ship', color: '#cfe3ff' },
-    { shape: 'satellite', label: 'Satellite', color: '#a5c4ff' },
-    { shape: 'portal', label: 'Portal', color: '#c07fff' },
-    { shape: 'beacon', label: 'Beacon', color: '#ffcf6a' },
-    { shape: 'reactor_core', label: 'Reactor', color: '#7fd0c0' },
-  ] },
-  { group: 'Markers', items: [
-    { shape: 'pin', label: 'Pin', color: '#e05a5a' },
-    { shape: 'marker_star', label: 'Star', color: '#f5b73c' },
-    { shape: 'marker_flag', label: 'Flag', color: '#e05a5a' },
-    { shape: 'marker_danger', label: 'Danger', color: '#f5a623' },
-    { shape: 'marker_target', label: 'Target', color: '#e05a5a' },
-  ] },
-];
-
-/** Look up a stamp's default color from the catalog (falls back to sand). */
-function stampColor(shape) {
-  for (const g of PLANET_STAMPS) {
-    const it = g.items.find((i) => i.shape === shape);
-    if (it) return it.color;
-  }
-  return '#c9b58a';
-}
+import {
+  terrainsForStyle, getTerrain, terrainMotifs, drawMotif, hexA,
+} from '../core/map-engine.js';
 
 const STORE_KEY = 'planetPainter';
 // Vertical field of view shared by BOTH the render projection and the ray
@@ -81,10 +38,15 @@ const CAMERA_FOV = Math.PI / 4;
 // ─── Module state ──────────────────────────────────────────────────────────
 let planet = null;         // persisted planet state (view + texture)
 let tool = 'orbit';        // 'orbit' | 'paint' | 'stamp' | 'erase'
-let activeColor = '#5f8f4f';
+let planetStyle = 'fantasy'; // which element catalog + terrain set to show
+let paintMode = 'terrain'; // 'terrain' (textured) | 'color' (flat custom hue)
+let activeTerrain = 'grass'; // textured terrain id when paintMode==='terrain'
+let activeColor = '#5f8f4f'; // flat hue when paintMode==='color'
 let brushSize = 60;        // paint dab radius in TEXTURE pixels
 let activeStamp = 'mountain';
 let stampSize = 54;        // stamp billboard size in screen px (at the globe front)
+let stampFilter = '';      // element-picker search query
+const collapsedStampGroups = new Set(); // collapsed group labels in the picker
 const stampNodes = new Map(); // stamp id -> overlay DOM node (reused across frames)
 
 let gl = null;             // WebGL context
@@ -167,9 +129,14 @@ export function renderPlanetPainter(container) {
 
 function renderToolbar() {
   return h('div', { class: 'planet__toolbar' },
+    // Style switcher — swaps the element catalog + terrain set (fantasy/sci-fi).
+    h('div', { class: 'planet__styles' },
+      styleBtn('fantasy', '🗺️ Fantasy'),
+      styleBtn('scifi', '🛰️ Sci-Fi'),
+    ),
     h('div', { class: 'planet__tools' },
       toolBtn('orbit', '🖐', 'Orbit · drag to spin'),
-      toolBtn('paint', '🖌️', 'Paint · drag to paint the surface'),
+      toolBtn('paint', '🖌️', 'Paint · drag to paint textured terrain'),
       toolBtn('stamp', '🌲', 'Place elements · click the globe to drop the selected element'),
       toolBtn('erase', '🧽', 'Remove elements · click one to delete it'),
     ),
@@ -184,42 +151,122 @@ function renderToolbar() {
   );
 }
 
-/** Paint controls (swatches + brush) — shown for Orbit/Paint/Erase. */
+function styleBtn(id, label) {
+  return h('button', {
+    class: `planet__style ${planetStyle === id ? 'planet__style--active' : ''}`,
+    onclick: () => { if (planetStyle !== id) switchPlanetStyle(id); },
+  }, label);
+}
+
+/** Terrain + brush controls — shown for Orbit/Paint/Erase. */
 function paintBar() {
+  const terrains = terrainsForStyle(planetStyle);
   return h('div', { class: 'planet__ctxbar' },
-    h('div', { class: 'planet__swatches' },
-      ...PLANET_PALETTE.map((p) => h('button', {
-        class: `planet__swatch ${activeColor === p.color ? 'planet__swatch--active' : ''}`,
-        title: p.label,
-        style: { background: safeColor(p.color, '#888') },
-        onclick: () => { activeColor = p.color; tool = 'paint'; refreshToolbar(); },
-      })),
-      h('input', {
-        type: 'color', class: 'planet__color', title: 'Custom color', value: activeColor,
-        oninput: (e) => { activeColor = e.target.value; tool = 'paint'; refreshToolbar(); },
-      }),
+    // Paint mode toggle: textured terrain vs a flat custom hue.
+    h('div', { class: 'planet__paintmode' },
+      h('button', {
+        class: `planet__mode ${paintMode === 'terrain' ? 'planet__mode--active' : ''}`,
+        onclick: () => { paintMode = 'terrain'; tool = 'paint'; refreshToolbar(); },
+      }, 'Terrain'),
+      h('button', {
+        class: `planet__mode ${paintMode === 'color' ? 'planet__mode--active' : ''}`,
+        onclick: () => { paintMode = 'color'; tool = 'paint'; refreshToolbar(); },
+      }, 'Color'),
     ),
+    paintMode === 'terrain'
+      ? h('div', { class: 'planet__swatches' },
+        ...terrains.map((t) => {
+          // A tiny textured preview so the swatch shows the real look (trees, waves…).
+          const preview = h('canvas', { class: 'planet__swatch-canvas', width: '132', height: '26' });
+          requestAnimationFrame(() => paintTerrainSwatch(preview, t));
+          return h('button', {
+            class: `planet__swatch-t ${activeTerrain === t.id ? 'planet__swatch-t--active' : ''}`,
+            title: `${t.label} — ${t.texture}`,
+            onclick: () => { activeTerrain = t.id; tool = 'paint'; refreshToolbar(); },
+          }, preview, h('span', { class: 'planet__swatch-label' }, `${t.icon} ${t.label}`));
+        }),
+      )
+      : h('div', { class: 'planet__swatches planet__swatches--dots' },
+        ...PLANET_PALETTE.map((p) => h('button', {
+          class: `planet__swatch ${activeColor === p.color ? 'planet__swatch--active' : ''}`,
+          title: p.label,
+          style: { background: safeColor(p.color, '#888') },
+          onclick: () => { activeColor = p.color; tool = 'paint'; refreshToolbar(); },
+        })),
+        h('input', {
+          type: 'color', class: 'planet__color', title: 'Custom color', value: activeColor,
+          oninput: (e) => { activeColor = e.target.value; tool = 'paint'; refreshToolbar(); },
+        }),
+      ),
     h('label', { class: 'planet__brush', title: 'Brush size' },
       h('span', {}, '⚫'),
       h('input', {
-        type: 'range', min: '8', max: '200', value: String(brushSize),
+        type: 'range', min: '20', max: '260', value: String(brushSize),
         oninput: (e) => { brushSize = Number(e.target.value); },
       }),
     ),
   );
 }
 
-/** Stamp controls (element picker + size) — shown for the Stamp tool. */
+/** Render a small tiled textured preview of a terrain into a swatch canvas. */
+function paintTerrainSwatch(canvas, terrain) {
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, hgt = canvas.height;
+  const g = ctx.createLinearGradient(0, 0, w, hgt);
+  g.addColorStop(0, terrain.base);
+  g.addColorStop(1, terrain.shade);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, hgt);
+  ctx.save();
+  ctx.globalAlpha = 0.95;
+  for (let cx = 14; cx < w; cx += 26) {
+    const seed = (cx * 2654435761) ^ (terrain.id.length * 40503);
+    terrainMotifs(terrain, cx, hgt / 2, 13, seed >>> 0).forEach((mo) => drawMotif(ctx, mo, 0.62));
+  }
+  ctx.restore();
+}
+
+/** Element picker + size — grouped, searchable (mirrors the 2D map palette). */
 function stampBar() {
-  return h('div', { class: 'planet__ctxbar' },
-    h('div', { class: 'planet__stamp-grid' },
-      ...PLANET_STAMPS.flatMap((g) => g.items).map((it) => h('button', {
-        class: `planet__stamp-btn ${activeStamp === it.shape ? 'planet__stamp-btn--active' : ''}`,
-        title: it.label,
-        onclick: () => { activeStamp = it.shape; refreshToolbar(); },
-        innerHTML: shapeMarkup(it.shape, 26, it.color),
-      })),
-    ),
+  const groups = STAMP_SETS[planetStyle] || STAMP_SETS.fantasy;
+  const q = stampFilter.trim().toLowerCase();
+
+  const stampBtn = (it) => h('button', {
+    class: `planet__stamp-btn ${activeStamp === it.shape ? 'planet__stamp-btn--active' : ''}`,
+    title: it.label,
+    onclick: () => { activeStamp = it.shape; tool = 'stamp'; refreshStampPicker(); },
+    innerHTML: shapeMarkup(it.shape, 26, stampColor(it.shape)),
+  });
+
+  let sections;
+  if (q) {
+    const hits = stampItemsForStyle(planetStyle).filter(
+      (it) => it.label.toLowerCase().includes(q) || it.shape.replace(/_/g, ' ').includes(q),
+    );
+    sections = hits.length
+      ? [h('div', { class: 'planet__stamp-grid' }, ...hits.map(stampBtn))]
+      : [h('div', { class: 'planet__pal-hint' }, `No elements match “${stampFilter}”.`)];
+  } else {
+    sections = groups.map((g) => {
+      const open = !collapsedStampGroups.has(g.group);
+      return h('div', { class: 'planet__stamp-group' },
+        h('button', { class: 'planet__stamp-group-head', onclick: () => toggleStampGroup(g.group) },
+          h('span', {}, `${open ? '▾' : '▸'} ${g.group}`),
+          h('span', { class: 'planet__stamp-group-count' }, String(g.items.length)),
+        ),
+        open ? h('div', { class: 'planet__stamp-grid' }, ...g.items.map(stampBtn)) : null,
+      );
+    });
+  }
+
+  return h('div', { class: 'planet__ctxbar planet__ctxbar--stamp' },
+    h('input', {
+      class: 'input planet__stamp-search', type: 'search', placeholder: 'Search elements…',
+      value: stampFilter,
+      oninput: (e) => { stampFilter = e.target.value; refreshStampPicker(); },
+    }),
+    h('div', { class: 'planet__stamp-scroll' }, ...sections),
     h('label', { class: 'planet__brush', title: 'Element size' },
       h('span', {}, '⬍'),
       h('input', {
@@ -228,6 +275,26 @@ function stampBar() {
       }),
     ),
   );
+}
+
+function toggleStampGroup(name) {
+  if (collapsedStampGroups.has(name)) collapsedStampGroups.delete(name);
+  else collapsedStampGroups.add(name);
+  refreshStampPicker();
+}
+
+/** Re-render just the stamp context row, preserving search-box focus + caret. */
+function refreshStampPicker() {
+  const bar = hostContainer && hostContainer.querySelector('.planet__ctxbar');
+  if (!bar) { refreshToolbar(); return; }
+  const active = document.activeElement;
+  const wasSearch = active && active.classList && active.classList.contains('planet__stamp-search');
+  const fresh = stampBar();
+  bar.replaceWith(fresh);
+  if (wasSearch) {
+    const box = fresh.querySelector('.planet__stamp-search');
+    if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+  }
 }
 
 function toolBtn(id, icon, label) {
@@ -242,6 +309,17 @@ function refreshToolbar() {
   const bar = hostContainer && hostContainer.querySelector('.planet__toolbar');
   if (bar) { const fresh = renderToolbar(); bar.replaceWith(fresh); }
   updateHint();
+}
+
+/** Switch the element catalog + terrain set; reset active picks to valid ids. */
+function switchPlanetStyle(id) {
+  planetStyle = id === 'scifi' ? 'scifi' : 'fantasy';
+  stampFilter = '';
+  const terrains = terrainsForStyle(planetStyle);
+  if (!terrains.some((t) => t.id === activeTerrain)) activeTerrain = terrains[0].id;
+  const items = stampItemsForStyle(planetStyle);
+  if (!items.some((it) => it.shape === activeStamp)) activeStamp = items[0].shape;
+  refreshToolbar();
 }
 
 function hintText() {
@@ -434,38 +512,76 @@ function uploadTexture() {
 }
 
 /**
- * Paint a soft radial dab at a UV position on the texture canvas. Wraps across
- * the u=0/1 seam so a stroke near the edge doesn't leave a gap.
+ * Paint a dab at a UV position on the texture canvas. Wraps across the u=0/1
+ * seam so a stroke near the edge doesn't leave a gap. In 'terrain' mode this
+ * lays textured motifs (trees/waves/dunes…) via the shared map-engine renderer;
+ * in 'color' mode it's a soft flat-hue dab.
  */
 function paintDab(u, v) {
   const { x, y } = uvToPixel(u, v, texCanvas.width, texCanvas.height);
-  dabAt(x, y);
+  // Derive the terrain seed ONCE from the primary (un-wrapped) texel so a dab
+  // and its seam-wrapped copy scatter the SAME motifs — otherwise the two halves
+  // of a stroke straddling u=0/1 would show a visible discontinuity.
+  const seed = terrainSeed(x, y);
+  dabAt(x, y, seed);
   // Wrap: draw a second dab on the opposite edge when near the seam.
-  if (x < brushSize) dabAt(x + texCanvas.width, y);
-  else if (x > texCanvas.width - brushSize) dabAt(x - texCanvas.width, y);
+  if (x < brushSize) dabAt(x + texCanvas.width, y, seed);
+  else if (x > texCanvas.width - brushSize) dabAt(x - texCanvas.width, y, seed);
   textureDirty = true;
 }
 
-function dabAt(cx, cy) {
+/** Deterministic terrain seed from a texel position + the active terrain. */
+function terrainSeed(x, y) {
+  const t = getTerrain(activeTerrain);
+  return (((Math.round(x / 6) * 73856093) ^ (Math.round(y / 6) * 19349663) ^ (t.id.length * 83492791)) >>> 0) || 1;
+}
+
+function dabAt(cx, cy, seed) {
+  if (paintMode === 'terrain') { dabTerrain(cx, cy, seed); return; }
+  dabColor(cx, cy);
+}
+
+/** Flat-hue soft dab (the "Color" paint mode). */
+function dabColor(cx, cy) {
   const r = brushSize;
   const col = safeColor(activeColor, '#5f8f4f');
   const g = texCtx.createRadialGradient(cx, cy, 0, cx, cy, r);
   g.addColorStop(0, col);
   g.addColorStop(0.7, col);
-  g.addColorStop(1, hexWithAlpha(col, 0));
+  g.addColorStop(1, hexA(col, 0));
   texCtx.fillStyle = g;
   texCtx.beginPath();
   texCtx.arc(cx, cy, r, 0, Math.PI * 2);
   texCtx.fill();
 }
 
-/** Return an rgba() string for a hex color with the given alpha (0..1). */
-function hexWithAlpha(hex, a) {
-  const c = hex.replace('#', '');
-  const n = c.length === 3
-    ? c.split('').map((ch) => parseInt(ch + ch, 16))
-    : [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
-  return `rgba(${n[0]},${n[1]},${n[2]},${a})`;
+/**
+ * Textured terrain dab: a soft base tone (base↔shade blend) then scattered
+ * motif primitives (trees, peaks, waves, dunes…) clipped to the dab disc — the
+ * SAME pipeline the 2D map uses (terrainMotifs + drawMotif), so the planet
+ * surface reads as real terrain instead of a single flat hue.
+ */
+function dabTerrain(cx, cy, seed) {
+  const terrain = getTerrain(activeTerrain);
+  const r = brushSize;
+  // Base gradient (blend the terrain's two tones toward transparent at the rim).
+  const g = texCtx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, hexA(terrain.base, 0.95));
+  g.addColorStop(0.6, hexA(terrain.shade, 0.9));
+  g.addColorStop(1, hexA(terrain.shade, 0));
+  texCtx.fillStyle = g;
+  texCtx.beginPath();
+  texCtx.arc(cx, cy, r, 0, Math.PI * 2);
+  texCtx.fill();
+  // Motifs, clipped to the dab disc so they don't spill past the brush.
+  texCtx.save();
+  texCtx.beginPath();
+  texCtx.arc(cx, cy, r * 0.98, 0, Math.PI * 2);
+  texCtx.clip();
+  // `seed` is passed in (shared with the seam-wrapped copy) so both halves match.
+  const scaleMul = Math.max(0.6, Math.min(2.4, r / 40));
+  terrainMotifs(terrain, cx, cy, r * 0.86, seed || 1).forEach((mo) => drawMotif(texCtx, mo, scaleMul));
+  texCtx.restore();
 }
 
 // ─── Render loop ─────────────────────────────────────────────────────────────
@@ -672,10 +788,14 @@ function onPointerDown(e) {
   // Right button always spins. Otherwise the active tool decides.
   const mode = (e.button === 2) ? 'orbit' : (tool === 'orbit' ? 'orbit' : tool);
   dragging = { mode, lastX: e.clientX, lastY: e.clientY };
-  if (mode === 'paint') paintAt(p);
+  if (mode === 'paint') { _lastPaintXY = p; paintAt(p); }
   else if (mode === 'stamp') placeStampAt(p);
   else if (mode === 'erase') eraseStampAt(p);
 }
+
+// Last screen point painted this stroke; used to gate heavy textured dabs so a
+// fast drag doesn't fire hundreds of full motif-scatter dabs per second.
+let _lastPaintXY = null;
 
 function onPointerMove(e) {
   if (!dragging) return;
@@ -687,7 +807,13 @@ function onPointerMove(e) {
     planet.view.yaw = wrapYaw(planet.view.yaw - dx * 0.008);
     planet.view.pitch = clampPitch(planet.view.pitch + dy * 0.008);
   } else if (dragging.mode === 'paint') {
-    paintAt(p);
+    // Space dabs along the drag (~40% of the brush radius) so the stroke stays
+    // continuous without re-scattering a full textured dab on every move event.
+    const minGap = Math.max(4, brushSize * 0.4) * (planet.view.distance / 3);
+    if (!_lastPaintXY || Math.hypot(p.x - _lastPaintXY.x, p.y - _lastPaintXY.y) >= minGap) {
+      _lastPaintXY = p;
+      paintAt(p);
+    }
   } else if (dragging.mode === 'erase') {
     eraseStampAt(p);
   }
@@ -695,7 +821,7 @@ function onPointerMove(e) {
 }
 
 function onPointerUp() {
-  if (dragging) { dragging = null; scheduleSave(); }
+  if (dragging) { dragging = null; _lastPaintXY = null; scheduleSave(); }
 }
 
 function onWheel(e) {

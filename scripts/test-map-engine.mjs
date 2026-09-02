@@ -348,5 +348,66 @@ assert(m.backdropRect('stretch', 200, 100, 400, 400).w === 400 && m.backdropRect
 assert(m.backdropRect('contain', 200, 100, 400, 400).w === contain.w, 'backdropRect(contain) matches fitContain');
 assert(Number.isFinite(m.fitContain(0, 0, 100, 100).w), 'fitContain is safe for a zero-size image');
 
+// ── Terrain motif renderer (drawMotif) — hoisted from the UI, now shared ──────
+// hexA builds a clean rgba() string from a hex + alpha, guarding junk.
+assert(/^rgba\(\d+,\d+,\d+,1\)$/.test(m.hexA('#3f7d4f', 1)), 'hexA builds an rgba() string');
+assert(m.hexA('#3f7d4f', 0).endsWith(',0)'), 'hexA honors the alpha');
+assert(typeof m.hexA('not-a-color', 0.5) === 'string', 'hexA is safe on a bad color');
+// drawMotif is exported and DOM-free: it should render every primitive type
+// against a canvas-2d-like context without throwing. Use a mock ctx that just
+// records that draw calls happened.
+assert(typeof m.drawMotif === 'function', 'drawMotif is exported');
+function mockCtx() {
+  const calls = [];
+  const rec = (name) => (...args) => { calls.push(name); return undefined; };
+  return {
+    calls,
+    save: rec('save'), restore: rec('restore'), beginPath: rec('beginPath'),
+    moveTo: rec('moveTo'), lineTo: rec('lineTo'), quadraticCurveTo: rec('quadraticCurveTo'),
+    arc: rec('arc'), closePath: rec('closePath'), fill: rec('fill'), stroke: rec('stroke'),
+    fillRect: rec('fillRect'),
+    createRadialGradient: () => ({ addColorStop: rec('addColorStop') }),
+    set fillStyle(v) {}, get fillStyle() { return ''; },
+    set strokeStyle(v) {}, get strokeStyle() { return ''; },
+    set lineWidth(v) {}, get lineWidth() { return 1; },
+    set lineJoin(v) {}, get lineJoin() { return ''; },
+    set lineCap(v) {}, get lineCap() { return ''; },
+  };
+}
+const primitives = [
+  { type: 'tree', x: 50, y: 50, s: 6, color: '#3f7d4f' },
+  { type: 'blob', x: 50, y: 50, s: 6, color: '#5a7d3f' },
+  { type: 'blob', x: 50, y: 50, s: 6, color: '#7a6a5a', poly: true },
+  { type: 'tuft', x: 50, y: 50, s: 6, color: '#6a9a4a' },
+  { type: 'peak', x: 50, y: 50, s: 6, color: '#8a8178' },
+  { type: 'hill', x: 50, y: 50, s: 6, color: '#84a35a' },
+  { type: 'shard', x: 50, y: 50, s: 6, color: '#9a7fd0' },
+  { type: 'cross', x: 50, y: 50, s: 6, color: '#7a5a3a' },
+  { type: 'ring', x: 50, y: 50, s: 6, color: '#9ca3af' },
+  { type: 'cloud', x: 50, y: 50, s: 6, color: '#b06fd0' },
+  { type: 'dot', x: 50, y: 50, s: 6, color: '#ffd27f' },
+  { type: 'dot', x: 50, y: 50, s: 6, color: '#ffd27f', glow: true },
+  { type: 'crack', x1: 10, y1: 10, x2: 40, y2: 40, color: '#57534e' },
+  { type: 'line', x1: 10, y1: 10, x2: 40, y2: 40, w: 2, color: '#7fd0ff' },
+  { type: 'wave', x1: 10, x2: 90, y: 50, amp: 3, phase: 0, w: 1.5, color: '#3f6b8a' },
+];
+let drewOk = 0;
+for (const p of primitives) {
+  const ctx = mockCtx();
+  try { m.drawMotif(ctx, p, 1); if (ctx.calls.includes('save') && ctx.calls.includes('restore')) drewOk++; }
+  catch (e) { console.error('   drawMotif threw for', p.type, e.message); }
+}
+assert(drewOk === primitives.length, `drawMotif renders all ${primitives.length} primitive variants without throwing`);
+// An unknown primitive type is a no-op (still balances save/restore).
+const ctxU = mockCtx();
+m.drawMotif(ctxU, { type: 'nope', x: 0, y: 0, s: 4, color: '#fff' }, 1);
+assert(ctxU.calls[0] === 'save' && ctxU.calls[ctxU.calls.length - 1] === 'restore', 'unknown motif type is a safe no-op');
+// terrainMotifs output feeds drawMotif cleanly (integration of the two).
+const tm = m.terrainMotifs(m.getTerrain('forest'), 50, 50, 30, 3);
+const ctxT = mockCtx();
+assert(tm.length > 0, 'terrainMotifs produced motifs to draw');
+tm.forEach((mo) => m.drawMotif(ctxT, mo, 1));
+assert(ctxT.calls.length > 0, 'drawMotif renders real terrainMotifs output');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} map-engine tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
