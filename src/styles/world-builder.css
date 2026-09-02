@@ -656,6 +656,15 @@
   margin-top: 10px;
 }
 
+.fmap__pal-actions { display: flex; gap: 6px; margin-top: 12px; }
+.fmap__pal-actions .btn { flex: 1; }
+
+/* Active state for the backdrop-image toolbar button. */
+.fmap__act--on {
+  color: var(--accent-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 40%, transparent);
+}
+
 .fmap__swatches { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
 
 .fmap__swatch {

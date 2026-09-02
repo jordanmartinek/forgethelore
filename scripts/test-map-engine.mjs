@@ -321,5 +321,32 @@ assert(m.worldSurfaceSeed('', 0, 0) >= 1, 'worldSurfaceSeed is a positive int ev
 const worldSeeds = worldSurfaces.map((s) => m.worldSurfaceSeed(s.world, 1000, 700));
 assert(new Set(worldSeeds).size === worldSeeds.length, 'all world-type flavors get unique seeds at a given size');
 
+// ── Backdrop image (imported reference canvas) ─────────────────────────────────
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA';
+assert(m.emptyMapProject().backdrop === null, 'empty project has no backdrop');
+assert(m.BACKDROP_FITS.includes('contain') && m.BACKDROP_FITS.includes('cover') && m.BACKDROP_FITS.includes('stretch'), 'backdrop fit modes defined');
+// normalizeBackdrop only accepts image data URLs (guards <img src> injection).
+assert(m.normalizeBackdrop({ dataUrl: PNG, fit: 'cover' }).fit === 'cover', 'normalizeBackdrop keeps a valid image data URL + fit');
+assert(m.normalizeBackdrop({ dataUrl: PNG }).fit === 'contain', 'normalizeBackdrop defaults fit to contain');
+assert(m.normalizeBackdrop({ dataUrl: PNG, fit: 'nope' }).fit === 'contain', 'normalizeBackdrop repairs a bad fit');
+assert(m.normalizeBackdrop({ dataUrl: 'https://evil.example/x.png' }) === null, 'normalizeBackdrop rejects a non-data URL');
+assert(m.normalizeBackdrop({ dataUrl: 'data:text/html,<script>' }) === null, 'normalizeBackdrop rejects a non-image data URL');
+assert(m.normalizeBackdrop(null) === null && m.normalizeBackdrop('x') === null, 'normalizeBackdrop guards junk');
+// Serialization round-trips through the project.
+assert(m.normalizeMapProject({ backdrop: { dataUrl: PNG, fit: 'stretch' } }).backdrop.fit === 'stretch', 'normalize keeps a valid backdrop');
+assert(m.normalizeMapProject({ backdrop: 'bad' }).backdrop === null, 'normalize repairs a bad backdrop to null');
+assert(m.normalizeMapProject({ style: 'fantasy' }).backdrop === null, 'legacy project (no backdrop) gets null');
+
+// fitContain / fitCover / backdropRect: aspect preserved, centered, degenerate-safe.
+const contain = m.fitContain(200, 100, 400, 400); // wide image into a square box
+assert(approx(contain.w, 400) && approx(contain.h, 200), 'fitContain scales to fit the limiting axis');
+assert(approx(contain.x, 0) && approx(contain.y, 100), 'fitContain centers the letterbox');
+const cover = m.fitCover(200, 100, 400, 400); // cover the square
+assert(approx(cover.h, 400) && approx(cover.w, 800), 'fitCover fills the box (overflows the other axis)');
+assert(approx(cover.x, -200) && approx(cover.y, 0), 'fitCover centers the overflow');
+assert(m.backdropRect('stretch', 200, 100, 400, 400).w === 400 && m.backdropRect('stretch', 200, 100, 400, 400).h === 400, 'stretch fills the whole box');
+assert(m.backdropRect('contain', 200, 100, 400, 400).w === contain.w, 'backdropRect(contain) matches fitContain');
+assert(Number.isFinite(m.fitContain(0, 0, 100, 100).w), 'fitContain is safe for a zero-size image');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} map-engine tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

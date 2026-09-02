@@ -42,6 +42,7 @@ import {
   EXPORT_PRESETS, getExportPreset,
   LAYER_ORDER, LAYER_META,
   defaultView, normalizeView, clampZoom, zoomAt, worldSurfaceSeed,
+  normalizeBackdrop, backdropRect,
 } from '../core/map-engine.js';
 
 const STORE_KEY = 'fantasyMap';
@@ -409,7 +410,9 @@ function bindPanKeys() {
     if (e.code === 'Space') {
       spaceHeld = false;
       const surf = document.getElementById('fmap-surface');
-      if (surf && !panState) surf.style.cursor = '';
+      // Keep the Pan tool's grab cursor after Space is released (mirror the
+      // pointer-up path); other tools fall back to the default cursor.
+      if (surf && !panState) surf.style.cursor = tool === 'pan' ? 'grab' : '';
     }
   });
 }
@@ -418,6 +421,7 @@ function bindPanKeys() {
 
 function renderToolbar() {
   const tools = [
+    { id: 'pan', icon: '✋', label: 'Pan · drag to move, scroll to zoom' },
     { id: 'brush', icon: '🖌️', label: 'Terrain brush' },
     { id: 'erase', icon: '🧽', label: 'Erase terrain' },
     { id: 'path', icon: '〰️', label: 'Paths & routes' },
@@ -468,11 +472,118 @@ function renderToolbar() {
     ),
     // Actions
     h('div', { class: 'fmap__actions' },
+      h('button', {
+        class: `btn btn--sm btn--ghost ${project.backdrop ? 'fmap__act--on' : ''}`,
+        title: project.backdrop ? 'Backdrop image (click to replace or remove)' : 'Import a reference image to paint & place over',
+        onclick: openBackdropMenu,
+      }, '🖼'),
       h('button', { class: 'btn btn--sm btn--ghost', title: 'Map settings', onclick: openSettings }, '⚙'),
       h('button', { class: 'btn btn--sm btn--ghost', title: 'Clear map', onclick: clearMap }, '🗑'),
       h('button', { class: 'btn btn--sm btn--primary', title: 'Export', onclick: exportMap }, '⬇ Export'),
     ),
   );
+}
+
+// ─── Backdrop image import ───────────────────────────────────────────────────
+
+/**
+ * Open (or trigger) image import. If a backdrop already exists, show a small
+ * menu to replace it, change its fit, or remove it; otherwise go straight to
+ * the file picker.
+ */
+function openBackdropMenu() {
+  if (!project.backdrop) { pickBackdropImage(); return; }
+  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } },
+    h('div', { class: 'modal', style: { maxWidth: '360px' } },
+      h('div', { class: 'modal__header' },
+        h('span', { class: 'modal__title' }, 'Backdrop image'),
+        h('button', { class: 'btn btn--ghost btn--icon', onclick: () => overlay.remove() }, '✕'),
+      ),
+      h('div', { class: 'modal__body' },
+        h('div', { style: labelCss() }, 'Fit'),
+        h('select', { class: 'input', onchange: (e) => { setBackdropFit(e.target.value); } },
+          ...['contain', 'cover', 'stretch'].map((f) => h('option', {
+            value: f, selected: (project.backdrop.fit || 'contain') === f ? 'selected' : null,
+          }, f.charAt(0).toUpperCase() + f.slice(1))),
+        ),
+        h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } },
+          'Contain shows the whole image; Cover fills the canvas (may crop); Stretch distorts to fit.'),
+      ),
+      h('div', { class: 'modal__footer' },
+        h('button', { class: 'btn btn--ghost', onclick: () => { removeBackdrop(); overlay.remove(); } }, '🗑 Remove'),
+        h('button', { class: 'btn', onclick: () => { pickBackdropImage(); overlay.remove(); } }, 'Replace…'),
+        h('button', { class: 'btn btn--primary', onclick: () => overlay.remove() }, 'Done'),
+      ),
+    ),
+  );
+  document.body.appendChild(overlay);
+}
+
+/** Trigger a hidden file input to choose an image, then load it as the backdrop. */
+function pickBackdropImage() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.display = 'none';
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    if (file.size > 12 * 1024 * 1024) { toastInfo('Image is too large (max 12 MB).'); return; }
+    const reader = new FileReader();
+    reader.onload = () => { loadBackdropFromDataUrl(String(reader.result)); };
+    reader.onerror = () => toastInfo('Could not read that image.');
+    reader.readAsDataURL(file);
+  };
+  document.body.appendChild(input);
+  input.click();
+}
+
+/**
+ * Set the backdrop from a data URL. Offers to match the canvas aspect ratio to
+ * the image so it isn't heavily letterboxed, then repaints + persists.
+ */
+function loadBackdropFromDataUrl(dataUrl) {
+  const bd = normalizeBackdrop({ dataUrl, fit: 'contain' });
+  if (!bd) { toastInfo('That file is not a supported image.'); return; }
+  const img = new Image();
+  img.onload = () => {
+    project.backdrop = bd;
+    // Offer to reshape the canvas to the image aspect (keeps content coherent
+    // and avoids big empty margins). Only when the aspect differs noticeably.
+    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const canvasAspect = project.width / project.height;
+    if (Math.abs(imgAspect - canvasAspect) > 0.06
+        && confirm('Resize the canvas to match this image\u2019s shape? (Your terrain, stamps & labels are rescaled to fit.)')) {
+      const longEdge = Math.max(project.width, project.height);
+      let nw; let nh;
+      if (imgAspect >= 1) { nw = longEdge; nh = Math.round(longEdge / imgAspect); }
+      else { nh = longEdge; nw = Math.round(longEdge * imgAspect); }
+      applyCanvasSize(nw, nh);   // rescales content + repaints (repaints surface too)
+    } else {
+      paintSurface();
+      save();
+    }
+    toastSuccess('Backdrop image set — paint and place elements over it.');
+  };
+  img.onerror = () => toastInfo('Could not load that image.');
+  img.src = dataUrl;
+}
+
+function setBackdropFit(fit) {
+  if (!project.backdrop) return;
+  project.backdrop = normalizeBackdrop({ ...project.backdrop, fit });
+  _backdropSrc = null; // force redraw with the new fit
+  paintSurface();
+  save();
+}
+
+function removeBackdrop() {
+  project.backdrop = null;
+  _backdropImg = null; _backdropSrc = null;
+  save();
+  rerender();       // rebuilds the toolbar (backdrop button state) + repaints
+  toastInfo('Backdrop removed.');
 }
 
 // ─── Palette (context-sensitive to the active tool) ────────────────────────────
@@ -492,7 +603,21 @@ function paletteBody() {
   if (tool === 'path') return pathPalette();
   if (tool === 'brush' || tool === 'erase') return brushPalette();
   if (tool === 'select') return selectPalette();
+  if (tool === 'pan') return panPalette();
   return hintPalette();
+}
+
+function panPalette() {
+  return h('div', {},
+    h('div', { class: 'fmap__pal-title' }, 'Navigate'),
+    h('div', { class: 'fmap__pal-hint' },
+      'Drag to pan. Scroll to zoom in/out toward the cursor. ',
+      'You can also pan in any tool by dragging with the middle mouse button, or holding Space.'),
+    h('div', { class: 'fmap__pal-actions' },
+      h('button', { class: 'btn btn--sm btn--ghost', onclick: fitView }, 'Fit to screen'),
+      h('button', { class: 'btn btn--sm btn--ghost', onclick: resetView }, 'Reset 100%'),
+    ),
+  );
 }
 
 function brushPalette() {
@@ -880,11 +1005,8 @@ function fitView() {
   setView({ zoom, panX, panY });
 }
 
-/** Ctrl/Cmd + wheel (or trackpad pinch) zooms toward the cursor. */
+/** Mouse wheel / trackpad zooms toward the cursor (no modifier needed). */
 function onStageWheel(e) {
-  // Only hijack the wheel for zoom when modified, so plain scroll still pans
-  // the overflow container naturally on large canvases.
-  if (!(e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
   const frame = document.getElementById('fmap-frame');
   if (!frame) return;
@@ -893,7 +1015,11 @@ function onStageWheel(e) {
     x: (e.clientX - fRect.left) / view().zoom,
     y: (e.clientY - fRect.top) / view().zoom,
   };
-  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  // Scale the step with deltaY magnitude so trackpads feel smooth and a mouse
+  // notch feels responsive, but clamp so one big delta can't jump too far.
+  const mag = Math.min(Math.abs(e.deltaY), 60) / 60; // 0..1
+  const step = 1 + 0.18 * mag;
+  const factor = e.deltaY < 0 ? step : 1 / step;
   setView(zoomAt(view(), factor, anchor));
 }
 
@@ -914,6 +1040,16 @@ function paintSurface() {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, hgt);
 
+  // When an imported reference image is set, it becomes the canvas backdrop:
+  // paint a neutral base then the image on top (skip the procedural texture +
+  // vignette so the photo/map reads clearly). Terrain/stamps/labels go over it.
+  if (project.backdrop && project.backdrop.dataUrl) {
+    ctx.fillStyle = '#1a1a1e';
+    ctx.fillRect(0, 0, w, hgt);
+    paintBackdrop(ctx, w, hgt);
+    return;
+  }
+
   if (surf.kind === 'stars') paintStarfield(ctx, w, hgt, surf);
   else if (surf.kind === 'grid') paintGrid(ctx, w, hgt, surf);
   else if (surf.kind === 'world') paintWorldSurface(ctx, w, hgt, surf);
@@ -925,6 +1061,32 @@ function paintSurface() {
   vg.addColorStop(1, surf.vignette);
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, w, hgt);
+}
+
+// Decoded backdrop image cache, keyed by data URL so we don't re-decode on
+// every repaint.
+let _backdropImg = null;
+let _backdropSrc = null;
+
+/**
+ * Draw the imported backdrop image onto the paper layer, fitted to the canvas
+ * per its `fit` mode. Decodes async; when the image finishes loading it repaints
+ * the paper layer once so the backdrop appears without a manual refresh.
+ */
+function paintBackdrop(ctx, w, hgt) {
+  const bd = project.backdrop;
+  if (!bd || !bd.dataUrl) return;
+  if (_backdropSrc !== bd.dataUrl) {
+    _backdropImg = new Image();
+    _backdropSrc = bd.dataUrl;
+    _backdropImg.onload = () => { paintSurface(); }; // repaint once decoded
+    _backdropImg.src = bd.dataUrl;
+  }
+  const img = _backdropImg;
+  if (img && img.complete && img.naturalWidth) {
+    const r = backdropRect(bd.fit || 'contain', img.naturalWidth, img.naturalHeight, w, hgt);
+    ctx.drawImage(img, r.x, r.y, r.w, r.h);
+  }
 }
 
 function paintPaperGrain(ctx, w, hgt, surf) {
@@ -1455,9 +1617,10 @@ function shift(hex, amt, alpha = 1) {
 // ─── Pointer handling ──────────────────────────────────────────────────────────
 
 function onPointerDown(e) {
-  // Pan gesture: middle mouse button, or space held while dragging. This lets
-  // you reposition a large/zoomed map without switching tools.
-  if (e.button === 1 || spaceHeld) {
+  // Pan gesture: the Pan tool (left-drag), or the universal shortcuts —
+  // middle mouse button, or space held while dragging — in any tool. This lets
+  // you reposition a large/zoomed map without hunting for the +/- buttons.
+  if (tool === 'pan' || e.button === 1 || spaceHeld) {
     e.preventDefault();
     panState = { startX: e.clientX, startY: e.clientY, panX: view().panX, panY: view().panY };
     document.getElementById('fmap-surface').setPointerCapture?.(e.pointerId);
@@ -1530,7 +1693,7 @@ function onPointerUp() {
   if (panState) {
     panState = null;
     const surf = document.getElementById('fmap-surface');
-    if (surf) surf.style.cursor = spaceHeld ? 'grab' : '';
+    if (surf) surf.style.cursor = (tool === 'pan' || spaceHeld) ? 'grab' : '';
     save();
     return;
   }
@@ -2298,9 +2461,9 @@ function setTool(t) {
   refreshPalette();
   // Show/hide the selection bounding box + resize handle with the Select tool.
   renderOverlayLayer();
-  // Don't leave a stale resize cursor behind when switching away from Select.
+  // Pan tool shows an open-hand cursor; other tools use the default crosshair.
   const surf = document.getElementById('fmap-surface');
-  if (surf) surf.style.cursor = '';
+  if (surf) surf.style.cursor = t === 'pan' ? 'grab' : '';
 }
 
 function switchStyle(styleId) {
@@ -2349,15 +2512,44 @@ function clearMap() {
 /**
  * Compose all visible layers onto one off-screen canvas at the chosen export
  * resolution and trigger a PNG download. Honors the transparent-background
- * option (skips the paper layer).
+ * option (skips the paper layer). If a backdrop image is set, its decode is
+ * awaited first so it can't be missing from the export (race), and it is drawn
+ * explicitly when the paper layer is skipped (transparent) or hidden so an
+ * imported reference image isn't silently lost.
  */
 function exportPNG() {
+  // Ensure the backdrop bitmap is decoded before we snapshot the paper canvas.
+  ensureBackdropDecoded(() => exportPNGNow());
+}
+
+/** Run `cb` once the backdrop image (if any) has finished decoding. */
+function ensureBackdropDecoded(cb) {
+  const bd = project.backdrop;
+  if (!bd || !bd.dataUrl) { cb(); return; }
+  if (_backdropImg && _backdropSrc === bd.dataUrl && _backdropImg.complete && _backdropImg.naturalWidth) { cb(); return; }
+  const img = new Image();
+  img.onload = () => { _backdropImg = img; _backdropSrc = bd.dataUrl; cb(); };
+  img.onerror = () => cb();
+  img.src = bd.dataUrl;
+}
+
+function exportPNGNow() {
   const preset = getExportPreset(exportPresetId);
   const { width, height, scale } = exportDimensions(project.width, project.height, preset.longEdge);
   const out = document.createElement('canvas');
   out.width = width; out.height = height;
   const octx = out.getContext('2d');
   octx.scale(scale, scale);
+
+  // If the paper layer won't be drawn (transparent export or paper hidden) but
+  // an imported backdrop exists, draw the backdrop directly so the user's
+  // reference image survives — it's content, not procedural paper chrome.
+  const paperState = project.layers.paper || { visible: true, opacity: 1 };
+  const paperDrawn = paperState.visible && !exportTransparent;
+  if (!paperDrawn && project.backdrop && _backdropImg && _backdropImg.naturalWidth) {
+    const r = backdropRect(project.backdrop.fit || 'contain', _backdropImg.naturalWidth, _backdropImg.naturalHeight, project.width, project.height);
+    octx.drawImage(_backdropImg, r.x, r.y, r.w, r.h);
+  }
 
   LAYER_ORDER.forEach((key) => {
     if (key === 'paper' && exportTransparent) return; // transparent bg
@@ -2521,18 +2713,26 @@ function ornToggle(label, key, orn) {
 
 function applyCanvasPreset(id) {
   const p = getCanvasPreset(id);
-  if (p.width === project.width && p.height === project.height) return;
-  const oldW = project.width, oldH = project.height;
-  const sx = p.width / oldW, sy = p.height / oldH;
+  applyCanvasSize(p.width, p.height);
+}
 
-  // Rescale everything proportionally so the composition survives a resize
-  // instead of bunching in a corner: stamps, labels, and path points all move
-  // and scale with the canvas.
+/**
+ * Resize the canvas to an arbitrary width/height, rescaling all content
+ * (terrain raster, stamps, labels, paths) proportionally so the composition
+ * survives the resize instead of bunching in a corner. Persists + re-renders.
+ */
+function applyCanvasSize(newW, newH) {
+  const w = Math.max(1, Math.round(newW));
+  const hgt = Math.max(1, Math.round(newH));
+  if (w === project.width && hgt === project.height) return;
+  const oldW = project.width, oldH = project.height;
+  const sx = w / oldW, sy = hgt / oldH;
+
   project.stamps.forEach((s) => { s.x *= sx; s.y *= sy; s.size *= (sx + sy) / 2; });
   project.labels.forEach((l) => { l.x *= sx; l.y *= sy; l.size = (l.size || 18) * (sx + sy) / 2; });
   project.paths.forEach((pa) => { pa.points = (pa.points || []).map((q) => ({ x: q.x * sx, y: q.y * sy })); });
 
-  project.width = p.width; project.height = p.height;
+  project.width = w; project.height = hgt;
 
   // Preserve the terrain raster by re-drawing it scaled into the new size.
   const old = document.getElementById('fmap-terrain');
@@ -2541,8 +2741,8 @@ function applyCanvasPreset(id) {
     const img = new Image();
     img.onload = () => {
       const tmp = document.createElement('canvas');
-      tmp.width = p.width; tmp.height = p.height;
-      tmp.getContext('2d').drawImage(img, 0, 0, oldW, oldH, 0, 0, p.width, p.height);
+      tmp.width = w; tmp.height = hgt;
+      tmp.getContext('2d').drawImage(img, 0, 0, oldW, oldH, 0, 0, w, hgt);
       // Stage the scaled raster and tell rerender() NOT to re-snapshot the
       // still-old on-screen canvas (which would clobber this scaled result).
       project.terrainDataUrl = tmp.toDataURL('image/png');

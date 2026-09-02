@@ -980,8 +980,67 @@ export function emptyMapProject(width = 1280, height = 800, style = 'fantasy') {
     grid: defaultGrid(),    // { mode, size, color }
     ornaments: defaultOrnaments(), // { frame, compass, scale }
     view: defaultView(),    // { zoom, panX, panY } — viewport transform (not exported)
+    backdrop: null,         // { dataUrl, fit } — imported reference image to paint/place over
     updatedAt: Date.now(),
   };
+}
+
+/** Valid backdrop fit modes. */
+export const BACKDROP_FITS = ['contain', 'cover', 'stretch'];
+
+/**
+ * Normalize an arbitrary backdrop value to `{dataUrl, fit}` or null.
+ * Only image data URLs are accepted so a corrupted/hostile value can't inject
+ * an arbitrary URL into an <img src>.
+ * @param {*} raw
+ */
+export function normalizeBackdrop(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const dataUrl = typeof raw.dataUrl === 'string' && /^data:image\//i.test(raw.dataUrl) ? raw.dataUrl : null;
+  if (!dataUrl) return null;
+  const fit = BACKDROP_FITS.includes(raw.fit) ? raw.fit : 'contain';
+  return { dataUrl, fit };
+}
+
+/**
+ * Fit a source image into a target box preserving aspect ratio ("contain":
+ * the whole image is visible, letterboxed). Returns the centered draw rect.
+ * @param {number} imgW
+ * @param {number} imgH
+ * @param {number} boxW
+ * @param {number} boxH
+ * @returns {{x:number,y:number,w:number,h:number}}
+ */
+export function fitContain(imgW, imgH, boxW, boxH) {
+  const iw = imgW > 0 ? imgW : 1;
+  const ih = imgH > 0 ? imgH : 1;
+  const scale = Math.min(boxW / iw, boxH / ih);
+  const w = iw * scale;
+  const h = ih * scale;
+  return { x: (boxW - w) / 2, y: (boxH - h) / 2, w, h };
+}
+
+/**
+ * Fit a source image to fully cover a target box preserving aspect ratio
+ * ("cover": no letterboxing, image may be cropped). Returns the centered rect.
+ */
+export function fitCover(imgW, imgH, boxW, boxH) {
+  const iw = imgW > 0 ? imgW : 1;
+  const ih = imgH > 0 ? imgH : 1;
+  const scale = Math.max(boxW / iw, boxH / ih);
+  const w = iw * scale;
+  const h = ih * scale;
+  return { x: (boxW - w) / 2, y: (boxH - h) / 2, w, h };
+}
+
+/**
+ * Compute the draw rect for a backdrop image given its fit mode.
+ * @param {'contain'|'cover'|'stretch'} fit
+ */
+export function backdropRect(fit, imgW, imgH, boxW, boxH) {
+  if (fit === 'stretch') return { x: 0, y: 0, w: boxW, h: boxH };
+  if (fit === 'cover') return fitCover(imgW, imgH, boxW, boxH);
+  return fitContain(imgW, imgH, boxW, boxH);
 }
 
 /**
@@ -1008,6 +1067,7 @@ export function normalizeMapProject(raw) {
     grid: { ...base.grid, ...(raw.grid && typeof raw.grid === 'object' ? raw.grid : {}) },
     ornaments: { ...base.ornaments, ...(raw.ornaments && typeof raw.ornaments === 'object' ? raw.ornaments : {}) },
     view: normalizeView(raw.view),
+    backdrop: normalizeBackdrop(raw.backdrop),
     terrainDataUrl: typeof raw.terrainDataUrl === 'string' ? raw.terrainDataUrl : null,
   };
 }
