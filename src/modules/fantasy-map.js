@@ -1631,17 +1631,9 @@ function renderStampsLayer() {
     ctx.shadowBlur = Math.max(2, s.size * 0.06);
     ctx.shadowOffsetY = Math.max(1, s.size * 0.04);
     if (s.id === selectedStampId) { ctx.shadowColor = 'rgba(80,140,255,0.8)'; ctx.shadowBlur = 12; }
-    // Apply per-stamp rotation (for organic variety) about the stamp's anchor
-    // point (its base = bottom-center), so rotated icons still "sit" in place.
-    // Clamp on read so a corrupted/imported value can't spin an icon wildly.
-    const rot = Number.isFinite(s.rot) ? Math.max(-45, Math.min(45, s.rot)) : 0;
-    if (rot) {
-      ctx.translate(s.x, s.y);
-      ctx.rotate((rot * Math.PI) / 180);
-      ctx.drawImage(img, -s.size / 2, -s.size, s.size, s.size);
-    } else {
-      ctx.drawImage(img, s.x - s.size / 2, s.y - s.size, s.size, s.size);
-    }
+    // Stamps are anchored on their CENTER at (s.x, s.y) so an element lands
+    // exactly under the cursor where you clicked. Kept upright (no rotation).
+    ctx.drawImage(img, s.x - s.size / 2, s.y - s.size / 2, s.size, s.size);
     ctx.restore();
   };
 
@@ -1829,8 +1821,8 @@ const HANDLE = 16; // resize-handle square size (canvas px)
 function selectionBounds() {
   if (selectedStampId) {
     const s = project.stamps.find((x) => x.id === selectedStampId);
-    // Stamp draws from (x - size/2, y - size) to (x + size/2, y).
-    if (s) return { kind: 'stamp', ref: s, x: s.x - s.size / 2, y: s.y - s.size, w: s.size, h: s.size };
+    // Stamp is centered on (x, y): draws from (x - size/2, y - size/2) to (x + size/2, y + size/2).
+    if (s) return { kind: 'stamp', ref: s, x: s.x - s.size / 2, y: s.y - s.size / 2, w: s.size, h: s.size };
   }
   if (selectedLabelId) {
     const lb = project.labels.find((x) => x.id === selectedLabelId);
@@ -2122,8 +2114,8 @@ function hitLabel(pt) {
 function hitStamp(pt) {
   for (let i = project.stamps.length - 1; i >= 0; i--) {
     const s = project.stamps[i];
-    // Stamp is drawn from (x - size/2, y - size) to (x + size/2, y).
-    if (pt.x > s.x - s.size / 2 && pt.x < s.x + s.size / 2 && pt.y > s.y - s.size && pt.y < s.y) return s;
+    // Stamp is centered on (x, y): drawn from (x - size/2, y - size/2) to (x + size/2, y + size/2).
+    if (pt.x > s.x - s.size / 2 && pt.x < s.x + s.size / 2 && pt.y > s.y - s.size / 2 && pt.y < s.y + s.size / 2) return s;
   }
   return null;
 }
