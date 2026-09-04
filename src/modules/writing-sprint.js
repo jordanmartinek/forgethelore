@@ -13,7 +13,16 @@
 import { h } from '../core/renderer.js';
 import { loadData, persistState } from '../core/persist.js';
 import { confirmDialog } from '../ui/modal.js';
+import { toastError } from '../ui/toast.js';
 import { generateId } from '../core/objects.js';
+
+// Keep at most this many sprints in storage. The stored array previously grew
+// without bound — every sprint kept its full text forever — which bloats the
+// localStorage namespace and eventually trips the quota, at which point saves
+// silently fail and sessions appear "not to save". The setup screen only ever
+// shows the 15 most recent, so retaining a generous window loses nothing the
+// user can see while keeping the payload bounded.
+const MAX_STORED_SPRINTS = 100;
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -24,11 +33,48 @@ let timeRemaining = 0;      // seconds left
 let startWordCount = 0;     // word count when sprint started
 
 function loadSprints() {
-  sprints = loadData('writingSprints', []);
+  const loaded = loadData('writingSprints', []);
+
+  // Preserve the LIVE reference to an in-progress sprint. `renderWritingSprint`
+  // calls loadSprints() on every render (including the re-render triggered right
+  // after a sprint starts), which would otherwise replace `currentSprint`'s
+  // entry in the array with a freshly-deserialized COPY. The active view and the
+  // textarea's oninput handler keep mutating the original `currentSprint` object,
+  // so if the array holds a different copy, everything the user types is saved
+  // onto a detached object and lost on reload. Swapping the live reference back
+  // in keeps `saveSprints()` persisting the text the user is actually writing.
+  if (currentSprint) {
+    const idx = loaded.findIndex((s) => s && s.id === currentSprint.id);
+    if (idx !== -1) loaded[idx] = currentSprint;
+  }
+
+  sprints = loaded;
 }
 
+// Guard so we only warn about a failed save once per failing streak, rather
+// than on every keystroke (the textarea saves on every input event).
+let saveFailedNotified = false;
+
 function saveSprints() {
-  persistState('writingSprints', sprints);
+  // Bound the stored history. Newest sprints are at the front (unshift), so we
+  // keep the head and drop the oldest tail. Trims the in-memory array too so
+  // the module and storage stay in sync.
+  if (sprints.length > MAX_STORED_SPRINTS) {
+    sprints.splice(MAX_STORED_SPRINTS);
+  }
+
+  const ok = persistState('writingSprints', sprints);
+
+  // Surface silent data loss. Without this, a full localStorage makes every
+  // sprint save fail while the UI still shows the sprint in memory — so it
+  // vanishes on reload with no explanation ("sessions aren't saving").
+  if (!ok && !saveFailedNotified) {
+    saveFailedNotified = true;
+    toastError('Your writing sprint could not be saved — storage is full. Export or clear old data to avoid losing this session.');
+  } else if (ok) {
+    saveFailedNotified = false;
+  }
+  return ok;
 }
 
 /**
