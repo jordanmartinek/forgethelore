@@ -12,8 +12,8 @@
 
 import { h } from '../core/renderer.js';
 import { loadData, persistState } from '../core/persist.js';
-import { confirmDialog } from '../ui/modal.js';
-import { toastError } from '../ui/toast.js';
+import { confirmDialog, openModal } from '../ui/modal.js';
+import { toastError, toastSuccess } from '../ui/toast.js';
 import { generateId } from '../core/objects.js';
 
 // Keep at most this many sprints in storage. The stored array previously grew
@@ -625,19 +625,144 @@ function renderSprintHistoryItem(sprint) {
     ? `${sprint.goals.filter(g => g.completed).length}/${sprint.goals.length} goals`
     : 'No goals';
 
-  return h('div', { class: 'sprint-history-item' },
+  // `wordsWritten` is only computed when a sprint COMPLETES, so an in-progress
+  // or interrupted sprint would show "0 words" even though its text is saved.
+  // Fall back to a live count of the saved content so history is honest.
+  const words = sprint.status === 'completed'
+    ? (sprint.wordsWritten || 0)
+    : countWords(sprint.content || '');
+
+  return h('div', {
+    class: 'sprint-history-item sprint-history-item--clickable',
+    role: 'button',
+    tabindex: '0',
+    title: 'Click to view this sprint',
+    onclick: () => showSprintDetail(sprint),
+    onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showSprintDetail(sprint); } },
+  },
     h('div', { class: 'sprint-history-item__header' },
       h('span', { class: 'sprint-history-item__date' }, `${date} ${time}`),
       h('span', { class: `sprint-history-item__status sprint-history-item__status--${sprint.status}` },
-        sprint.status === 'completed' ? '✓' : sprint.status === 'running' ? '⏱' : '—'
+        sprint.status === 'completed' ? '✓' : sprint.status === 'running' ? '⏱' : sprint.status === 'paused' ? '⏸' : '—'
       ),
     ),
     h('div', { class: 'sprint-history-item__stats' },
-      h('span', {}, `${sprint.wordsWritten || 0} words`),
+      h('span', {}, `${words} words`),
       h('span', {}, `${sprint.duration}m`),
       h('span', {}, goalsText),
     ),
   );
+}
+
+// ─── Sprint Detail (view a saved sprint's writing) ───────────────────────────
+
+/**
+ * Open a read-only view of a past sprint's saved writing, with a Copy button
+ * and — for a sprint that was never finished — a Resume button. This is the
+ * missing piece that made history items look "unclickable": they render the
+ * summary but there was no detail view to open, so a click did nothing.
+ */
+function showSprintDetail(sprint) {
+  const words = sprint.status === 'completed'
+    ? (sprint.wordsWritten || 0)
+    : countWords(sprint.content || '');
+  const started = new Date(sprint.startedAt).toLocaleString();
+  const content = sprint.content || '';
+
+  const meta = h('div', { class: 'sprint-detail__meta' },
+    h('span', {}, `📝 ${words} words`),
+    h('span', {}, `⏱️ ${sprint.duration}m`),
+    h('span', {}, `📅 ${started}`),
+    h('span', {}, sprint.status === 'completed' ? '✓ Completed'
+      : sprint.status === 'paused' ? '⏸ Paused (unfinished)'
+      : sprint.status === 'running' ? '⏱ In progress (unfinished)'
+      : '— Unfinished'),
+  );
+
+  const textarea = h('textarea', {
+    class: 'input sprint-detail__text',
+    readonly: 'true',
+    rows: '16',
+    value: content,
+  });
+
+  const body = h('div', { class: 'sprint-detail' },
+    meta,
+    sprint.goals && sprint.goals.length
+      ? h('div', { class: 'sprint-detail__goals' },
+          ...sprint.goals.map((g) => h('span', { class: `tag ${g.completed ? 'tag--success' : ''}` },
+            `${g.completed ? '✓ ' : ''}${g.text}`)),
+        )
+      : null,
+    content.trim()
+      ? textarea
+      : h('div', { class: 'sprint-detail__empty' }, 'No writing was saved for this sprint.'),
+  );
+
+  const unfinished = sprint.status === 'running' || sprint.status === 'paused';
+  const actions = [{ label: 'Close', variant: '' }];
+  if (content.trim()) {
+    actions.push({ label: '📋 Copy', variant: '', closeOnClick: false, onClick: () => copyText(content) });
+  }
+  if (unfinished) {
+    actions.push({ label: '▶ Resume Sprint', variant: 'primary', onClick: () => resumeSprint(sprint) });
+  }
+
+  openModal({ title: 'Sprint Details', content: body, actions });
+}
+
+/** Re-enter an unfinished sprint as the active one, restoring its timer. */
+function resumeSprint(sprint) {
+  // Guard: only one active sprint at a time.
+  if (currentSprint && currentSprint.status === 'running') {
+    toastError('Finish or end the current sprint before resuming another.');
+    return;
+  }
+
+  // Make sure we point at the live array element (so saves persist to it).
+  const idx = sprints.findIndex((s) => s && s.id === sprint.id);
+  currentSprint = idx !== -1 ? sprints[idx] : sprint;
+
+  // Restore a sensible remaining time: full duration minus what already elapsed,
+  // clamped to at least a little time so the user can keep writing.
+  const elapsedSec = Math.max(0, Math.round((Date.now() - currentSprint.startedAt) / 1000));
+  timeRemaining = Math.max(30, currentSprint.duration * 60 - elapsedSec);
+  startWordCount = countWords(currentSprint.content || '');
+
+  currentSprint.status = 'running';
+  saveSprints();
+  startTimer();
+  rerender();
+
+  setTimeout(() => {
+    const ta = document.getElementById('sprint-textarea');
+    if (ta) ta.focus();
+  }, 50);
+}
+
+/** Copy text to the clipboard with a fallback for non-secure contexts. */
+function copyText(text) {
+  const done = () => toastSuccess('Copied to clipboard.');
+  const fail = () => toastError('Could not copy — select the text and copy manually.');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => { if (fallbackCopy(text)) done(); else fail(); });
+  } else if (fallbackCopy(text)) { done(); } else { fail(); }
+}
+
+function fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (_) {
+    return false;
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
