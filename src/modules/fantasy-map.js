@@ -766,6 +766,10 @@ function renderStage() {
       ),
     ),
     zoomControls(),
+    // A subtle, always-visible reminder of how to navigate — panning isn't
+    // discoverable otherwise (left-drag only pans with the Pan tool active).
+    h('div', { class: 'fmap__navhint', title: 'Scroll to zoom. Hold Space and drag, or use the middle mouse button, to pan in any tool. Or pick the ✋ Pan tool and just drag.' },
+      '✋ drag with the Pan tool · Space-drag or middle-drag to pan · scroll to zoom'),
   );
 }
 
