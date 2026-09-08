@@ -15,22 +15,24 @@
   <link rel="manifest" href="/public/manifest.json">
 
   <!-- Theme -->
-  <meta name="theme-color" content="#6366f1">
+  <meta name="theme-color" content="#f4efe4">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="LoreForge">
   <meta name="application-name" content="LoreForge Planner">
   <meta name="description" content="Creative Planning Operating System — Mission control for fictional universes">
 
-  <!-- Apply saved theme before first paint to avoid a flash of the default palette -->
+  <!-- Apply saved theme before first paint to avoid a flash of the default palette.
+       Default is 'literary' (attr-less :root); any other saved theme sets the attr. -->
   <script>
     try {
       var t = localStorage.getItem('loreforge_theme');
-      if (t && t !== 'parchment') document.documentElement.setAttribute('data-theme', t);
+      if (t && t !== 'literary') document.documentElement.setAttribute('data-theme', t);
     } catch (e) {}
   </script>
 
   <!-- Styles -->
+  <link rel="stylesheet" href="src/styles/fonts.css">
   <link rel="stylesheet" href="src/styles/main.css">
   <link rel="stylesheet" href="src/styles/themes.css">
   <link rel="stylesheet" href="src/styles/components.css">

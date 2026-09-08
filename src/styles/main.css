@@ -1,58 +1,71 @@
-/* LoreForge Planner - Design System: Arcane Edition */
+/* LoreForge Planner - Design System
+ *
+ * DEFAULT THEME: "Warm Literary" — a warm cream, charcoal-ink, forest-green &
+ * terracotta editorial palette with soft gold reserved for AI/special features.
+ * This is the attribute-less base (:root). Alternate palettes (including the
+ * original "Candlelit Parchment" dark theme) are html[data-theme] swaps in
+ * themes.css. Because every component reads these tokens, switching themes never
+ * requires a component change. */
 :root {
-  /* Core Colors — deep parchment/candlelit tones */
-  --bg-primary: #1a1510;
-  --bg-secondary: #1e1914;
-  --bg-tertiary: #242019;
-  --bg-elevated: #2a2520;
-  --bg-hover: #33291f;
-  --bg-active: #3d3226;
+  /* Core Colors — warm cream page tones (light) */
+  --bg-primary: #f4efe4;
+  --bg-secondary: #f0e9db;
+  --bg-tertiary: #ece3d2;
+  --bg-elevated: #fbf8f1;
+  --bg-hover: #ece4d5;
+  --bg-active: #e4d9c4;
 
-  /* Surface Colors — layered parchment */
-  --surface-1: #211c16;
-  --surface-2: #28231c;
-  --surface-3: #302a22;
-  --surface-4: #3a332a;
+  /* Surface Colors — layered warm paper (lightest = cards) */
+  --surface-1: #fbf8f1;
+  --surface-2: #f6f1e6;
+  --surface-3: #efe8d9;
+  --surface-4: #e7ddc9;
 
-  /* Text Colors — warm ivory to faded ink */
-  --text-primary: #f0e6d3;
-  --text-secondary: #b8a88e;
-  --text-tertiary: #8a7a62;
-  --text-muted: #6b5c48;
+  /* Text Colors — charcoal ink to faded pencil */
+  --text-primary: #2b2a27;
+  --text-secondary: #5c574d;
+  --text-tertiary: #837c6e;
+  --text-muted: #a89f8c;
 
-  /* Accent Colors — gold, amber, arcane purple */
-  --accent-primary: #c9a84c;
-  --accent-primary-hover: #dbb95e;
-  --accent-secondary: #9b6dd7;
-  --accent-tertiary: #4fb8a7;
+  /* Accent Colors — muted forest green (primary), terracotta, soft gold (AI) */
+  --accent-primary: #4a6350;
+  --accent-primary-hover: #3c5342;
+  --accent-secondary: #b56a4e;
+  --accent-tertiary: #c9a24b;
 
-  /* Status Colors — muted, rich jewel tones */
-  --success: #5a9e5a;
-  --warning: #c9873c;
-  --danger: #b84a4a;
-  --info: #5a7eb8;
+  /* Status Colors — muted, warm, readable on cream */
+  --success: #4a6350;
+  --warning: #c08a3e;
+  --danger: #b04a3f;
+  --info: #4f7a86;
 
-  /* Conflict Board Colors */
-  --faction-red: #b84a4a;
-  --faction-blue: #5a7eb8;
-  --faction-green: #5a9e5a;
-  --faction-purple: #9b6dd7;
-  --faction-orange: #c9873c;
-  --faction-cyan: #4fb8a7;
-  --faction-pink: #b85a8a;
-  --faction-yellow: #c9a84c;
+  /* Conflict Board Colors — kept vivid enough to distinguish on light paper */
+  --faction-red: #b04a3f;
+  --faction-blue: #4f7a86;
+  --faction-green: #4a6350;
+  --faction-purple: #7c5a92;
+  --faction-orange: #c08a3e;
+  --faction-cyan: #3f8a7d;
+  --faction-pink: #a85a7a;
+  --faction-yellow: #c9a24b;
 
-  /* Borders — warm gold tints */
-  --border-subtle: rgba(201,168,76,0.08);
-  --border-default: rgba(201,168,76,0.15);
-  --border-strong: rgba(201,168,76,0.25);
-  --border-accent: rgba(201,168,76,0.5);
+  /* Borders — soft charcoal tints (subtle on cream) */
+  --border-subtle: rgba(43,42,39,0.07);
+  --border-default: rgba(43,42,39,0.14);
+  --border-strong: rgba(43,42,39,0.24);
+  --border-accent: rgba(74,99,80,0.5);
 
-  /* Shadows — warm, deep, layered */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.3);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-glow: 0 0 20px rgba(201,168,76,0.15), 0 0 40px rgba(201,168,76,0.05);
+  /* Shadows — soft, warm, low-contrast for a light editorial surface */
+  --shadow-sm: 0 1px 3px rgba(43,42,39,0.08), 0 1px 2px rgba(43,42,39,0.05);
+  --shadow-md: 0 4px 16px rgba(43,42,39,0.10), 0 2px 4px rgba(43,42,39,0.05);
+  --shadow-lg: 0 12px 40px rgba(43,42,39,0.14), 0 4px 12px rgba(43,42,39,0.07);
+  --shadow-glow: 0 0 20px rgba(201,162,75,0.18), 0 0 40px rgba(201,162,75,0.06);
+
+  /* Derived accent helpers — a translucent accent wash (chips/focus rings) and
+   * a lighter gradient companion stop. Defined per-theme so glows/gradients
+   * stay on-palette instead of hardcoding the old gold. */
+  --accent-primary-soft: rgba(74,99,80,0.12);
+  --accent-glow: #6f8a74;
 
   /* Spacing */
   --space-xs: 4px;
@@ -70,11 +83,13 @@
   --radius-xl: 16px;
   --radius-full: 9999px;
 
-  /* Typography — editorial serif + clean sans */
-  --font-sans: 'Georgia', 'Palatino Linotype', 'Book Antiqua', 'Palatino', serif;
-  --font-heading: 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif;
+  /* Typography — self-hosted Fraunces (story/headings) + Inter (UI chrome).
+   * Fallbacks keep the correct literary/clean feel before the fonts load or if
+   * a file is missing (see src/styles/fonts.css). */
+  --font-sans: 'Fraunces', 'Georgia', 'Palatino Linotype', 'Book Antiqua', 'Palatino', serif;
+  --font-heading: 'Fraunces', 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 
   /* Transitions — smooth, elegant */
   --transition-fast: 0.15s ease;
@@ -106,10 +121,12 @@ html, body {
   line-height: 1.5;
   color: var(--text-primary);
   background: var(--bg-primary);
-  background-image: 
-    radial-gradient(ellipse at 20% 50%, rgba(201,168,76,0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(155,109,215,0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, rgba(79,184,167,0.02) 0%, transparent 50%);
+  /* Whisper-quiet warm wash — barely-there editorial paper tint on the cream
+   * canvas. Alternate themes retune or flatten this (see themes.css). */
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(74,99,80,0.035) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 20%, rgba(181,106,78,0.030) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 85%, rgba(201,162,75,0.025) 0%, transparent 55%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -131,18 +148,18 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(201,168,76,0.2);
+  background: var(--border-strong);
   border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(201,168,76,0.4);
+  background: var(--border-accent);
 }
 
 /* Selection */
 ::selection {
-  background: rgba(201,168,76,0.25);
-  color: var(--text-primary);
+  background: var(--border-accent);
+  color: var(--bg-elevated);
 }
 
 /* Focus */

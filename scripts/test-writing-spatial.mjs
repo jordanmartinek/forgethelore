@@ -33,18 +33,23 @@ function approx(a, b, eps = 0.001) { return Math.abs(a - b) <= eps; }
 
 // ── #37 Theming ──────────────────────────────────────────────────────────────
 const theme = await import('../src/core/theme.js');
-assert(theme.getTheme() === 'parchment', 'default theme is parchment');
+assert(theme.getTheme() === 'literary', 'default theme is literary (Warm Literary)');
+assert(theme.DEFAULT_THEME === 'literary', 'DEFAULT_THEME is literary');
+assert(theme.THEMES[0].id === 'literary', 'literary is the first/primary theme');
+assert(theme.THEMES.some((t) => t.id === 'parchment'), 'parchment is still available as an option');
 theme.setTheme('midnight');
 assert(theme.getTheme() === 'midnight', 'setTheme persists a valid theme');
 assert(rootAttrs.get('data-theme') === 'midnight', 'applyTheme sets data-theme attribute');
 theme.setTheme('parchment');
-assert(rootAttrs.has('data-theme') === false, 'parchment clears the data-theme attribute (uses :root default)');
+assert(rootAttrs.get('data-theme') === 'parchment', 'a non-default theme (parchment) sets the data-theme attribute');
+theme.setTheme('literary');
+assert(rootAttrs.has('data-theme') === false, 'the default (literary) clears the data-theme attribute (uses :root)');
 theme.setTheme('not-a-real-theme');
-assert(theme.getTheme() === 'parchment', 'invalid theme falls back to parchment');
+assert(theme.getTheme() === 'literary', 'invalid theme falls back to the default (literary)');
 const before = theme.getTheme();
 const next = theme.cycleTheme();
 assert(next !== before && theme.THEMES.some((t) => t.id === next), 'cycleTheme advances to a valid, different theme');
-theme.setTheme('parchment');
+theme.setTheme('literary');
 
 // ── #21 Word-count report ────────────────────────────────────────────────────
 const { wordCountReport, povReport } = await import('../src/core/pov-analytics.js');
