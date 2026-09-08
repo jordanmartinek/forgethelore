@@ -15,7 +15,8 @@ import { loadData, saveData, persistState, getActiveProjectId } from '../core/pe
 import { appStore } from '../core/store.js';
 import { generateId } from '../core/objects.js';
 import { toastSuccess, toastWarning, toastError } from '../ui/toast.js';
-import { confirmDialog } from '../ui/modal.js';
+import { confirmDialog, openModal } from '../ui/modal.js';
+import { synthesizeThroughLine, getThroughLine, isAIEnabled as isSynthAIEnabled } from '../core/sprint-synthesis.js';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -58,9 +59,17 @@ export function renderBrainstorm(container) {
 
 function renderSessionList() {
   const list = h('div', { style: { width: '240px', minWidth: '240px', borderRight: '1px solid var(--border-subtle)', background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
-    h('div', { style: { padding: '12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+    h('div', { style: { padding: '12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' } },
       h('span', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Sessions'),
-      h('button', { class: 'btn btn--primary btn--sm', onclick: createNewSession }, '+ New'),
+      h('div', { style: { display: 'flex', gap: '6px' } },
+        h('button', {
+          class: 'btn btn--ghost btn--sm',
+          title: 'Weave all your brainstorm sessions into a cohesive overview of plot and characters',
+          disabled: sessions.length === 0 ? 'true' : undefined,
+          onclick: () => showThroughLineModal(),
+        }, '🧵'),
+        h('button', { class: 'btn btn--primary btn--sm', onclick: createNewSession }, '+ New'),
+      ),
     ),
     h('div', { style: { flex: '1', overflowY: 'auto', padding: '4px' } },
       sessions.length === 0
@@ -393,6 +402,206 @@ async function deleteSession(session) {
   activeSessionId = sessions.length > 0 ? sessions[0].id : null;
   save();
   rerender();
+}
+
+// ─── Through-Line Overview (synthesize plot & characters from sessions) ──────
+
+/**
+ * Open a modal that weaves ALL brainstorm sessions into a cohesive overview of
+ * plot and characters. Renders the deterministic overview immediately, then —
+ * when an AI provider is configured — asks the model for a richer narrative and
+ * enriches the view in place. Any AI failure silently leaves the deterministic
+ * overview standing. Mirrors the writing-sprint through-line feature, reusing
+ * the same core engine with the brainstorm source preset (so explicit
+ * @Character / #Location / etc. tags feed the analysis).
+ */
+function showThroughLineModal() {
+  loadSessions();
+  const opts = { source: 'brainstorm' };
+
+  // Deterministic result is instant and always available.
+  const base = synthesizeThroughLine(sessions, opts);
+
+  const bodyHost = h('div', { class: 'brainstorm-throughline' });
+  bodyHost.appendChild(renderThroughLine(base, { aiPending: !base.empty && isSynthAIEnabled() }));
+
+  const actions = [{ label: 'Close', variant: '' }];
+  if (!base.empty && base.summary) {
+    actions.push({
+      label: '📋 Copy Overview',
+      variant: '',
+      closeOnClick: false,
+      onClick: () => copyOverview(throughLineToText(base)),
+    });
+  }
+
+  openModal({ title: '🧵 Story Through-Line', content: bodyHost, actions });
+
+  // If AI is configured, upgrade the view once the model responds.
+  if (!base.empty && isSynthAIEnabled()) {
+    getThroughLine(sessions, opts)
+      .then((result) => {
+        if (!bodyHost.isConnected) return; // modal closed
+        bodyHost.innerHTML = '';
+        bodyHost.appendChild(renderThroughLine(result, { aiPending: false }));
+      })
+      .catch(() => {
+        if (!bodyHost.isConnected) return;
+        bodyHost.innerHTML = '';
+        bodyHost.appendChild(renderThroughLine(base, { aiPending: false }));
+      });
+  }
+}
+
+function renderThroughLine(result, { aiPending } = {}) {
+  if (result.empty) {
+    return h('div', { style: { color: 'var(--text-muted)', fontSize: '13px', lineHeight: '1.6' } }, result.summary);
+  }
+
+  const section = (title, ...children) =>
+    h('div', { style: { marginBottom: '16px' } },
+      h('h4', { style: { margin: '0 0 6px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' } }, title),
+      ...children,
+    );
+
+  const stat = (label, value) => h('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } },
+    h('strong', { style: { color: 'var(--text-primary)' } }, String(value)), ` ${label}`);
+
+  const nodes = [];
+
+  // Stats strip
+  nodes.push(h('div', { style: { display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' } },
+    stat('sessions', result.stats.sessions),
+    stat('words', result.stats.totalWords.toLocaleString()),
+    result.stats.spanDays > 1 ? stat('days', result.stats.spanDays) : null,
+  ));
+
+  // AI narrative (if present) OR deterministic summary.
+  const ai = result.ai;
+  if (ai && ai.narrative) {
+    nodes.push(section('Narrative Overview',
+      ...ai.narrative.split(/\n{2,}/).map((p) =>
+        h('p', { style: { margin: '0 0 8px', fontSize: '13px', lineHeight: '1.7', color: 'var(--text-secondary)' } }, p)),
+      h('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '✨ Written by your configured AI model'),
+    ));
+  } else {
+    nodes.push(section('Overview',
+      h('p', { style: { margin: '0', fontSize: '13px', lineHeight: '1.7', color: 'var(--text-secondary)' } }, result.summary),
+      aiPending
+        ? h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' } }, '✨ Asking your AI model for a richer narrative…')
+        : null,
+    ));
+  }
+
+  // Plot spine (AI) — a concise ordered beat list.
+  if (ai && ai.plotSpine && ai.plotSpine.length) {
+    nodes.push(section('Plot Spine',
+      h('ol', { style: { margin: '0', paddingLeft: '18px', fontSize: '13px', lineHeight: '1.6', color: 'var(--text-secondary)' } },
+        ...ai.plotSpine.map((b) => h('li', {}, b))),
+    ));
+  }
+
+  // Characters: prefer AI-described cast; fall back to deterministic recurrence.
+  if (ai && ai.characters && ai.characters.length) {
+    nodes.push(section('Characters',
+      h('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+        ...ai.characters.map((c) => h('div', { style: { fontSize: '13px' } },
+          h('strong', { style: { color: 'var(--text-primary)' } }, c.name),
+          c.role ? h('span', { style: { color: 'var(--text-muted)' } }, ` — ${c.role}`) : null,
+          c.arc ? h('div', { style: { color: 'var(--text-secondary)', lineHeight: '1.5' } }, c.arc) : null,
+        ))),
+    ));
+  } else if (result.characters.length) {
+    nodes.push(section('Recurring Characters',
+      h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+        ...result.characters.slice(0, 10).map((c) => h('span', {
+          class: 'tag',
+          title: c.tagged ? 'Tagged with @' : `${c.mentions} mentions across ${c.sessions} session(s)`,
+        }, `${c.tagged ? '@' : ''}${c.name} · ${c.sessions}×`))),
+    ));
+  }
+
+  // Themes / motifs
+  const themes = (ai && ai.themes && ai.themes.length) ? ai.themes : result.motifs.map((m) => m.word);
+  if (themes.length) {
+    nodes.push(section((ai && ai.themes && ai.themes.length) ? 'Themes' : 'Recurring Motifs',
+      h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+        ...themes.slice(0, 10).map((t) => h('span', { class: 'tag' }, t))),
+    ));
+  }
+
+  // Open threads (AI only)
+  if (ai && ai.openThreads && ai.openThreads.length) {
+    nodes.push(section('Loose Threads & Gaps',
+      h('ul', { style: { margin: '0', paddingLeft: '18px', fontSize: '13px', lineHeight: '1.6', color: 'var(--text-secondary)' } },
+        ...ai.openThreads.map((t) => h('li', {}, t))),
+    ));
+  }
+
+  // Session timeline
+  if (result.timeline.length) {
+    nodes.push(section('Session Timeline',
+      h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        ...result.timeline.map((t) => {
+          const date = t.date ? new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+          return h('div', { style: { fontSize: '12px', lineHeight: '1.5', paddingLeft: '10px', borderLeft: '2px solid var(--border-subtle)' } },
+            h('span', { style: { color: 'var(--text-muted)' } }, `#${t.index}${date ? ` · ${date}` : ''} · ${t.words}w`),
+            h('div', { style: { color: 'var(--text-secondary)' } }, t.beat || '(empty session)'),
+          );
+        })),
+    ));
+  }
+
+  return h('div', {}, ...nodes);
+}
+
+/** Plain-text rendering of the deterministic overview, for the Copy button. */
+function throughLineToText(result) {
+  if (result.empty) return result.summary;
+  const lines = [];
+  lines.push('STORY THROUGH-LINE');
+  lines.push('');
+  lines.push(result.summary);
+  if (result.characters.length) {
+    lines.push('');
+    lines.push('Recurring characters:');
+    result.characters.slice(0, 10).forEach((c) => lines.push(`  - ${c.tagged ? '@' : ''}${c.name} (${c.mentions} mentions, ${c.sessions} sessions)`));
+  }
+  if (result.motifs.length) {
+    lines.push('');
+    lines.push(`Recurring motifs: ${result.motifs.map((m) => m.word).join(', ')}`);
+  }
+  if (result.timeline.length) {
+    lines.push('');
+    lines.push('Session timeline:');
+    result.timeline.forEach((t) => lines.push(`  #${t.index} (${t.words}w): ${t.beat}`));
+  }
+  return lines.join('\n');
+}
+
+/** Copy text to the clipboard with a fallback for non-secure contexts. */
+function copyOverview(text) {
+  const done = () => toastSuccess('Copied to clipboard.');
+  const fail = () => toastError('Could not copy — select the text and copy manually.');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => { if (fallbackCopy(text)) done(); else fail(); });
+  } else if (fallbackCopy(text)) { done(); } else { fail(); }
+}
+
+function fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (_) {
+    return false;
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

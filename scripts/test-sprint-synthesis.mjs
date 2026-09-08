@@ -141,5 +141,76 @@ assert(AI.PROVIDERS.gemini.extractText({ choices: [{ message: { content: 'ok' } 
 // isAIEnabled reflects settings (no key => disabled).
 assert(S.isAIEnabled() === false, 'isAIEnabled is false with no configured key');
 
+// ── Brainstorm source path ───────────────────────────────────────────────────
+
+// parseBrainstormTags: line-leading @/#/!/~/* tags -> {type,name}
+const tags = S.parseBrainstormTags([
+  '@Kaelen the exiled heir',
+  'She wants the throne back.',
+  '#Harbor District where it opens',
+  '!Iron Circle the antagonist faction',
+  '~The Missing Crown',
+  '*Aetheric Engines',
+  'plain line, no tag',
+].join('\n'));
+// The tag name greedily captures the rest of the line, matching the existing
+// brainstorm.js parseTags grammar (so entities are named consistently with the
+// app's push-to-modules feature).
+assert(tags.length === 5, 'parseBrainstormTags finds all five tag types');
+assert(tags[0].type === 'character' && tags[0].name === 'Kaelen the exiled heir', '@ -> character with full trailing text');
+assert(tags.find((t) => t.type === 'location').name === 'Harbor District where it opens', '# -> location');
+assert(tags.find((t) => t.type === 'faction').name === 'Iron Circle the antagonist faction', '! -> faction');
+assert(tags.find((t) => t.type === 'mystery').name === 'The Missing Crown', '~ -> mystery');
+assert(tags.find((t) => t.type === 'technology').name === 'Aetheric Engines', '* -> technology');
+
+// buildBrainstormCorpus: schema {id,title,content,createdAt}, oldest-first
+const bsBase = Date.parse('2026-02-01T09:00:00Z');
+const bsSessions = [
+  { id: 'b2', title: 'Midpoint ideas', content: '@Kaelen confronts the council. The crown is a lie. betrayal everywhere.', createdAt: bsBase + 2 * day },
+  { id: 'b1', title: 'Opening', content: '@Kaelen escapes the harbor. The crown was stolen.\n#Harbor District burns as he flees.', createdAt: bsBase },
+  { id: 'b0', title: 'Empty', content: '   ', createdAt: bsBase - day },
+];
+const bsCorpus = S.buildBrainstormCorpus(bsSessions);
+assert(bsCorpus.sessions.length === 2, 'brainstorm corpus drops the empty session');
+assert(bsCorpus.sessions[0].id === 'b1' && bsCorpus.sessions[1].id === 'b2', 'brainstorm corpus sorts oldest-first by createdAt');
+assert(bsCorpus.sessions[0].title === 'Opening', 'brainstorm corpus carries the session title');
+assert(bsCorpus.sessions[0].taggedEntities.some((t) => t.type === 'character' && /Kaelen/.test(t.name)), 'brainstorm corpus attaches parsed tags');
+
+// extractCharacters folds explicit @character tags (tagged flag, ranked first).
+const bsChars = S.extractCharacters(bsCorpus.sessions);
+const kael = bsChars.find((c) => c.name === 'Kaelen');
+assert(kael && kael.tagged === true, 'a @-tagged name is marked tagged=true');
+assert(bsChars[0].tagged === true, 'tagged characters rank first');
+
+// A tagged character qualifies even if it would fail the proper-noun heuristic
+// (e.g. appears only once). "Solo" is tagged once and must still surface.
+const soloCorpus = S.buildBrainstormCorpus([{ id: 'x', title: 't', content: '@Solo does a thing once.', createdAt: bsBase }]);
+const soloChars = S.extractCharacters(soloCorpus.sessions);
+assert(soloChars.some((c) => c.name === 'Solo' && c.tagged), 'a singly-tagged character still qualifies (explicit signal beats heuristics)');
+
+// synthesizeThroughLine with the brainstorm preset
+const bsOverview = S.synthesizeThroughLine(bsSessions, { source: 'brainstorm' });
+assert(bsOverview.empty === false && bsOverview.stats.sessions === 2, 'brainstorm overview analyzes 2 sessions');
+assert(/brainstorm session/.test(bsOverview.summary), 'brainstorm summary uses the brainstorm noun');
+assert(bsOverview.timeline[0].beat === 'Opening', 'brainstorm timeline beat prefers the session title');
+assert(bsOverview.characters.some((c) => c.name === 'Kaelen'), 'brainstorm overview surfaces the tagged lead');
+assert(bsOverview.goals.total === 0, 'brainstorm has no goals');
+
+// empty brainstorm history gives the brainstorm-specific hint
+const bsEmpty = S.synthesizeThroughLine([], { source: 'brainstorm' });
+assert(bsEmpty.empty === true && /brainstorm/.test(bsEmpty.summary), 'empty brainstorm history gives a brainstorm hint');
+
+// buildSynthesisPrompt (brainstorm) includes taggedEntities and sourceKind
+const bsPrompt = JSON.parse(S.buildSynthesisPrompt(bsSessions, { source: 'brainstorm' }));
+assert(bsPrompt.sourceKind === 'brainstorm session', 'prompt digest tags the source kind');
+assert(bsPrompt.taggedEntities && bsPrompt.taggedEntities.character, 'prompt digest carries tagged entities');
+assert(bsPrompt.taggedEntities.location && bsPrompt.taggedEntities.location.some((n) => /Harbor District/.test(n)), 'prompt digest carries tagged locations');
+assert(bsPrompt.sessions[0].title === 'Opening', 'prompt digest carries session titles');
+
+// The sprint path is unaffected by the generalization (default source).
+const sprintPrompt = JSON.parse(S.buildSynthesisPrompt(sprints));
+assert(sprintPrompt.sourceKind === 'writing sprint', 'default prompt source is writing sprint');
+assert(sprintPrompt.totalSessions === 3, 'default (sprint) path still builds a 3-session digest');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} sprint-synthesis tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
