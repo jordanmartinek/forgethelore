@@ -523,10 +523,10 @@
 }
 
 .sprint-setup__preset--active {
-  background: rgba(201,168,76,0.15);
+  background: var(--accent-primary-soft);
   border-color: var(--accent-primary);
   color: var(--accent-primary);
-  box-shadow: 0 0 8px rgba(201,168,76,0.15);
+  box-shadow: 0 0 8px var(--accent-primary-soft);
 }
 
 .sprint-setup__goals {
@@ -636,7 +636,7 @@
 
 .sprint-active__timer-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), #e8c96a);
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-glow));
   border-radius: var(--radius-full);
   transition: width 1s linear;
 }
@@ -702,7 +702,7 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--accent-primary);
-  background: rgba(201,168,76,0.1);
+  background: var(--accent-primary-soft);
   padding: 2px 8px;
   border-radius: var(--radius-full);
 }

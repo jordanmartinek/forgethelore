@@ -1,0 +1,48 @@
+/**
+ * LoreForge Planner - Self-Hosted Web Fonts
+ *
+ * Two typefaces, split by ROLE (the design tokens in main.css point at these):
+ *   - Fraunces  -> story / headings  (--font-sans, --font-heading): a warm,
+ *                  modern "old-style" serif with real literary character.
+ *   - Inter     -> UI / chrome        (--font-ui): a clean, highly legible sans
+ *                  for buttons, inputs, navigation — everything that isn't prose.
+ *
+ * OFFLINE-FIRST / SELF-HOSTED: the files live under /public/fonts and are served
+ * from the app's own origin, so the service worker's runtime cache-on-fetch
+ * (sw.js) caches them automatically on first load — no CDN, no third-party
+ * request, works fully offline. See /public/fonts/README.md for the exact files.
+ *
+ * GRACEFUL DEGRADATION: every token that references these families also lists
+ * system fallbacks (Georgia/Palatino for serif, system-ui for sans), and each
+ * @font-face uses `font-display: swap`. So if a .woff2 is missing, the app still
+ * renders in the correct literary/clean style — the web fonts simply upgrade the
+ * look once present. This means the CSS is safe to ship before the binaries land.
+ *
+ * Variable fonts: we declare a single variable file per family spanning the full
+ * weight axis (100–900), so one file covers every weight the UI uses.
+ */
+
+/* ── Fraunces (serif — story & headings) ─────────────────────────────────── */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/public/fonts/fraunces-variable.woff2') format('woff2-variations');
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/public/fonts/fraunces-italic-variable.woff2') format('woff2-variations');
+}
+
+/* ── Inter (sans — UI chrome) ────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/public/fonts/inter-variable.woff2') format('woff2-variations');
+}

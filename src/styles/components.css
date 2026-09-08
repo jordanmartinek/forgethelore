@@ -52,7 +52,7 @@
   font-size: 15px;
   font-weight: 700;
   font-family: var(--font-heading);
-  background: linear-gradient(135deg, var(--accent-primary), #e8c96a);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-glow));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: 0.5px;
@@ -622,7 +622,7 @@
   border-color: var(--accent-primary);
   color: var(--text-primary);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md), 0 0 12px rgba(201,168,76,0.1);
+  box-shadow: var(--shadow-md), 0 0 12px var(--accent-primary-soft);
 }
 
 .dashboard__action-icon {
@@ -787,7 +787,7 @@
 }
 
 .btn--primary:hover {
-  background: linear-gradient(135deg, var(--accent-primary-hover), #c9a84c);
+  background: linear-gradient(135deg, var(--accent-primary-hover), var(--accent-primary));
   box-shadow: var(--shadow-glow);
   transform: translateY(-1px);
 }
@@ -839,7 +839,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg), 0 0 80px rgba(201,168,76,0.05);
+  box-shadow: var(--shadow-lg), 0 0 80px var(--accent-primary-soft);
   overflow: hidden;
   animation: scaleIn 0.2s ease;
   backdrop-filter: blur(20px);
@@ -1042,7 +1042,7 @@
   border: 1px solid var(--border-subtle);
 }
 
-.tag--accent { background: rgba(201,168,76,0.15); color: var(--accent-primary); border-color: rgba(201,168,76,0.2); }
+.tag--accent { background: var(--accent-primary-soft); color: var(--accent-primary); border-color: var(--border-accent); }
 .tag--success { background: rgba(90,158,90,0.15); color: var(--success); border-color: rgba(90,158,90,0.2); }
 .tag--warning { background: rgba(201,135,60,0.15); color: var(--warning); border-color: rgba(201,135,60,0.2); }
 .tag--danger { background: rgba(184,74,74,0.15); color: var(--danger); border-color: rgba(184,74,74,0.2); }
@@ -1061,7 +1061,7 @@
   height: 100%;
   border-radius: var(--radius-full);
   transition: width var(--transition-smooth);
-  background: linear-gradient(90deg, var(--accent-primary), #e8c96a);
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-glow));
 }
 
 /* ─── Tooltip ──────────────────────────────────────────────────────────────── */
@@ -1100,7 +1100,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg), 0 0 60px rgba(201,168,76,0.05);
+  box-shadow: var(--shadow-lg), 0 0 60px var(--accent-primary-soft);
   overflow: hidden;
   animation: scaleIn 0.25s ease;
   display: flex;
@@ -1151,12 +1151,12 @@
   font-family: var(--font-ui);
   transition: all var(--transition-normal);
   outline: none;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: inset 0 1px 2px var(--border-subtle);
 }
 
 .input:focus {
   border-color: var(--accent-primary);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2), 0 0 0 3px rgba(201,168,76,0.1);
+  box-shadow: inset 0 1px 2px var(--border-subtle), 0 0 0 3px var(--accent-primary-soft);
 }
 
 .input::placeholder {
@@ -1267,7 +1267,7 @@ textarea.input {
 
 .text-expand-editor__textarea:focus {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(201,168,76,0.1);
+  box-shadow: 0 0 0 3px var(--accent-primary-soft);
 }
 
 .text-expand-editor__footer {
@@ -1462,4 +1462,55 @@ textarea.input {
   background: var(--surface-3);
   padding: 1px 6px;
   border-radius: var(--radius-full);
+}
+
+
+/* ─── Card (shared surface primitive) ──────────────────────────────────────────
+ * A single, token-driven "card" surface so modules stop hand-rolling bespoke
+ * inline card styles (a de-clutter goal of the visual overhaul). Rounded but not
+ * overly SaaS-y: a soft border, generous padding, and a low, warm shadow.
+ *
+ *   .card            base surface
+ *   .card--flush     no padding (for media/edge-to-edge content)
+ *   .card--pad-lg    roomier padding for editorial/worldbuilding surfaces
+ *   .card--interactive  hover lift for clickable cards
+ *   .card--editorial add a whisper-quiet paper wash (worldbuilding areas). Keep
+ *                    the actual writing editor on a plain .card (no wash).
+ */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.card--flush { padding: 0; }
+.card--pad-lg { padding: var(--space-xl); }
+
+.card--interactive {
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+.card--interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-default);
+}
+
+/* Whisper-quiet editorial paper wash for worldbuilding surfaces. Pure CSS
+ * (no image asset), so it works offline and adapts to the theme's border tint. */
+.card--editorial {
+  background-image:
+    radial-gradient(ellipse at 15% 0%, var(--accent-primary-soft) 0%, transparent 60%),
+    radial-gradient(ellipse at 100% 100%, var(--border-subtle) 0%, transparent 55%);
+}
+
+/* A card title uses the editorial serif; body/meta stay in the UI sans. */
+.card__title {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
 }
