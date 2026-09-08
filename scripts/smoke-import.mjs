@@ -121,6 +121,7 @@ const modules = [
   '../src/modules/pov-analytics.js',
   '../src/modules/world-map.js',
   '../src/modules/focus-mode.js',
+  '../src/modules/brainstorm.js',
   '../src/core/registry.js',
   '../src/ui/command-palette.js',
   '../src/ui/app-shell.js',
