@@ -19,6 +19,7 @@ export function openAISettings() {
     h('option', { value: '' }, 'Off (use offline analysis only)'),
     h('option', { value: 'openai', ...(state.provider === 'openai' ? { selected: 'selected' } : {}) }, 'OpenAI (ChatGPT)'),
     h('option', { value: 'anthropic', ...(state.provider === 'anthropic' ? { selected: 'selected' } : {}) }, 'Anthropic (Claude)'),
+    h('option', { value: 'gemini', ...(state.provider === 'gemini' ? { selected: 'selected' } : {}) }, 'Google (Gemini)'),
   );
 
   const keyInput = h('input', {

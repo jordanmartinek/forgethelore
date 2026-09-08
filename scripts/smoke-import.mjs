@@ -84,6 +84,7 @@ const modules = [
   '../src/core/analysis.js',
   '../src/core/ai-settings.js',
   '../src/core/ai.js',
+  '../src/core/sprint-synthesis.js',
   '../src/core/templates.js',
   '../src/core/world-shapes.js',
   '../src/core/map-engine.js',
