@@ -112,7 +112,7 @@ function renderSprintStatsBanner() {
     h('div', { style: { fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' } }, String(value)),
     h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, label),
   );
-  return h('div', { style: { display: 'flex', gap: '8px', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '8px', marginBottom: '16px' } },
+  return h('div', { class: 'card', style: { display: 'flex', gap: '8px', padding: '8px', marginBottom: '16px' } },
     stat('Day Streak', streak, '🔥'),
     stat('Words Today', wordsToday, '✍️'),
     stat('Total Words', totalWords, '📚'),

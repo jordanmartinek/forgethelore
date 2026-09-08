@@ -215,7 +215,7 @@ function legendDot(color, opacity, label) {
 // ─── Shared bits ─────────────────────────────────────────────────────────────
 
 function statCard(icon, value, label) {
-  return h('div', { style: { background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '14px' } },
+  return h('div', { class: 'card', style: { borderRadius: '10px', padding: '14px' } },
     h('div', { style: { fontSize: '20px', marginBottom: '4px' } }, icon),
     h('div', { style: { fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' } }, value),
     h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, label),
@@ -227,7 +227,7 @@ function sectionTitle(text) {
 }
 
 function warnBox(title, detail) {
-  return h('div', { style: { background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderLeft: '3px solid var(--warning)', borderRadius: '8px', padding: '10px 12px', marginBottom: '10px' } },
+  return h('div', { class: 'card', style: { border: '1px solid var(--border-default)', borderLeft: '3px solid var(--warning)', borderRadius: '8px', padding: '10px 12px', marginBottom: '10px' } },
     h('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' } }, title),
     h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' } }, detail),
   );

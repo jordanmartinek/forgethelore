@@ -111,7 +111,7 @@ function renderFactionDetailContent(fac) {
     collapsible('Overview', true, h('p', { style: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', whiteSpace: 'pre-wrap' } }, fac.description)),
 
     collapsible('Strategic Goal', true, h('div', {},
-      h('div', { style: { padding: '12px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' } }, `🎯 ${fac.goal}`),
+      h('div', { style: { padding: '12px', background: 'var(--accent-primary-soft)', border: '1px solid var(--border-accent)', borderRadius: 'var(--radius-md)', fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)' } }, `🎯 ${fac.goal}`),
     )),
 
     collapsible('Power & Resources', true, h('div', { style: { display: 'grid', gridTemplateColumns: '1fr', gap: '8px' } },
