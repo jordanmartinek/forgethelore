@@ -57,6 +57,24 @@ const PROVIDERS = {
     }),
     extractText: (json) => (Array.isArray(json?.content) ? json.content.map((c) => c.text || '').join('') : ''),
   },
+  // Google Gemini via its OpenAI-compatible endpoint. Request/response shape is
+  // identical to OpenAI (Bearer key + chat/completions), so we reuse the same
+  // body/extract logic. See https://ai.google.dev/gemini-api/docs/openai
+  gemini: {
+    url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    defaultModel: 'gemini-2.0-flash',
+    buildBody: (model, system, user) => ({
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+    }),
+    headers: (key) => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }),
+    extractText: (json) => json?.choices?.[0]?.message?.content ?? '',
+  },
 };
 
 /** Is an AI provider configured with a key? */
