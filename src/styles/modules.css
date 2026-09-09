@@ -656,11 +656,13 @@
 .sprint-active__textarea {
   flex: 1;
   width: 100%;
-  padding: var(--space-xl) var(--space-2xl);
+  max-width: 46rem;        /* comfortable literary measure, centered */
+  margin: 0 auto;
+  padding: var(--space-2xl) var(--space-xl);
   background: var(--bg-primary);
   border: none;
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: 17px;
   font-family: var(--font-sans);
   line-height: 1.9;
   resize: none;

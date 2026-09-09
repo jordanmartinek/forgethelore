@@ -148,13 +148,12 @@ function openOverlay(card, root) {
 
   const hud = h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '14px' } });
 
+  // Shared premium prose surface (.editor-surface): serif, comfortable measure,
+  // centered, borderless. Kept at 18px/1.8 so keepCaretCentered's line-height
+  // constant stays valid.
   const editor = h('textarea', {
+    class: 'editor-surface',
     placeholder: 'Write…',
-    style: {
-      flex: '1', width: '100%', maxWidth: '720px', margin: '0 auto', background: 'transparent',
-      border: 'none', outline: 'none', resize: 'none', color: 'var(--text-primary)',
-      fontSize: '18px', lineHeight: '1.8', fontFamily: 'var(--font-sans)', padding: '0 8px',
-    },
   });
   editor.value = startText;
 
@@ -216,7 +215,7 @@ function openOverlay(card, root) {
     ),
     // Body: editor + rail.
     h('div', { style: { flex: '1', display: 'flex', overflow: 'hidden' } },
-      h('div', { style: { flex: '1', display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '40px 20px' } }, editor),
+      h('div', { style: { flex: '1', display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '64px 24px' } }, editor),
       railEl,
     ),
   );

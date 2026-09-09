@@ -6,10 +6,13 @@
 
 import { h, render } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
-import { db } from '../core/database.js';
 import { getNavGroups, getModuleLabel, renderModuleById } from '../core/registry.js';
 import { APP_NAME, APP_VERSION } from '../core/version.js';
 import { timeAgo, formatNumber, countWords } from '../core/format.js';
+import * as repo from '../core/repo.js';
+import { Collections } from '../core/repo.js';
+import { loadData, persistState } from '../core/persist.js';
+import { generateId } from '../core/objects.js';
 import { openAISettings } from './ai-settings-panel.js';
 import { TEMPLATES, applyTemplate, applyGeneratedWorld } from '../core/templates.js';
 import { renderCommandPalette } from './command-palette.js';
@@ -120,11 +123,75 @@ function createTopBar() {
     h('div', { class: 'topbar__right' },
       createSaveIndicator(),
       createSyncIndicator(),
-      h('button', { class: 'btn btn--ghost btn--icon', title: 'Show/edit reminder banner', 'aria-label': 'Show reminder banner', id: 'banner-btn', onclick: () => showBanner() }, '📌'),
-      h('button', { class: 'btn btn--ghost btn--icon', title: 'Theme', 'aria-label': 'Change theme', id: 'theme-btn', onclick: toggleThemeMenu }, '🎨'),
-      h('button', { class: 'btn btn--ghost btn--icon', title: 'AI Settings', 'aria-label': 'AI Settings', onclick: () => openAISettings() }, '⚙'),
+      // A single quiet overflow menu consolidates the reminder banner, theme,
+      // and AI settings so the header stops competing for attention. The theme
+      // dropdown now anchors under this ⋯ button (#topbar-menu-btn).
+      h('div', { style: { position: 'relative' } },
+        h('button', {
+          class: 'btn btn--ghost btn--icon',
+          id: 'topbar-menu-btn',
+          title: 'Menu',
+          'aria-label': 'Workspace menu',
+          'aria-haspopup': 'true',
+          onclick: toggleWorkspaceMenu,
+        }, '⋯'),
+      ),
     )
   );
+}
+
+// ─── Workspace overflow menu ─────────────────────────────────────────────────
+// Consolidates the previously-competing topbar buttons (reminder banner, theme,
+// AI settings) behind one quiet ⋯ button, keeping the header calm while the
+// writer works. Each item delegates to the existing handlers so behavior is
+// unchanged.
+function toggleWorkspaceMenu() {
+  const existing = document.getElementById('workspace-menu');
+  if (existing) { existing._close ? existing._close() : existing.remove(); return; }
+
+  const btn = document.getElementById('topbar-menu-btn');
+  const rect = btn ? btn.getBoundingClientRect() : { right: 320, bottom: 44 };
+
+  let closeHandler = null;
+  const closeMenu = () => {
+    if (closeHandler) document.removeEventListener('click', closeHandler);
+    menu.remove();
+  };
+
+  const item = (icon, label, onClick) =>
+    h('div', {
+      role: 'button', tabindex: '0',
+      class: 'workspace-menu__item',
+      onclick: () => { closeMenu(); onClick(); },
+      onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeMenu(); onClick(); } },
+    },
+      h('span', { class: 'workspace-menu__icon', 'aria-hidden': 'true' }, icon),
+      h('span', {}, label),
+    );
+
+  const menu = h('div', {
+    id: 'workspace-menu',
+    class: 'workspace-menu',
+    role: 'menu',
+    style: {
+      position: 'fixed', top: `${rect.bottom + 4}px`,
+      right: `${Math.max(8, window.innerWidth - rect.right)}px`,
+    },
+  },
+    item('🎨', 'Theme', toggleThemeMenu),
+    item('✨', 'AI settings', () => openAISettings()),
+    item('📌', 'Reminder banner', () => showBanner()),
+  );
+
+  menu._close = closeMenu;
+  document.body.appendChild(menu);
+
+  setTimeout(() => {
+    closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== btn && (!btn || !btn.contains(e.target))) closeMenu();
+    };
+    document.addEventListener('click', closeHandler);
+  }, 10);
 }
 
 // ─── Theme Picker ────────────────────────────────────────────────────────────
@@ -136,7 +203,8 @@ function toggleThemeMenu() {
   const existing = document.getElementById('theme-menu');
   if (existing) { existing._close ? existing._close() : existing.remove(); return; }
 
-  const btn = document.getElementById('theme-btn');
+  // Anchor under the topbar overflow button (theme is now opened from there).
+  const btn = document.getElementById('topbar-menu-btn') || document.getElementById('theme-btn');
   const rect = btn ? btn.getBoundingClientRect() : { right: 320, bottom: 44 };
   const current = getTheme();
 
@@ -195,9 +263,17 @@ function toggleThemeMenu() {
 }
 
 function createSaveIndicator() {
-  return h('div', { class: 'save-indicator save-indicator--saved', id: 'save-indicator' },
+  // Quiet by default: while everything is saved the indicator is a bare, muted
+  // dot with no pill or label — it should be almost invisible during writing.
+  // It only grows a label/background when something needs attention (saving or
+  // offline). See .save-indicator--quiet in components.css.
+  return h('div', {
+    class: 'save-indicator save-indicator--saved save-indicator--quiet',
+    id: 'save-indicator',
+    title: 'All changes saved',
+  },
     h('span', { class: 'save-indicator__dot' }),
-    h('span', { class: 'save-indicator__text' }, 'All Changes Saved')
+    h('span', { class: 'save-indicator__text' }, 'Saved')
   );
 }
 
@@ -206,13 +282,16 @@ function updateSaveIndicator() {
   if (!indicator) return;
 
   const state = appStore.getState();
-  indicator.className = `save-indicator save-indicator--${state.saveStatus}`;
+  // 'saved' is the quiet state (dot only). 'saving'/'offline' need attention, so
+  // drop the --quiet modifier to reveal the label + pill.
+  const quiet = state.saveStatus === 'saved' ? ' save-indicator--quiet' : '';
+  indicator.className = `save-indicator save-indicator--${state.saveStatus}${quiet}`;
 
   const text = indicator.querySelector('.save-indicator__text');
   switch (state.saveStatus) {
-    case 'saved': text.textContent = 'All Changes Saved'; break;
-    case 'saving': text.textContent = 'Saving...'; break;
-    case 'offline': text.textContent = 'Offline (Queued)'; break;
+    case 'saved': text.textContent = 'Saved'; indicator.title = 'All changes saved'; break;
+    case 'saving': text.textContent = 'Saving…'; indicator.title = 'Saving…'; break;
+    case 'offline': text.textContent = 'Offline (queued)'; indicator.title = 'Offline — changes queued'; break;
   }
 }
 
@@ -274,9 +353,10 @@ function createNavSidebar() {
       h('a', {
         class: `nav-sidebar__home-link ${appStore.getState().activeModule === 'dashboard' ? 'nav-sidebar__home-link--active' : ''}`,
         href: '#',
+        title: 'Home',
         dataset: { module: 'dashboard' },
         onclick: (e) => { e.preventDefault(); appStore.setState({ activeModule: 'dashboard' }); }
-      }, '🏠 Dashboard')
+      }, h('span', { 'aria-hidden': 'true' }, '🏠'), h('span', {}, ' Home'))
     ),
     // Navigation groups
     ...navGroups.map(group => createNavGroup(group)),
@@ -287,7 +367,8 @@ function createNavSidebar() {
         id: 'sidebar-collapse-btn',
         onclick: toggleNavSidebar,
         title: 'Collapse Sidebar',
-      }, '◀ Collapse')
+        'aria-label': 'Collapse sidebar',
+      }, h('span', { class: 'nav-sidebar__collapse-label' }, '◀ Collapse'), h('span', { class: 'nav-sidebar__collapse-icon' }, '▶'))
     )
   );
 
@@ -296,26 +377,63 @@ function createNavSidebar() {
 
 function createNavGroup(group) {
   const state = appStore.getState();
-  const isExpanded = true; // All groups expanded by default
+
+  const primary = group.items.filter((it) => (it.tier || 'primary') !== 'advanced');
+  const advanced = group.items.filter((it) => it.tier === 'advanced');
+
+  // Build a nav item link. `icon` lets collapsed mode show a recognizable glyph
+  // (with the label as a tooltip) and keeps the expanded row scannable.
+  const navItem = (item) =>
+    h('a', {
+      class: `nav-sidebar__item ${state.activeModule === item.id ? 'nav-sidebar__item--active' : ''}`,
+      href: '#',
+      title: item.label,
+      dataset: { module: item.id },
+      onclick: (e) => { e.preventDefault(); appStore.setState({ activeModule: item.id }); },
+    },
+      h('span', { class: 'nav-sidebar__item-icon', 'aria-hidden': 'true' }, item.icon || '•'),
+      h('span', { class: 'nav-sidebar__item-label' }, item.label),
+    );
+
+  const items = h('div', { class: 'nav-sidebar__group-items' },
+    ...primary.map(navItem),
+  );
+
+  // Progressive disclosure: advanced tools live behind a quiet "More" toggle so
+  // the section stays calm, but nothing is hidden from a power user.
+  if (advanced.length) {
+    const moreWrap = h('div', { class: 'nav-sidebar__more', dataset: { open: 'false' } },
+      ...advanced.map(navItem),
+    );
+    const activeInAdvanced = advanced.some((it) => it.id === state.activeModule);
+    if (activeInAdvanced) moreWrap.dataset.open = 'true';
+    const moreBtn = h('button', {
+      class: 'nav-sidebar__more-toggle',
+      type: 'button',
+      'aria-expanded': activeInAdvanced ? 'true' : 'false',
+      onclick: (e) => {
+        const wrap = e.currentTarget.nextElementSibling;
+        const open = wrap.dataset.open === 'true';
+        wrap.dataset.open = open ? 'false' : 'true';
+        e.currentTarget.setAttribute('aria-expanded', open ? 'false' : 'true');
+        e.currentTarget.querySelector('.nav-sidebar__more-label').textContent = open ? `More (${advanced.length})` : 'Less';
+      },
+    },
+      h('span', { class: 'nav-sidebar__more-label' }, activeInAdvanced ? 'Less' : `More (${advanced.length})`),
+    );
+    items.appendChild(moreBtn);
+    items.appendChild(moreWrap);
+  }
 
   return h('div', { class: 'nav-sidebar__group', dataset: { group: group.id } },
     h('div', {
       class: 'nav-sidebar__group-header',
       onclick: (e) => toggleNavGroup(e, group.id),
     },
-      h('span', { class: 'nav-sidebar__group-chevron' }, '▾'),
       h('span', { class: 'nav-sidebar__group-label' }, group.label),
+      h('span', { class: 'nav-sidebar__group-chevron' }, '▾'),
     ),
-    h('div', { class: 'nav-sidebar__group-items' },
-      ...group.items.map(item =>
-        h('a', {
-          class: `nav-sidebar__item ${state.activeModule === item.id ? 'nav-sidebar__item--active' : ''}`,
-          href: '#',
-          dataset: { module: item.id },
-          onclick: (e) => { e.preventDefault(); appStore.setState({ activeModule: item.id }); }
-        }, item.label)
-      )
-    )
+    items,
   );
 }
 
@@ -332,8 +450,10 @@ function toggleNavSidebar() {
   const isCollapsed = layout.classList.toggle('app-layout--sidebar-collapsed');
   const btn = document.getElementById('sidebar-collapse-btn');
   if (btn) {
-    btn.textContent = isCollapsed ? '▶' : '◀ Collapse';
+    // CSS shows/hides the label vs icon spans based on the collapsed class;
+    // just keep the tooltip/aria honest here.
     btn.title = isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
+    btn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
   }
 }
 
@@ -381,100 +501,128 @@ function createStatusBar() {
 
 // ─── Dashboard (Home Screen) ─────────────────────────────────────────────────
 
-async function renderDashboard(container) {
+/**
+ * Gather real, story-centric dashboard data from the live localStorage layer
+ * (repo/persist) rather than the mostly-unused IndexedDB `objects` store, so the
+ * home screen reflects what the writer is actually working on.
+ */
+function gatherStoryData() {
+  // Manuscript prose: the step-keyed scene map { [stepNum]: [{title,content}] }.
+  const manuscript = loadData(Collections.MANUSCRIPT, {}) || {};
+  const scenes = [];
+  let manuscriptWords = 0;
+  if (manuscript && typeof manuscript === 'object') {
+    for (const list of Object.values(manuscript)) {
+      (Array.isArray(list) ? list : []).forEach((card) => {
+        const words = countWords(card && card.content ? card.content : '');
+        manuscriptWords += words;
+        scenes.push({ id: card.id, title: card.title || 'Untitled scene', words, content: card.content || '' });
+      });
+    }
+  }
+
+  // Writing sprints (newest first already) contribute prose + "continue" hints.
+  const sprints = loadData(Collections.SPRINTS, []) || [];
+  const sprintWords = sprints.reduce((sum, s) => sum + (s.wordsWritten || countWords(s.content || '')), 0);
+  const lastSprint = sprints.find((s) => (s.content || '').trim().length) || null;
+
+  const characters = repo.list(Collections.CHARACTERS);
+  const locations = repo.list(Collections.LOCATIONS);
+
+  // Recent work: characters/locations + brainstorm sessions + sprints, by time.
+  const brainstorm = loadData(Collections.BRAINSTORM, []) || [];
+  const recent = [];
+  characters.forEach((c) => recent.push({ type: 'character', name: c.name, ts: c.updatedAt || 0, module: 'characters' }));
+  locations.forEach((l) => recent.push({ type: 'location', name: l.name, ts: l.updatedAt || 0, module: 'locations' }));
+  brainstorm.forEach((b) => recent.push({ type: 'note', name: b.title || 'Note', ts: b.createdAt || 0, module: 'brainstorm' }));
+  sprints.slice(0, 3).forEach((s) => recent.push({ type: 'sprint', name: `${s.wordsWritten || countWords(s.content || '')} words`, ts: s.endedAt || s.startedAt || 0, module: 'writing-sprint' }));
+  const recentItems = recent.filter((r) => r.ts).sort((a, b) => b.ts - a.ts).slice(0, 6);
+
+  return {
+    wordCount: manuscriptWords + sprintWords,
+    sceneCount: scenes.length,
+    characterCount: characters.length,
+    locationCount: locations.length,
+    lastScene: scenes.length ? scenes[scenes.length - 1] : null,
+    lastSprint,
+    recentItems,
+  };
+}
+
+/** Time-of-day greeting for the studio feel. */
+function greeting() {
+  const hr = new Date().getHours();
+  if (hr < 5) return 'Good evening';
+  if (hr < 12) return 'Good morning';
+  if (hr < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function renderDashboard(container) {
   const state = appStore.getState();
   const activeProject = state.projects.find(p => p.id === state.activeProjectId);
   const projectName = activeProject ? activeProject.name : 'LoreForge';
-  const projectIcon = activeProject ? activeProject.icon : '🏰';
+  const data = gatherStoryData();
 
-  // Get data for stats
-  let objectCount = 0;
-  let wordCount = 0;
-  let recentItems = [];
-  try {
-    const objects = await db.getAll('objects');
-    objectCount = objects.length;
-    // Calculate word count from text fields
-    objects.forEach(obj => {
-      if (obj.content) wordCount += countWords(obj.content);
-      if (obj.description) wordCount += countWords(obj.description);
-      if (obj.notes) wordCount += countWords(obj.notes);
-      if (obj.text) wordCount += countWords(obj.text);
-      if (obj.body) wordCount += countWords(obj.body);
-    });
-    // Get recent items sorted by updatedAt
-    recentItems = objects
-      .filter(obj => obj.updatedAt)
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, 8);
-  } catch (e) {
-    // DB might be empty
-  }
+  const go = (id) => appStore.setState({ activeModule: id });
 
-  const dashboard = h('div', { class: 'dashboard' },
-    // Header
-    h('div', { class: 'dashboard__header' },
-      h('div', { class: 'dashboard__greeting' },
-        h('h1', { class: 'dashboard__title' }, `${projectIcon} ${projectName}`),
-        h('p', { class: 'dashboard__subtitle' }, activeProject?.description || 'Your creative planning workspace'),
+  // What to continue: the last-written scene if any, else the manuscript.
+  const continueLabel = data.lastScene && data.lastScene.title
+    ? data.lastScene.title
+    : (data.lastSprint ? 'Your last writing sprint' : 'Start your manuscript');
+  const continueSub = data.lastScene
+    ? `${formatNumber(data.lastScene.words)} words`
+    : (data.lastSprint ? `${formatNumber(data.lastSprint.wordsWritten || countWords(data.lastSprint.content || ''))} words` : 'Chapter 1');
+  const continueTarget = data.lastSprint && !data.lastScene ? 'writing-sprint' : 'manuscript';
+
+  const dashboard = h('div', { class: 'studio' },
+    // ── Greeting + Continue Writing hero ──────────────────────────────────
+    h('div', { class: 'studio__hero' },
+      h('p', { class: 'studio__greeting' }, `${greeting()}.`),
+      h('h1', { class: 'studio__project' }, projectName),
+      activeProject?.description
+        ? h('p', { class: 'studio__tagline' }, activeProject.description)
+        : null,
+      h('div', { class: 'studio__continue card card--editorial' },
+        h('div', { class: 'studio__continue-info' },
+          h('div', { class: 'studio__continue-eyebrow' }, 'Continue writing'),
+          h('div', { class: 'studio__continue-title' }, continueLabel),
+          h('div', { class: 'studio__continue-sub' }, continueSub),
+        ),
+        h('button', { class: 'btn btn--primary studio__continue-btn', onclick: () => go(continueTarget) }, 'Continue →'),
       ),
     ),
 
-    // Stats Row
-    h('div', { class: 'dashboard__stats' },
-      createStatCard('📝', 'Word Count', formatNumber(wordCount), 'Across all entries'),
-      createStatCard('📦', 'Total Objects', String(objectCount), 'Characters, locations, etc.'),
-      createStatCard('🗂️', 'Projects', String(state.projects.length), 'Active universes'),
-      createStatCard('💾', 'Status', state.saveStatus === 'saved' ? 'Saved' : state.saveStatus === 'saving' ? 'Saving...' : 'Offline', 'Data persistence'),
+    // ── Story progress ────────────────────────────────────────────────────
+    h('div', { class: 'studio__stats' },
+      studioStat(formatNumber(data.wordCount), 'Words'),
+      studioStat(String(data.sceneCount), data.sceneCount === 1 ? 'Scene' : 'Scenes'),
+      studioStat(String(data.characterCount), data.characterCount === 1 ? 'Character' : 'Characters'),
+      studioStat(String(data.locationCount), data.locationCount === 1 ? 'Place' : 'Places'),
     ),
 
-    // Quick Actions
-    h('div', { class: 'dashboard__section' },
-      h('h2', { class: 'dashboard__section-title' }, 'Quick Actions'),
-      h('div', { class: 'dashboard__actions' },
-        createQuickAction('📖', 'Open Manuscript', () => appStore.setState({ activeModule: 'manuscript' })),
-        createQuickAction('⚡', 'Quick Log', () => appStore.setState({ activeModule: 'quick-log' })),
-        createQuickAction('💭', 'Brainstorm', () => appStore.setState({ activeModule: 'brainstorm' })),
-        createQuickAction('♟️', 'Strategic Board', () => appStore.setState({ activeModule: 'conflict-board' })),
-        createQuickAction('👤', 'Characters', () => appStore.setState({ activeModule: 'characters' })),
-        createQuickAction('🕸️', 'Knowledge Graph', () => appStore.setState({ activeModule: 'knowledge-graph' })),
-        createQuickAction('📊', 'Analytics', () => appStore.setState({ activeModule: 'analytics' })),
-        createQuickAction('⏳', 'Timeline', () => appStore.setState({ activeModule: 'timeline' })),
-      ),
+    // ── Quick capture ─────────────────────────────────────────────────────
+    h('div', { class: 'studio__section' },
+      h('h2', { class: 'studio__section-title' }, 'Quick capture'),
+      renderQuickCapture(),
     ),
 
-    // Recent Items
-    h('div', { class: 'dashboard__section' },
-      h('h2', { class: 'dashboard__section-title' }, 'Recent Items'),
-      recentItems.length > 0
-        ? h('div', { class: 'dashboard__recent' },
-            ...recentItems.map(item => createRecentItem(item))
-          )
-        : h('div', { class: 'dashboard__empty' },
-            h('p', {}, 'No items yet. Start by creating objects in any module!'),
-          ),
+    // ── Recent work ───────────────────────────────────────────────────────
+    h('div', { class: 'studio__section' },
+      h('h2', { class: 'studio__section-title' }, 'Recent work'),
+      data.recentItems.length
+        ? h('div', { class: 'studio__recent' }, ...data.recentItems.map(createRecentItem))
+        : h('p', { class: 'studio__empty' }, 'Your recent characters, places and notes will appear here as you build your story.'),
     ),
 
-    // Navigation Guide
-    h('div', { class: 'dashboard__section' },
-      h('h2', { class: 'dashboard__section-title' }, 'Modules Overview'),
-      h('div', { class: 'dashboard__modules-grid' },
-        ...navGroups.map(group =>
-          h('div', { class: 'dashboard__module-group' },
-            h('h3', { class: 'dashboard__module-group-title' }, group.label),
-            h('ul', { class: 'dashboard__module-list' },
-              ...group.items.map(item =>
-                h('li', {},
-                  h('a', {
-                    href: '#',
-                    class: 'dashboard__module-link',
-                    onclick: (e) => { e.preventDefault(); appStore.setState({ activeModule: item.id }); }
-                  }, item.label)
-                )
-              )
-            )
-          )
-        )
+    // ── Jump back in (a few primary destinations, not every module) ────────
+    h('div', { class: 'studio__section' },
+      h('h2', { class: 'studio__section-title' }, 'Jump back in'),
+      h('div', { class: 'studio__jump' },
+        jumpCard('📖', 'Manuscript', 'Write your story', () => go('manuscript')),
+        jumpCard('👤', 'Characters', 'Your story\u2019s people', () => go('characters')),
+        jumpCard('🌌', 'World', 'Explore your world', () => go('world-builder')),
+        jumpCard('⏳', 'Timeline', 'Events & continuity', () => go('timeline')),
       ),
     ),
   );
@@ -482,38 +630,75 @@ async function renderDashboard(container) {
   container.appendChild(dashboard);
 }
 
-function createStatCard(icon, label, value, description) {
-  return h('div', { class: 'dashboard__stat-card' },
-    h('div', { class: 'dashboard__stat-icon' }, icon),
-    h('div', { class: 'dashboard__stat-info' },
-      h('div', { class: 'dashboard__stat-value' }, value),
-      h('div', { class: 'dashboard__stat-label' }, label),
-      h('div', { class: 'dashboard__stat-desc' }, description),
-    )
+function studioStat(value, label) {
+  return h('div', { class: 'studio__stat' },
+    h('div', { class: 'studio__stat-value' }, value),
+    h('div', { class: 'studio__stat-label' }, label),
   );
 }
 
-function createQuickAction(icon, label, onclick) {
-  return h('button', { class: 'dashboard__action-btn', onclick },
-    h('span', { class: 'dashboard__action-icon' }, icon),
-    h('span', { class: 'dashboard__action-label' }, label),
+/**
+ * Frictionless quick capture: a note the writer can jot without deciding where
+ * it belongs. Saving creates a brainstorm session (same shape/store the
+ * Brainstorm module uses) so it can later become a character, place, event, etc.
+ */
+function renderQuickCapture() {
+  const textarea = h('textarea', {
+    class: 'input studio__capture-input',
+    rows: '2',
+    placeholder: 'What\u2019s on your mind? Capture an idea…',
+  });
+
+  const save = () => {
+    const text = (textarea.value || '').trim();
+    if (!text) return;
+    const sessions = loadData(Collections.BRAINSTORM, []) || [];
+    const firstLine = text.split('\n')[0].slice(0, 50);
+    sessions.unshift({ id: generateId(), title: firstLine || `Note — ${new Date().toLocaleDateString()}`, content: text, createdAt: Date.now() });
+    persistState(Collections.BRAINSTORM, sessions);
+    textarea.value = '';
+    // Reflect the new note immediately by re-rendering the dashboard.
+    renderActiveModule();
+  };
+
+  return h('div', { class: 'studio__capture card' },
+    textarea,
+    h('div', { class: 'studio__capture-actions' },
+      h('span', { class: 'studio__capture-hint' }, 'Saved to Brainstorm — turn it into anything later.'),
+      h('button', { class: 'btn btn--primary btn--sm', onclick: save }, 'Capture'),
+    ),
+  );
+}
+
+function jumpCard(icon, title, sub, onclick) {
+  return h('button', { class: 'studio__jump-card card card--interactive', onclick },
+    h('span', { class: 'studio__jump-icon' }, icon),
+    h('span', { class: 'studio__jump-title' }, title),
+    h('span', { class: 'studio__jump-sub' }, sub),
   );
 }
 
 function createRecentItem(item) {
   const typeIcons = {
     character: '👤', location: '📍', faction: '⚔️', scene: '🎬',
-    note: '📝', event: '📅', species: '🧬', religion: '🕯️',
+    note: '📝', sprint: '⏱️', event: '📅', species: '🧬', religion: '🕯️',
     organization: '🏢', military: '⚔️', technology: '⚙️',
   };
   const icon = typeIcons[item.type] || '📋';
-  const timeStr = item.updatedAt ? timeAgo(item.updatedAt) : '';
+  const timeStr = item.ts ? timeAgo(item.ts) : (item.updatedAt ? timeAgo(item.updatedAt) : '');
+  const target = item.module;
 
-  return h('div', { class: 'dashboard__recent-item' },
-    h('span', { class: 'dashboard__recent-icon' }, icon),
-    h('div', { class: 'dashboard__recent-info' },
-      h('span', { class: 'dashboard__recent-name' }, item.name || item.title || 'Untitled'),
-      h('span', { class: 'dashboard__recent-meta' }, `${item.type || 'object'} · ${timeStr}`),
+  return h('div', {
+    class: 'studio__recent-item',
+    role: target ? 'button' : undefined,
+    tabindex: target ? '0' : undefined,
+    onclick: target ? () => appStore.setState({ activeModule: target }) : undefined,
+    onkeydown: target ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); appStore.setState({ activeModule: target }); } } : undefined,
+  },
+    h('span', { class: 'studio__recent-icon' }, icon),
+    h('div', { class: 'studio__recent-info' },
+      h('span', { class: 'studio__recent-name' }, item.name || item.title || 'Untitled'),
+      h('span', { class: 'studio__recent-meta' }, `${item.type || 'item'}${timeStr ? ` · ${timeStr}` : ''}`),
     ),
   );
 }
