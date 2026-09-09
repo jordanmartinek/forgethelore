@@ -167,7 +167,7 @@ function openPushModal(session) {
       `Found ${pushItems.length} tagged section(s). Review and approve what you want to push to other modules:`,
     ),
     ...itemStates.map((item, idx) =>
-      h('div', { style: { padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', marginBottom: '8px', border: '1px solid var(--border-subtle)' } },
+      h('div', { class: 'card', style: { padding: 'var(--space-md)', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-sm)' } },
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } },
           h('input', { type: 'checkbox', checked: true, onchange: (e) => { itemStates[idx].approved = e.target.checked; } }),
           h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: getTagBgColor(item.type), color: getTagColor(item.type), fontWeight: '600' } }, item.type),
