@@ -55,57 +55,95 @@ import { renderPovAnalytics } from '../modules/pov-analytics.js';
  * @property {string} id       Stable module id used in the app store.
  * @property {string} label    Human-friendly name for nav/palette/status bar.
  * @property {string} icon     Emoji icon.
- * @property {string} group    Sidebar group: 'write' | 'plan' | 'world' | 'analysis'.
+ * @property {string} group    LEGACY coarse group ('write'|'plan'|'world'|'analysis').
+ *                             Kept for backward compatibility; the sidebar now
+ *                             reads `section`.
+ * @property {string} section  Story-centric nav section: 'write' | 'story' |
+ *                             'world' | 'create' | 'insights' | 'settings'.
+ * @property {'primary'|'advanced'} tier  Whether the item shows in the section's
+ *                             always-visible list (primary) or is tucked behind a
+ *                             "More" disclosure (advanced) — progressive disclosure
+ *                             so the sidebar stays quiet without hiding features.
  * @property {(container: HTMLElement, id: string) => void} render
  * @property {boolean} [hidden] If true, not shown in the sidebar (still routable).
  */
 
-/** @type {ModuleDef[]} */
+/**
+ * The module registry — the single source of truth. The redesign reorganizes
+ * these into a story-centric hierarchy (section + tier) WITHOUT removing any
+ * module: everything remains routable and discoverable. The mental model is
+ * "here is your story; everything else helps you work on it", so the sections
+ * are ordered Write → Story → World → Create → Insights → Settings, and the
+ * powerful-but-occasional tools are marked `tier: 'advanced'` so the sidebar can
+ * keep them one disclosure away instead of shouting all 30+ at once.
+ *
+ * @type {ModuleDef[]}
+ */
 export const MODULES = [
-  // ── Write ──────────────────────────────────────────────────────────────
-  { id: 'manuscript',      label: 'Manuscript',      icon: '📖', group: 'write',    render: renderManuscriptPlanner },
-  { id: 'focus-mode',      label: 'Focus Mode',      icon: '✍️', group: 'write',    render: renderFocusMode },
-  { id: 'quick-log',       label: 'Quick Log',       icon: '⚡', group: 'write',    render: renderQuickSceneLog },
-  { id: 'brainstorm',      label: 'Brainstorm',      icon: '💭', group: 'write',    render: renderBrainstorm },
-  { id: 'character-interview', label: 'Interview Character', icon: '💬', group: 'write', render: renderCharacterInterview },
-  { id: 'writing-sprint',  label: 'Writing Sprint',  icon: '⏱️', group: 'write',    render: renderWritingSprint },
+  // ── WRITE — what writers use constantly ─────────────────────────────────
+  { id: 'manuscript',      label: 'Manuscript',      icon: '📖', section: 'write', tier: 'primary',  group: 'write',    render: renderManuscriptPlanner },
+  { id: 'quick-log',       label: 'Notes / Quick Log', icon: '⚡', section: 'write', tier: 'primary', group: 'write',    render: renderQuickSceneLog },
+  { id: 'focus-mode',      label: 'Focus Mode',      icon: '✍️', section: 'write', tier: 'advanced', group: 'write',    render: renderFocusMode },
 
-  // ── Plan ───────────────────────────────────────────────────────────────
-  { id: 'conflict-board',  label: 'Strategic Board', icon: '♟️', group: 'plan',     render: renderConflictBoard },
-  { id: 'confrontations',  label: 'Confrontations',  icon: '⚔️', group: 'plan',     render: renderConfrontations },
-  { id: 'daily-planner',   label: 'Daily Planner',   icon: '📅', group: 'plan',     render: renderDailyPlanner },
-  { id: 'timeline',        label: 'Timeline',        icon: '⏳', group: 'plan',     render: renderTimeline },
-  { id: 'mysteries',       label: 'Conflicts & Mysteries', icon: '🔍', group: 'plan', render: renderMysteryPlanner },
+  // ── STORY — the people, places and structure of the story ───────────────
+  { id: 'characters',      label: 'Characters',      icon: '👤', section: 'story', tier: 'primary',  group: 'world',    render: renderCharacterPlanner },
+  { id: 'locations',       label: 'Places',          icon: '📍', section: 'story', tier: 'primary',  group: 'world',    render: renderLocationPlanner },
+  { id: 'timeline',        label: 'Timeline',        icon: '⏳', section: 'story', tier: 'primary',  group: 'plan',     render: renderTimeline },
+  { id: 'relationships',   label: 'Relationships',   icon: '💫', section: 'story', tier: 'primary',  group: 'analysis', render: renderRelationshipPlanner },
+  { id: 'character-builder', label: 'Character Builder', icon: '🪪', section: 'story', tier: 'advanced', group: 'world', render: renderCharacterBuilder },
+  { id: 'knowledge-matrix',label: 'Character Arcs',  icon: '📈', section: 'story', tier: 'advanced', group: 'analysis', render: renderCharacterArc },
+  { id: 'family-tree',     label: 'Family Trees',    icon: '🌳', section: 'story', tier: 'advanced', group: 'analysis', render: renderFamilyTree },
 
-  // ── World ──────────────────────────────────────────────────────────────
-  { id: 'world-builder',   label: 'World Builder',   icon: '🌌', group: 'world',    render: renderWorldBuilder },
-  { id: 'characters',      label: 'Characters',      icon: '👤', group: 'world',    render: renderCharacterPlanner },
-  { id: 'character-builder', label: 'Character Builder', icon: '🪪', group: 'world', render: renderCharacterBuilder },
-  { id: 'factions',        label: 'Factions',        icon: '⚔️', group: 'world',    render: renderFactionPlanner },
-  { id: 'locations',       label: 'Locations',       icon: '📍', group: 'world',    render: renderLocationPlanner },
-  { id: 'world-map',       label: 'Interactive Map', icon: '🗺️', group: 'world',    render: renderWorldMap },
-  { id: 'species',         label: 'Species',         icon: '🧬', group: 'world',    render: renderSpeciesPlanner },
-  { id: 'languages',       label: 'Languages',       icon: '🗣️', group: 'world',    render: renderLanguagePlanner },
-  { id: 'religions',       label: 'Religions',       icon: '🕯️', group: 'world',    render: renderReligionPlanner },
-  { id: 'organizations',   label: 'Organizations',   icon: '🏢', group: 'world',    render: renderOrganizationPlanner },
-  { id: 'politics',        label: 'Politics',        icon: '🏛️', group: 'world',    render: renderPoliticsPlanner },
-  { id: 'military',        label: 'Military',        icon: '🎖️', group: 'world',    render: renderMilitaryPlanner },
-  { id: 'technology',      label: 'Technology',      icon: '⚙️', group: 'world',    render: renderTechnologyPlanner },
-  { id: 'resources',       label: 'Resources',       icon: '💎', group: 'world',    render: renderResourcePlanner },
+  // ── WORLD — worldbuilding, with hierarchical discovery ──────────────────
+  { id: 'world-builder',   label: 'World',           icon: '🌌', section: 'world', tier: 'primary',  group: 'world',    render: renderWorldBuilder },
+  { id: 'world-map',       label: 'Map',             icon: '🗺️', section: 'world', tier: 'primary',  group: 'world',    render: renderWorldMap },
+  { id: 'factions',        label: 'Factions',        icon: '⚔️', section: 'world', tier: 'primary',  group: 'world',    render: renderFactionPlanner },
+  { id: 'species',         label: 'Species',         icon: '🧬', section: 'world', tier: 'advanced', group: 'world',    render: renderSpeciesPlanner },
+  { id: 'languages',       label: 'Languages',       icon: '🗣️', section: 'world', tier: 'advanced', group: 'world',    render: renderLanguagePlanner },
+  { id: 'religions',       label: 'Religions',       icon: '🕯️', section: 'world', tier: 'advanced', group: 'world',    render: renderReligionPlanner },
+  { id: 'organizations',   label: 'Organizations',   icon: '🏢', section: 'world', tier: 'advanced', group: 'world',    render: renderOrganizationPlanner },
+  { id: 'politics',        label: 'Politics',        icon: '🏛️', section: 'world', tier: 'advanced', group: 'world',    render: renderPoliticsPlanner },
+  { id: 'military',        label: 'Military',        icon: '🎖️', section: 'world', tier: 'advanced', group: 'world',    render: renderMilitaryPlanner },
+  { id: 'technology',      label: 'Technology',      icon: '⚙️', section: 'world', tier: 'advanced', group: 'world',    render: renderTechnologyPlanner },
+  { id: 'resources',       label: 'Resources',       icon: '💎', section: 'world', tier: 'advanced', group: 'world',    render: renderResourcePlanner },
 
-  // ── Analysis ───────────────────────────────────────────────────────────
-  { id: 'knowledge-graph', label: 'Knowledge Graph', icon: '🕸️', group: 'analysis', render: renderKnowledgeGraph },
-  { id: 'relationships',   label: 'Relationships',   icon: '💫', group: 'analysis', render: renderRelationshipPlanner },
-  { id: 'knowledge-matrix',label: 'Character Arcs',  icon: '📈', group: 'analysis', render: renderCharacterArc },
-  { id: 'story-analytics', label: 'Story Analytics', icon: '🎢', group: 'analysis', render: renderStoryAnalytics },
-  { id: 'secrets-matrix',  label: 'Knowledge & Setups', icon: '🕵️', group: 'analysis', render: renderKnowledgeMatrix },
-  { id: 'family-tree',     label: 'Family Trees',    icon: '🌳', group: 'analysis', render: renderFamilyTree },
-  { id: 'analytics',       label: 'Analytics',       icon: '📊', group: 'analysis', render: renderAnalytics },
-  { id: 'pov-analytics',   label: 'Word & POV',      icon: '🎭', group: 'analysis', render: renderPovAnalytics },
-  { id: 'export-import',   label: 'Export / Import', icon: '💾', group: 'analysis', render: renderExportImport },
+  // ── CREATE — generative & planning workspaces ───────────────────────────
+  { id: 'brainstorm',      label: 'Brainstorm',      icon: '💭', section: 'create', tier: 'primary',  group: 'write',   render: renderBrainstorm },
+  { id: 'writing-sprint',  label: 'Writing Sprint',  icon: '⏱️', section: 'create', tier: 'primary',  group: 'write',   render: renderWritingSprint },
+  { id: 'character-interview', label: 'Interview Character', icon: '💬', section: 'create', tier: 'primary', group: 'write', render: renderCharacterInterview },
+  { id: 'conflict-board',  label: 'Strategic Board', icon: '♟️', section: 'create', tier: 'advanced', group: 'plan',    render: renderConflictBoard },
+  { id: 'confrontations',  label: 'Confrontations',  icon: '⚔️', section: 'create', tier: 'advanced', group: 'plan',    render: renderConfrontations },
+  { id: 'daily-planner',   label: 'Daily Planner',   icon: '📅', section: 'create', tier: 'advanced', group: 'plan',    render: renderDailyPlanner },
+  { id: 'mysteries',       label: 'Conflicts & Mysteries', icon: '🔍', section: 'create', tier: 'advanced', group: 'plan', render: renderMysteryPlanner },
+
+  // ── INSIGHTS — advanced analysis, subordinate to writing ────────────────
+  { id: 'story-analytics', label: 'Story Analytics', icon: '🎢', section: 'insights', tier: 'primary',  group: 'analysis', render: renderStoryAnalytics },
+  { id: 'knowledge-graph', label: 'Knowledge Graph', icon: '🕸️', section: 'insights', tier: 'advanced', group: 'analysis', render: renderKnowledgeGraph },
+  { id: 'secrets-matrix',  label: 'Knowledge & Setups', icon: '🕵️', section: 'insights', tier: 'advanced', group: 'analysis', render: renderKnowledgeMatrix },
+  { id: 'pov-analytics',   label: 'Word & POV',      icon: '🎭', section: 'insights', tier: 'advanced', group: 'analysis', render: renderPovAnalytics },
+  { id: 'analytics',       label: 'Analytics',       icon: '📊', section: 'insights', tier: 'advanced', group: 'analysis', render: renderAnalytics },
+
+  // ── SETTINGS ────────────────────────────────────────────────────────────
+  { id: 'export-import',   label: 'Import / Export', icon: '💾', section: 'settings', tier: 'primary', group: 'analysis', render: renderExportImport },
 ];
 
-/** Ordered sidebar groups with their display labels. */
+/**
+ * Ordered nav sections with display labels. This is the story-centric hierarchy
+ * the sidebar and command palette render.
+ */
+export const SECTIONS = [
+  { id: 'write',    label: 'Write' },
+  { id: 'story',    label: 'Story' },
+  { id: 'world',    label: 'World' },
+  { id: 'create',   label: 'Create' },
+  { id: 'insights', label: 'Insights' },
+  { id: 'settings', label: 'Settings' },
+];
+
+/**
+ * LEGACY coarse groups. Retained so any consumer still reading `GROUPS` /
+ * `m.group` keeps working; the sidebar now uses `SECTIONS` / `m.section`.
+ */
 export const GROUPS = [
   { id: 'write',    label: 'Write' },
   { id: 'plan',     label: 'Plan' },
@@ -126,14 +164,18 @@ export function getModuleLabel(id) {
   return BY_ID.get(id)?.label || id;
 }
 
-/** Build the grouped nav structure the sidebar expects. */
+/**
+ * Build the story-centric sectioned nav structure the sidebar expects. Each
+ * item carries its `tier` so the sidebar can show primary items and tuck
+ * advanced ones behind a "More" disclosure — no feature is removed.
+ */
 export function getNavGroups() {
-  return GROUPS.map((g) => ({
-    id: g.id,
-    label: g.label,
-    items: MODULES.filter((m) => m.group === g.id && !m.hidden)
-      .map((m) => ({ id: m.id, label: m.label, icon: m.icon })),
-  }));
+  return SECTIONS.map((s) => ({
+    id: s.id,
+    label: s.label,
+    items: MODULES.filter((m) => m.section === s.id && !m.hidden)
+      .map((m) => ({ id: m.id, label: m.label, icon: m.icon, tier: m.tier || 'primary' })),
+  })).filter((s) => s.items.length > 0);
 }
 
 /**

@@ -144,12 +144,16 @@ try {
   const nav = reg.getNavGroups();
   const total = nav.reduce((n, g) => n + g.items.length, 0);
   if (total !== reg.MODULES.length) throw new Error(`nav items (${total}) != MODULES (${reg.MODULES.length})`);
-  // Every module must have a render fn and a group.
+  // Every module must have a render fn, a valid nav section, and a tier.
+  const SECTION_IDS = new Set(reg.SECTIONS.map((s) => s.id));
   for (const mod of reg.MODULES) {
     if (typeof mod.render !== 'function') throw new Error(`module ${mod.id} has no render fn`);
+    if (!SECTION_IDS.has(mod.section)) throw new Error(`module ${mod.id} bad section ${mod.section}`);
+    if (!['primary', 'advanced'].includes(mod.tier)) throw new Error(`module ${mod.id} bad tier ${mod.tier}`);
+    // Legacy coarse group retained for backward compatibility.
     if (!['write', 'plan', 'world', 'analysis'].includes(mod.group)) throw new Error(`module ${mod.id} bad group ${mod.group}`);
   }
-  console.log(`OK    registry: ${reg.MODULES.length} modules, all render fns present, nav covers all`);
+  console.log(`OK    registry: ${reg.MODULES.length} modules, all render fns present, nav covers all, sections+tiers valid`);
 } catch (e) {
   failed = true;
   console.error('FAIL  registry checks:', e.message);

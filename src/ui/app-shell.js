@@ -274,9 +274,10 @@ function createNavSidebar() {
       h('a', {
         class: `nav-sidebar__home-link ${appStore.getState().activeModule === 'dashboard' ? 'nav-sidebar__home-link--active' : ''}`,
         href: '#',
+        title: 'Home',
         dataset: { module: 'dashboard' },
         onclick: (e) => { e.preventDefault(); appStore.setState({ activeModule: 'dashboard' }); }
-      }, '🏠 Dashboard')
+      }, h('span', { 'aria-hidden': 'true' }, '🏠'), h('span', {}, ' Home'))
     ),
     // Navigation groups
     ...navGroups.map(group => createNavGroup(group)),
@@ -287,7 +288,8 @@ function createNavSidebar() {
         id: 'sidebar-collapse-btn',
         onclick: toggleNavSidebar,
         title: 'Collapse Sidebar',
-      }, '◀ Collapse')
+        'aria-label': 'Collapse sidebar',
+      }, h('span', { class: 'nav-sidebar__collapse-label' }, '◀ Collapse'), h('span', { class: 'nav-sidebar__collapse-icon' }, '▶'))
     )
   );
 
@@ -296,26 +298,63 @@ function createNavSidebar() {
 
 function createNavGroup(group) {
   const state = appStore.getState();
-  const isExpanded = true; // All groups expanded by default
+
+  const primary = group.items.filter((it) => (it.tier || 'primary') !== 'advanced');
+  const advanced = group.items.filter((it) => it.tier === 'advanced');
+
+  // Build a nav item link. `icon` lets collapsed mode show a recognizable glyph
+  // (with the label as a tooltip) and keeps the expanded row scannable.
+  const navItem = (item) =>
+    h('a', {
+      class: `nav-sidebar__item ${state.activeModule === item.id ? 'nav-sidebar__item--active' : ''}`,
+      href: '#',
+      title: item.label,
+      dataset: { module: item.id },
+      onclick: (e) => { e.preventDefault(); appStore.setState({ activeModule: item.id }); },
+    },
+      h('span', { class: 'nav-sidebar__item-icon', 'aria-hidden': 'true' }, item.icon || '•'),
+      h('span', { class: 'nav-sidebar__item-label' }, item.label),
+    );
+
+  const items = h('div', { class: 'nav-sidebar__group-items' },
+    ...primary.map(navItem),
+  );
+
+  // Progressive disclosure: advanced tools live behind a quiet "More" toggle so
+  // the section stays calm, but nothing is hidden from a power user.
+  if (advanced.length) {
+    const moreWrap = h('div', { class: 'nav-sidebar__more', dataset: { open: 'false' } },
+      ...advanced.map(navItem),
+    );
+    const activeInAdvanced = advanced.some((it) => it.id === state.activeModule);
+    if (activeInAdvanced) moreWrap.dataset.open = 'true';
+    const moreBtn = h('button', {
+      class: 'nav-sidebar__more-toggle',
+      type: 'button',
+      'aria-expanded': activeInAdvanced ? 'true' : 'false',
+      onclick: (e) => {
+        const wrap = e.currentTarget.nextElementSibling;
+        const open = wrap.dataset.open === 'true';
+        wrap.dataset.open = open ? 'false' : 'true';
+        e.currentTarget.setAttribute('aria-expanded', open ? 'false' : 'true');
+        e.currentTarget.querySelector('.nav-sidebar__more-label').textContent = open ? `More (${advanced.length})` : 'Less';
+      },
+    },
+      h('span', { class: 'nav-sidebar__more-label' }, activeInAdvanced ? 'Less' : `More (${advanced.length})`),
+    );
+    items.appendChild(moreBtn);
+    items.appendChild(moreWrap);
+  }
 
   return h('div', { class: 'nav-sidebar__group', dataset: { group: group.id } },
     h('div', {
       class: 'nav-sidebar__group-header',
       onclick: (e) => toggleNavGroup(e, group.id),
     },
-      h('span', { class: 'nav-sidebar__group-chevron' }, '▾'),
       h('span', { class: 'nav-sidebar__group-label' }, group.label),
+      h('span', { class: 'nav-sidebar__group-chevron' }, '▾'),
     ),
-    h('div', { class: 'nav-sidebar__group-items' },
-      ...group.items.map(item =>
-        h('a', {
-          class: `nav-sidebar__item ${state.activeModule === item.id ? 'nav-sidebar__item--active' : ''}`,
-          href: '#',
-          dataset: { module: item.id },
-          onclick: (e) => { e.preventDefault(); appStore.setState({ activeModule: item.id }); }
-        }, item.label)
-      )
-    )
+    items,
   );
 }
 
@@ -332,8 +371,10 @@ function toggleNavSidebar() {
   const isCollapsed = layout.classList.toggle('app-layout--sidebar-collapsed');
   const btn = document.getElementById('sidebar-collapse-btn');
   if (btn) {
-    btn.textContent = isCollapsed ? '▶' : '◀ Collapse';
+    // CSS shows/hides the label vs icon spans based on the collapsed class;
+    // just keep the tooltip/aria honest here.
     btn.title = isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
+    btn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
   }
 }
 
