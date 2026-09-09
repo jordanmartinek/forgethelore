@@ -134,7 +134,8 @@ function renderStep(step) {
   const isActive = activeStepNum === step.num;
 
   return h('div', {
-    style: { background: 'var(--surface-1)', borderRadius: '12px', border: `1px solid ${isActive ? step.color : 'var(--border-subtle)'}`, padding: '14px', transition: 'all 0.15s ease', minHeight: '120px' },
+    class: 'card',
+    style: { border: `1px solid ${isActive ? step.color : 'var(--border-subtle)'}`, padding: '14px', transition: 'all 0.15s ease', minHeight: '120px' },
     ondragover: (e) => { e.preventDefault(); e.currentTarget.style.borderColor = step.color; e.currentTarget.style.background = step.color + '08'; },
     ondragleave: (e) => { e.currentTarget.style.borderColor = isActive ? step.color : 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--surface-1)'; },
     ondrop: (e) => handleDropOnStep(e, step.num),

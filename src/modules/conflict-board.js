@@ -1167,7 +1167,7 @@ function renderSceneIntel() {
         h('div', { class: 'intel-section__title' }, '⚡ CUMULATIVE POWER SHIFTS'),
         ...factions.map(f => {
           const totalShift = scenes.reduce((sum, s) => sum + (s.powerShift[f.id] || 0), 0);
-          return h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' } },
+          return h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' } },
             h('span', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, `${f.icon} ${f.name}`),
             h('span', { style: { fontSize: '13px', fontWeight: '700', color: totalShift > 0 ? 'var(--success)' : totalShift < 0 ? 'var(--danger)' : 'var(--text-muted)' } }, `${totalShift > 0 ? '+' : ''}${totalShift}%`),
           );
