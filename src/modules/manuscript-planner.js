@@ -90,9 +90,9 @@ function renderHeader() {
   const totalCards = Object.values(sceneCards).reduce((sum, arr) => sum + arr.length, 0);
   const filledSteps = Object.keys(sceneCards).filter(k => sceneCards[k].length > 0).length;
 
-  return h('div', { style: { padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: '0' } },
+  return h('div', { style: { padding: '20px 32px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: '0' } },
     h('div', {},
-      h('h2', { style: { fontSize: '18px', fontWeight: '700', marginBottom: '2px' } }, '📖 Manuscript Structure'),
+      h('h2', { style: { fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: '600', marginBottom: '2px', letterSpacing: '-0.01em' } }, 'Manuscript'),
       h('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, `John Truby's 22 Steps • ${totalCards} scene cards • ${filledSteps}/22 steps filled`),
     ),
     h('div', { style: { display: 'flex', gap: '8px' } },

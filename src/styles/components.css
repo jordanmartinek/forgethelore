@@ -1869,3 +1869,41 @@ textarea.input {
   .studio__continue-btn { width: 100%; }
   .studio__stats { gap: var(--space-xl); }
 }
+
+
+/* ─── Editor surface (shared premium prose surface) ────────────────────────────
+ * The canonical "elegant sheet of paper" for all writing surfaces (Focus Mode,
+ * Writing Sprint, and any future manuscript editor). Serif story type, a
+ * comfortable reading measure, generous line-height, centered, borderless and
+ * transparent so the prose — not chrome — is what the writer sees.
+ *
+ * NOTE: keep font-size 18px / line-height 1.8 in sync with Focus Mode's
+ * keepCaretCentered() line-height constant (~32px) if you change them.
+ */
+.editor-surface {
+  flex: 1;
+  width: 100%;
+  max-width: 46rem;      /* ~66 characters — a comfortable literary measure */
+  margin: 0 auto;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);   /* Fraunces serif — story voice */
+  font-size: 18px;
+  line-height: 1.8;
+  padding: 0 var(--space-sm);
+  box-shadow: none;
+}
+
+.editor-surface::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.editor-surface:focus {
+  outline: none;
+  box-shadow: none;
+  border: none;
+}
