@@ -97,5 +97,37 @@ const res = await A.getStoryResponse('brainstorm', '', { activeModule: 'manuscri
 assert(res && res.usedAI === false, 'offline response is marked not-AI');
 assert(res.body && res.body.length > 0, 'offline response has content');
 
+// ── Selection actions (highlight → contextual AI) ────────────────────────────
+assert(Array.isArray(A.SELECTION_ACTIONS) && A.SELECTION_ACTIONS.length >= 6, 'SELECTION_ACTIONS defined');
+assert(A.selectionAction('continue-from').mode === 'insert', 'continue-from is an insert action');
+assert(A.selectionAction('improve').mode === 'replace', 'improve is a replace action');
+assert(A.selectionAction('nope') === null, 'unknown selection action -> null');
+
+// buildSelectionPrompt carries action + passage + story
+const selPrompt = JSON.parse(A.buildSelectionPrompt('improve', 'The rain fell.', { characters: [] }));
+assert(selPrompt.action === 'improve' && selPrompt.passage === 'The rain fell.' && selPrompt.story, 'buildSelectionPrompt shape');
+
+// parseSelectionReply: {"text":...}, bare JSON string, prose, fenced
+assert(A.parseSelectionReply('{"text":"Better prose."}') === 'Better prose.', 'parses {text}');
+assert(A.parseSelectionReply('"just a string"') === 'just a string', 'parses bare JSON string');
+assert(A.parseSelectionReply('Plain prose reply.') === 'Plain prose reply.', 'falls back to raw prose');
+assert(A.parseSelectionReply('```\nFenced prose\n```') === 'Fenced prose', 'strips code fences');
+assert(A.parseSelectionReply('') === null && A.parseSelectionReply(null) === null, 'empty/null -> null');
+
+// deterministicSelectionResponse: never crashes, returns a string + note
+const shorten = A.deterministicSelectionResponse('shorten', 'He was really very tired and just wanted to simply rest.');
+assert(typeof shorten.text === 'string' && shorten.text.length > 0, 'shorten returns text');
+assert(!/\breally\b|\bvery\b|\bjust\b|\bsimply\b/i.test(shorten.text), 'shorten strips filler words');
+const improve = A.deterministicSelectionResponse('improve', 'The  cat   sat .');
+assert(improve.text === 'The cat sat.', 'improve cleans spacing/punctuation');
+assert(A.deterministicSelectionResponse('improve', '   ').text === '', 'empty passage -> empty text');
+
+// getSelectionResponse offline resolves with mode + usedAI=false
+const selRes = await A.getSelectionResponse('improve', 'The rain fell hard.', {});
+assert(selRes && selRes.usedAI === false && selRes.mode === 'replace', 'offline selection response marked not-AI, replace mode');
+assert(typeof selRes.text === 'string', 'offline selection response has text');
+const contFrom = await A.getSelectionResponse('continue-from', 'She opened the door.', {});
+assert(contFrom.mode === 'insert', 'continue-from resolves as insert mode');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} story-ai tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

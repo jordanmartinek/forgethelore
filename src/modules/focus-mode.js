@@ -17,6 +17,7 @@ import { loadData, persistState } from '../core/persist.js';
 import { list, Collections } from '../core/repo.js';
 import { sessionStats, contextRail } from '../core/focus-model.js';
 import { mountBannerInto } from '../ui/banner.js';
+import { attachTextAIActions } from '../ui/text-ai-actions.js';
 
 const TRUBY_TITLES = {
   1: 'Self-Revelation, Need & Desire', 2: 'Ghost & Story World', 3: 'Weakness & Need',
@@ -156,6 +157,8 @@ function openOverlay(card, root) {
     placeholder: 'Write…',
   });
   editor.value = startText;
+  // Contextual selection AI (highlight a passage → ✨ Improve/Rewrite/…).
+  const detachAI = attachTextAIActions(editor);
 
   const updateHud = () => {
     const s = sessionStats(startText, currentText, sessionGoal, startedAt);
@@ -179,6 +182,7 @@ function openOverlay(card, root) {
 
   const close = () => {
     if (saveTimer) clearTimeout(saveTimer);
+    if (detachAI) detachAI();
     saveCard(card.stepNum, { id: card.id, title: card.title, content: editor.value, color: card.color });
     document.removeEventListener('keydown', onKey);
     // Tear down the banner mirror's event subscriptions.

@@ -51,6 +51,7 @@ import { renderWorldMap } from '../modules/world-map.js';
 import { renderPovAnalytics } from '../modules/pov-analytics.js';
 import { renderCharacterHub } from '../modules/character-hub.js';
 import { renderWorldHub } from '../modules/world-hub.js';
+import { renderInsightsHub } from '../modules/insights-hub.js';
 
 /**
  * @typedef {Object} ModuleDef
@@ -125,7 +126,9 @@ export const MODULES = [
   { id: 'mysteries',       label: 'Conflicts & Mysteries', icon: '🔍', section: 'create', tier: 'advanced', group: 'plan', render: renderMysteryPlanner },
 
   // ── INSIGHTS — advanced analysis, subordinate to writing ────────────────
-  { id: 'story-analytics', label: 'Story Analytics', icon: '🎢', section: 'insights', tier: 'primary',  group: 'analysis', render: renderStoryAnalytics },
+  // `insights-hub` is the calm landing page; the individual tools sit beneath it.
+  { id: 'insights-hub',    label: 'Story Insights',  icon: '🔭', section: 'insights', tier: 'primary',  group: 'analysis', render: renderInsightsHub },
+  { id: 'story-analytics', label: 'Story Analytics', icon: '🎢', section: 'insights', tier: 'advanced', group: 'analysis', render: renderStoryAnalytics },
   { id: 'knowledge-graph', label: 'Knowledge Graph', icon: '🕸️', section: 'insights', tier: 'advanced', group: 'analysis', render: renderKnowledgeGraph },
   { id: 'secrets-matrix',  label: 'Knowledge & Setups', icon: '🕵️', section: 'insights', tier: 'advanced', group: 'analysis', render: renderKnowledgeMatrix },
   { id: 'pov-analytics',   label: 'Word & POV',      icon: '🎭', section: 'insights', tier: 'advanced', group: 'analysis', render: renderPovAnalytics },

@@ -16,6 +16,7 @@ import { confirmDialog, openModal } from '../ui/modal.js';
 import { toastError, toastSuccess } from '../ui/toast.js';
 import { generateId } from '../core/objects.js';
 import { synthesizeThroughLine, getThroughLine, isAIEnabled as isSynthAIEnabled } from '../core/sprint-synthesis.js';
+import { attachTextAIActions } from '../ui/text-ai-actions.js';
 
 // Keep at most this many sprints in storage. The stored array previously grew
 // without bound — every sprint kept its full text forever — which bloats the
@@ -128,6 +129,11 @@ export function renderWritingSprint(container) {
   // If there's an active sprint in progress, show the sprint view
   if (currentSprint && currentSprint.status === 'running') {
     container.appendChild(renderSprintActive());
+    // Attach contextual selection AI to the prose textarea once it's mounted.
+    setTimeout(() => {
+      const ta = document.getElementById('sprint-textarea');
+      if (ta) attachTextAIActions(ta);
+    }, 0);
   } else {
     container.appendChild(renderSprintSetup());
   }

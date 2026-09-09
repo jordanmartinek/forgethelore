@@ -51,6 +51,27 @@ export const STORY_ACTIONS = [
   { id: 'ask',          label: 'Ask about my world',    icon: '💬', hint: 'Ask anything about your story or world.', freeform: true },
 ];
 
+/**
+ * Actions that operate on a SELECTED passage in the editor (§12: highlight text
+ * → contextual AI). Each returns replacement/continuation prose. `mode` tells
+ * the UI whether the result should replace the selection ('replace') or be
+ * inserted after it ('insert').
+ * @typedef {Object} SelectionAction
+ * @property {string} id
+ * @property {string} label
+ * @property {string} icon
+ * @property {'replace'|'insert'} mode
+ */
+export const SELECTION_ACTIONS = [
+  { id: 'improve',     label: 'Improve',            icon: '✨', mode: 'replace' },
+  { id: 'rewrite',     label: 'Rewrite',            icon: '🔁', mode: 'replace' },
+  { id: 'atmospheric', label: 'More atmospheric',   icon: '🌫️', mode: 'replace' },
+  { id: 'tension',     label: 'Increase tension',   icon: '⚡', mode: 'replace' },
+  { id: 'shorten',     label: 'Shorten',            icon: '✂️', mode: 'replace' },
+  { id: 'describe',    label: 'Add description',    icon: '🖋️', mode: 'replace' },
+  { id: 'continue-from', label: 'Continue from here', icon: '➡️', mode: 'insert' },
+];
+
 const MAX_ITEMS = 24;         // cap list sizes sent to the model
 const MAX_SCENE_CHARS = 1500; // cap the recent-prose excerpt
 
@@ -284,6 +305,136 @@ export async function getStoryResponse(action, input = '', opts = {}) {
     return { ...reply, usedAI: true };
   } catch (err) {
     console.warn('[LoreForge] Story AI failed, using deterministic response:', err.message);
+    return fallback();
+  }
+}
+
+
+// ─── Selection actions (highlight text → contextual AI) (§12) ─────────────────
+
+/** Look up a selection action by id. */
+export function selectionAction(id) {
+  return SELECTION_ACTIONS.find((a) => a.id === id) || null;
+}
+
+export const SELECTION_AI_SYSTEM_PROMPT =
+  'You are a line editor working inside a novelist\'s manuscript. You receive a selected passage, the requested transformation, and a compact snapshot of the story for voice/context. ' +
+  'Return ONLY the transformed prose — no preamble, no quotes, no commentary — as JSON {"text":"<result>"}. ' +
+  'Preserve the writer\'s voice, tense and point of view. Do not introduce named characters, places or events that are not in the passage or the story context. ' +
+  'improve = tighten and elevate the prose while keeping meaning; rewrite = a fresh phrasing of the same beat; atmospheric = richer sensory mood; tension = raise stakes/urgency; shorten = fewer words, same meaning; describe = add vivid sensory description; continue-from = write the next 1-2 sentences that would follow the passage.';
+
+/** Build the user message for a selection transform. */
+export function buildSelectionPrompt(action, passage, context) {
+  return JSON.stringify({ action, passage, story: context });
+}
+
+/**
+ * Parse a selection reply into plain replacement text. Accepts {"text":...},
+ * a bare JSON string, or raw prose — always returns a string or null.
+ */
+export function parseSelectionReply(text) {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  // Try strict/loose JSON with a `text` field first.
+  let obj = null;
+  try { obj = JSON.parse(trimmed); } catch (_) {
+    const m = trimmed.match(/\{[\s\S]*\}/);
+    if (m) { try { obj = JSON.parse(m[0]); } catch (_) { obj = null; } }
+  }
+  if (obj && typeof obj === 'object' && typeof obj.text === 'string' && obj.text.trim()) {
+    return obj.text.trim();
+  }
+  if (typeof obj === 'string' && obj.trim()) return obj.trim();
+  // Not JSON — treat the whole reply as prose (strip surrounding quotes/fences).
+  const cleaned = trimmed.replace(/^```[a-z]*\n?/i, '').replace(/```$/,'').replace(/^["']|["']$/g, '').trim();
+  return cleaned || null;
+}
+
+/**
+ * Deterministic, on-device transform for when no AI key is configured or the
+ * call fails. These are intentionally conservative, mechanical edits — never
+ * empty — so the feature is always useful offline.
+ * @returns {{ text:string, note:string }}
+ */
+export function deterministicSelectionResponse(action, passage) {
+  const p = String(passage || '').trim();
+  const note = 'On-device edit — add an AI key for a model-quality rewrite.';
+  if (!p) return { text: '', note };
+
+  switch (action) {
+    case 'shorten': {
+      // Drop common filler words and collapse whitespace.
+      const filler = /\b(very|really|quite|rather|just|somewhat|actually|simply|basically|literally|that)\b/gi;
+      const text = p.replace(filler, '').replace(/\s{2,}/g, ' ').replace(/\s+([,.;:!?])/g, '$1').trim();
+      return { text, note };
+    }
+    case 'continue-from': {
+      // Suggest a next-sentence scaffold rather than inventing content.
+      return { text: ' ', note: 'Add an AI key to auto-continue. Meanwhile, keep writing from here — the cursor is placed after your selection.' };
+    }
+    case 'atmospheric':
+    case 'describe': {
+      return { text: p, note: 'On-device mode can\u2019t enrich prose — add an AI key for atmospheric/descriptive rewrites. Your text was left unchanged.' };
+    }
+    case 'tension': {
+      return { text: p, note: 'On-device mode can\u2019t raise tension automatically — add an AI key. Your text was left unchanged.' };
+    }
+    case 'improve':
+    case 'rewrite':
+    default: {
+      // Light, safe cleanup: collapse double spaces, fix spacing before punctuation.
+      const text = p.replace(/\s{2,}/g, ' ').replace(/\s+([,.;:!?])/g, '$1').trim();
+      return { text, note: action === 'rewrite'
+        ? 'On-device mode only cleans spacing — add an AI key for a true rewrite.'
+        : note };
+    }
+  }
+}
+
+/** Low-level: call the provider for a selection transform. */
+async function requestSelectionAI(action, passage, context) {
+  const { provider, apiKey, model } = getAISettings();
+  const cfg = PROVIDERS[provider];
+  if (!cfg) throw new Error(`Unknown provider: ${provider}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const res = await fetch(cfg.url, {
+      method: 'POST',
+      headers: cfg.headers(apiKey),
+      body: JSON.stringify(cfg.buildBody(model || cfg.defaultModel, SELECTION_AI_SYSTEM_PROMPT, buildSelectionPrompt(action, passage, context))),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    return parseSelectionReply(cfg.extractText(json));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Public entry point for selection transforms. Always resolves to a usable
+ * result. Uses the model when a key is configured (falling back to the
+ * deterministic transform on any failure), otherwise transforms on-device.
+ *
+ * @param {string} action    a SELECTION_ACTIONS id
+ * @param {string} passage    the selected text
+ * @param {object} [opts]     { activeModule }
+ * @returns {Promise<{ text:string, mode:'replace'|'insert', usedAI:boolean, note?:string }>}
+ */
+export async function getSelectionResponse(action, passage, opts = {}) {
+  const meta = selectionAction(action) || { mode: 'replace' };
+  const context = buildStoryContext(opts);
+  const fallback = () => { const r = deterministicSelectionResponse(action, passage); return { text: r.text, note: r.note, mode: meta.mode, usedAI: false }; };
+
+  if (!isAIEnabled()) return fallback();
+  try {
+    const text = await requestSelectionAI(action, passage, context);
+    if (!text) return fallback();
+    return { text, mode: meta.mode, usedAI: true };
+  } catch (err) {
+    console.warn('[LoreForge] Selection AI failed, using deterministic transform:', err.message);
     return fallback();
   }
 }
