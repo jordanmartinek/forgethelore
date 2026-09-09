@@ -61,7 +61,7 @@ function renderArcDetail(piece) {
   return h('div', { class: 'character-detail' }, renderArcDetailContent(piece));
 }
 
-function renderArcDetailContent(piece) {
+export function renderArcDetailContent(piece) {
   const arc = getArc(piece.id);
   const rels = getRelationshipsFor(piece.id);
   const scenes = getScenes();

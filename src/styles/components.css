@@ -1907,3 +1907,227 @@ textarea.input {
   box-shadow: none;
   border: none;
 }
+
+
+/* ─── Character Hub (unified entity experience) ────────────────────────────────
+ * A rich header + tabbed detail that composes existing renderers. Reuses the
+ * .character-planner / .character-list / .character-card layout for the roster.
+ */
+.hub-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.hub-header__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  font-family: var(--font-heading);
+}
+
+.hub-header__id { flex: 1; min-width: 0; }
+
+.hub-header__name {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 2px;
+}
+
+.hub-header__meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.hub-header__tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.hub-header__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* Tabs */
+.hub-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-lg);
+  overflow-x: auto;
+}
+
+.hub-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.hub-tab:hover { color: var(--text-primary); }
+
+.hub-tab--active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.hub-panel { animation: fadeIn 0.15s ease; }
+
+/* Tab empty states + light relationship rows */
+.hub-tab-empty {
+  padding: var(--space-2xl) var(--space-lg);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.hub-tab-empty__sub { font-size: 13px; color: var(--text-muted); margin: 6px 0 var(--space-md); }
+.hub-tab-empty p { margin-bottom: var(--space-sm); }
+
+.hub-tab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.hub-rel__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: 6px;
+}
+.hub-rel__name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.hub-rel__dim {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+.hub-rel__pct { color: var(--text-muted); }
+
+.hub-notes__label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-tertiary);
+  margin: 0 0 6px;
+}
+.hub-notes__text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* Hub empty state */
+.hub-empty { text-align: center; max-width: 380px; }
+.hub-empty__icon { font-size: 44px; opacity: 0.5; margin-bottom: var(--space-md); }
+.hub-empty__title {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+.hub-empty__body { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--space-lg); }
+.hub-empty__hint { font-size: 12px; color: var(--text-muted); margin-top: var(--space-md); }
+
+/* ─── World Hub (landing page) ─────────────────────────────────────────────────
+ * Hierarchical discovery: a small grid of calm category cards with live counts.
+ */
+.world-hub {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: var(--space-3xl) var(--space-xl) var(--space-2xl);
+}
+
+.world-hub__title {
+  font-family: var(--font-heading);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-xs);
+}
+
+.world-hub__subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-2xl);
+}
+
+.world-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-lg);
+}
+
+.world-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 4px;
+  padding: var(--space-xl);
+  font-family: var(--font-ui);
+  min-height: 150px;
+}
+
+.world-card__icon { font-size: 26px; margin-bottom: var(--space-xs); }
+.world-card__title {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.world-card__desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.world-card__count {
+  margin-top: auto;
+  padding-top: var(--space-sm);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.world-card__links { font-size: 12px; margin-top: 6px; }
+.world-card__link { color: var(--accent-primary); text-decoration: none; }
+.world-card__link:hover { text-decoration: underline; }
+.world-card__sep { color: var(--text-muted); }
+
+.world-hub__footer {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 640px) {
+  .world-hub { padding: var(--space-xl) var(--space-lg); }
+  .hub-header { flex-wrap: wrap; }
+  .hub-header__actions { width: 100%; }
+}

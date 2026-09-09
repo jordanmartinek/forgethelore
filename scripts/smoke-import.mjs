@@ -122,6 +122,8 @@ const modules = [
   '../src/modules/world-map.js',
   '../src/modules/focus-mode.js',
   '../src/modules/brainstorm.js',
+  '../src/modules/character-hub.js',
+  '../src/modules/world-hub.js',
   '../src/core/registry.js',
   '../src/ui/command-palette.js',
   '../src/ui/app-shell.js',

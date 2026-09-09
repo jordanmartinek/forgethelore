@@ -49,6 +49,8 @@ import { renderExportImport } from '../ui/export-import.js';
 import { renderFocusMode } from '../modules/focus-mode.js';
 import { renderWorldMap } from '../modules/world-map.js';
 import { renderPovAnalytics } from '../modules/pov-analytics.js';
+import { renderCharacterHub } from '../modules/character-hub.js';
+import { renderWorldHub } from '../modules/world-hub.js';
 
 /**
  * @typedef {Object} ModuleDef
@@ -86,18 +88,24 @@ export const MODULES = [
   { id: 'focus-mode',      label: 'Focus Mode',      icon: '✍️', section: 'write', tier: 'advanced', group: 'write',    render: renderFocusMode },
 
   // ── STORY — the people, places and structure of the story ───────────────
-  { id: 'characters',      label: 'Characters',      icon: '👤', section: 'story', tier: 'primary',  group: 'world',    render: renderCharacterPlanner },
+  // `character-hub` is the unified character experience (Overview/Arc/…) and is
+  // the primary entry; the raw planner remains available as "Character Profiles".
+  { id: 'character-hub',   label: 'Characters',      icon: '👤', section: 'story', tier: 'primary',  group: 'world',    render: renderCharacterHub },
   { id: 'locations',       label: 'Places',          icon: '📍', section: 'story', tier: 'primary',  group: 'world',    render: renderLocationPlanner },
   { id: 'timeline',        label: 'Timeline',        icon: '⏳', section: 'story', tier: 'primary',  group: 'plan',     render: renderTimeline },
   { id: 'relationships',   label: 'Relationships',   icon: '💫', section: 'story', tier: 'primary',  group: 'analysis', render: renderRelationshipPlanner },
+  { id: 'characters',      label: 'Character Profiles', icon: '📇', section: 'story', tier: 'advanced', group: 'world', render: renderCharacterPlanner },
   { id: 'character-builder', label: 'Character Builder', icon: '🪪', section: 'story', tier: 'advanced', group: 'world', render: renderCharacterBuilder },
   { id: 'knowledge-matrix',label: 'Character Arcs',  icon: '📈', section: 'story', tier: 'advanced', group: 'analysis', render: renderCharacterArc },
   { id: 'family-tree',     label: 'Family Trees',    icon: '🌳', section: 'story', tier: 'advanced', group: 'analysis', render: renderFamilyTree },
 
   // ── WORLD — worldbuilding, with hierarchical discovery ──────────────────
-  { id: 'world-builder',   label: 'World',           icon: '🌌', section: 'world', tier: 'primary',  group: 'world',    render: renderWorldBuilder },
+  // `world-hub` is the landing page (category cards); the full tree builder and
+  // per-category planners remain available beneath it.
+  { id: 'world-hub',       label: 'World',           icon: '🌌', section: 'world', tier: 'primary',  group: 'world',    render: renderWorldHub },
   { id: 'world-map',       label: 'Map',             icon: '🗺️', section: 'world', tier: 'primary',  group: 'world',    render: renderWorldMap },
   { id: 'factions',        label: 'Factions',        icon: '⚔️', section: 'world', tier: 'primary',  group: 'world',    render: renderFactionPlanner },
+  { id: 'world-builder',   label: 'World Builder',   icon: '🗂️', section: 'world', tier: 'advanced', group: 'world',    render: renderWorldBuilder },
   { id: 'species',         label: 'Species',         icon: '🧬', section: 'world', tier: 'advanced', group: 'world',    render: renderSpeciesPlanner },
   { id: 'languages',       label: 'Languages',       icon: '🗣️', section: 'world', tier: 'advanced', group: 'world',    render: renderLanguagePlanner },
   { id: 'religions',       label: 'Religions',       icon: '🕯️', section: 'world', tier: 'advanced', group: 'world',    render: renderReligionPlanner },

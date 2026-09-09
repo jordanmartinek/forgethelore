@@ -260,7 +260,7 @@ function renderCharacterDetail(char) {
   return h('div', { class: 'character-detail' }, renderCharacterDetailContent(char));
 }
 
-function renderCharacterDetailContent(char) {
+export function renderCharacterDetailContent(char) {
   const factionColors = {};
   allFactionSources().forEach(f => { factionColors[f.name] = f.color; });
   const color = factionColors[char.faction] || char.color || '#6366f1';
