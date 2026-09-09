@@ -19,6 +19,7 @@ import { renderCommandPalette } from './command-palette.js';
 import { THEMES, getTheme, setTheme } from '../core/theme.js';
 import { createBanner, showBanner } from './banner.js';
 import { isBannerEnabled } from '../core/banner.js';
+import { toggleAIPanel } from './ai-panel.js';
 
 // Reflect the banner's initial visibility on the layout grid so a hidden banner
 // collapses its row. banner.js keeps this in sync on later toggles.
@@ -178,8 +179,9 @@ function toggleWorkspaceMenu() {
       right: `${Math.max(8, window.innerWidth - rect.right)}px`,
     },
   },
+    item('✨', 'Story AI  (⌘J)', () => toggleAIPanel()),
     item('🎨', 'Theme', toggleThemeMenu),
-    item('✨', 'AI settings', () => openAISettings()),
+    item('🔑', 'AI settings', () => openAISettings()),
     item('📌', 'Reminder banner', () => showBanner()),
   );
 
@@ -925,6 +927,12 @@ function setupKeyboardShortcuts() {
     if ((e.metaKey || e.ctrlKey) && e.key === 'h') {
       e.preventDefault();
       appStore.setState({ activeModule: 'dashboard' });
+    }
+
+    // Story AI assistant
+    if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+      e.preventDefault();
+      toggleAIPanel();
     }
   });
 }

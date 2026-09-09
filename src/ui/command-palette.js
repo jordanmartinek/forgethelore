@@ -23,6 +23,7 @@ import { openSyncSettings } from './sync-settings-panel.js';
 import { syncNow } from '../core/sync/sync-init.js';
 import { isSyncConfigured } from '../core/sync/sync-settings.js';
 import { getInsights } from '../core/ai.js';
+import { toggleAIPanel } from './ai-panel.js';
 
 // Navigation commands generated from the registry.
 const navCommands = MODULES.map((m) => ({
@@ -53,6 +54,7 @@ const createCommands = [
 
 const utilityCommands = [
   { id: 'goto-dashboard', icon: '🏠', label: 'Go to Dashboard', category: 'Navigate', action: () => appStore.setState({ activeModule: 'dashboard' }) },
+  { id: 'story-ai', icon: '✨', label: 'Open Story AI Assistant (⌘J)', category: 'Utility', action: () => toggleAIPanel() },
   { id: 'ai-settings', icon: '🧠', label: 'AI Settings (Bring Your Own Key)', category: 'Utility', action: () => openAISettings() },
   { id: 'sync-settings', icon: '☁️', label: 'Cloud Sync Settings', category: 'Utility', action: () => openSyncSettings() },
   { id: 'sync-now', icon: '🔄', label: 'Sync Now', category: 'Utility', action: () => { if (isSyncConfigured()) { syncNow(); toastInfo('Syncing…'); } else { openSyncSettings(); } } },

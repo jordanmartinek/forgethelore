@@ -27,6 +27,7 @@ import { buildEntityMap, resolveIdByName, getPieces, getBoardFactions, getFactio
 import { getRelationshipsFor, RELATIONSHIP_DIMENSIONS } from '../core/progression.js';
 import { renderCharacterDetailContent } from './character-planner.js';
 import { renderArcDetailContent } from './character-arc.js';
+import { entityMention } from '../ui/entity-preview.js';
 
 // Session UI state (not persisted).
 let selectedId = null;
@@ -243,7 +244,9 @@ function renderRelationshipsTab(char, piece) {
       const dimMeta = top ? RELATIONSHIP_DIMENSIONS[top[0]] : null;
       return h('div', { class: 'card hub-rel', style: { marginBottom: 'var(--space-sm)' } },
         h('div', { class: 'hub-rel__top' },
-          h('span', { class: 'hub-rel__name' }, other ? other.name : 'Unknown'),
+          // The related character's name is an interactive entity mention:
+          // click it for a contextual preview + Open.
+          h('span', { class: 'hub-rel__name' }, other ? entityMention(other.name, { preferType: 'piece' }) : 'Unknown'),
           h('span', { class: 'tag' }, rel.type),
         ),
         top ? h('div', { class: 'hub-rel__dim' },
