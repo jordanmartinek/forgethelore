@@ -120,11 +120,75 @@ function createTopBar() {
     h('div', { class: 'topbar__right' },
       createSaveIndicator(),
       createSyncIndicator(),
-      h('button', { class: 'btn btn--ghost btn--icon', title: 'Show/edit reminder banner', 'aria-label': 'Show reminder banner', id: 'banner-btn', onclick: () => showBanner() }, '📌'),
-      h('button', { class: 'btn btn--ghost btn--icon', title: 'Theme', 'aria-label': 'Change theme', id: 'theme-btn', onclick: toggleThemeMenu }, '🎨'),
-      h('button', { class: 'btn btn--ghost btn--icon', title: 'AI Settings', 'aria-label': 'AI Settings', onclick: () => openAISettings() }, '⚙'),
+      // A single quiet overflow menu consolidates the reminder banner, theme,
+      // and AI settings so the header stops competing for attention. The theme
+      // dropdown now anchors under this ⋯ button (#topbar-menu-btn).
+      h('div', { style: { position: 'relative' } },
+        h('button', {
+          class: 'btn btn--ghost btn--icon',
+          id: 'topbar-menu-btn',
+          title: 'Menu',
+          'aria-label': 'Workspace menu',
+          'aria-haspopup': 'true',
+          onclick: toggleWorkspaceMenu,
+        }, '⋯'),
+      ),
     )
   );
+}
+
+// ─── Workspace overflow menu ─────────────────────────────────────────────────
+// Consolidates the previously-competing topbar buttons (reminder banner, theme,
+// AI settings) behind one quiet ⋯ button, keeping the header calm while the
+// writer works. Each item delegates to the existing handlers so behavior is
+// unchanged.
+function toggleWorkspaceMenu() {
+  const existing = document.getElementById('workspace-menu');
+  if (existing) { existing._close ? existing._close() : existing.remove(); return; }
+
+  const btn = document.getElementById('topbar-menu-btn');
+  const rect = btn ? btn.getBoundingClientRect() : { right: 320, bottom: 44 };
+
+  let closeHandler = null;
+  const closeMenu = () => {
+    if (closeHandler) document.removeEventListener('click', closeHandler);
+    menu.remove();
+  };
+
+  const item = (icon, label, onClick) =>
+    h('div', {
+      role: 'button', tabindex: '0',
+      class: 'workspace-menu__item',
+      onclick: () => { closeMenu(); onClick(); },
+      onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeMenu(); onClick(); } },
+    },
+      h('span', { class: 'workspace-menu__icon', 'aria-hidden': 'true' }, icon),
+      h('span', {}, label),
+    );
+
+  const menu = h('div', {
+    id: 'workspace-menu',
+    class: 'workspace-menu',
+    role: 'menu',
+    style: {
+      position: 'fixed', top: `${rect.bottom + 4}px`,
+      right: `${Math.max(8, window.innerWidth - rect.right)}px`,
+    },
+  },
+    item('🎨', 'Theme', toggleThemeMenu),
+    item('✨', 'AI settings', () => openAISettings()),
+    item('📌', 'Reminder banner', () => showBanner()),
+  );
+
+  menu._close = closeMenu;
+  document.body.appendChild(menu);
+
+  setTimeout(() => {
+    closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== btn && (!btn || !btn.contains(e.target))) closeMenu();
+    };
+    document.addEventListener('click', closeHandler);
+  }, 10);
 }
 
 // ─── Theme Picker ────────────────────────────────────────────────────────────
@@ -136,7 +200,8 @@ function toggleThemeMenu() {
   const existing = document.getElementById('theme-menu');
   if (existing) { existing._close ? existing._close() : existing.remove(); return; }
 
-  const btn = document.getElementById('theme-btn');
+  // Anchor under the topbar overflow button (theme is now opened from there).
+  const btn = document.getElementById('topbar-menu-btn') || document.getElementById('theme-btn');
   const rect = btn ? btn.getBoundingClientRect() : { right: 320, bottom: 44 };
   const current = getTheme();
 
@@ -195,9 +260,17 @@ function toggleThemeMenu() {
 }
 
 function createSaveIndicator() {
-  return h('div', { class: 'save-indicator save-indicator--saved', id: 'save-indicator' },
+  // Quiet by default: while everything is saved the indicator is a bare, muted
+  // dot with no pill or label — it should be almost invisible during writing.
+  // It only grows a label/background when something needs attention (saving or
+  // offline). See .save-indicator--quiet in components.css.
+  return h('div', {
+    class: 'save-indicator save-indicator--saved save-indicator--quiet',
+    id: 'save-indicator',
+    title: 'All changes saved',
+  },
     h('span', { class: 'save-indicator__dot' }),
-    h('span', { class: 'save-indicator__text' }, 'All Changes Saved')
+    h('span', { class: 'save-indicator__text' }, 'Saved')
   );
 }
 
@@ -206,13 +279,16 @@ function updateSaveIndicator() {
   if (!indicator) return;
 
   const state = appStore.getState();
-  indicator.className = `save-indicator save-indicator--${state.saveStatus}`;
+  // 'saved' is the quiet state (dot only). 'saving'/'offline' need attention, so
+  // drop the --quiet modifier to reveal the label + pill.
+  const quiet = state.saveStatus === 'saved' ? ' save-indicator--quiet' : '';
+  indicator.className = `save-indicator save-indicator--${state.saveStatus}${quiet}`;
 
   const text = indicator.querySelector('.save-indicator__text');
   switch (state.saveStatus) {
-    case 'saved': text.textContent = 'All Changes Saved'; break;
-    case 'saving': text.textContent = 'Saving...'; break;
-    case 'offline': text.textContent = 'Offline (Queued)'; break;
+    case 'saved': text.textContent = 'Saved'; indicator.title = 'All changes saved'; break;
+    case 'saving': text.textContent = 'Saving…'; indicator.title = 'Saving…'; break;
+    case 'offline': text.textContent = 'Offline (queued)'; indicator.title = 'Offline — changes queued'; break;
   }
 }
 
