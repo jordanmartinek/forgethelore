@@ -51,7 +51,7 @@ function renderSceneForm() {
 
   // ─── Step 1: What Happened ───────────────────────────────────────────────
 
-  const step1 = h('div', { style: { marginBottom: '28px', padding: '20px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-subtle)' } },
+  const step1 = h('div', { class: 'card', style: { marginBottom: '28px', padding: '20px' } },
     h('div', { style: { fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--accent-primary)', marginBottom: '12px' } }, '① What Happened?'),
     h('div', { style: { marginBottom: '12px' } },
       h('input', { class: 'input', placeholder: 'Scene title (e.g. "The Betrayal at Nexus Hub")', style: { fontSize: '14px', fontWeight: '500' }, oninput: (e) => state.title = e.target.value }),
@@ -75,7 +75,7 @@ function renderSceneForm() {
 
   // ─── Step 2: Who Was Involved ────────────────────────────────────────────
 
-  const step2 = h('div', { style: { marginBottom: '28px', padding: '20px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-subtle)' } },
+  const step2 = h('div', { class: 'card', style: { marginBottom: '28px', padding: '20px' } },
     h('div', { style: { fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--accent-primary)', marginBottom: '12px' } }, '② Who Was Involved?'),
     h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '6px' } },
       ...pieces.map(p => {
@@ -98,7 +98,7 @@ function renderSceneForm() {
 
   // ─── Step 3: Who Won / Who Lost ──────────────────────────────────────────
 
-  const step3 = h('div', { style: { marginBottom: '28px', padding: '20px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-subtle)' } },
+  const step3 = h('div', { class: 'card', style: { marginBottom: '28px', padding: '20px' } },
     h('div', { style: { fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--accent-primary)', marginBottom: '12px' } }, '③ Who Won / Who Lost?'),
     h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' } },
       // Winners
@@ -134,7 +134,7 @@ function renderSceneForm() {
 
   const relContainer = h('div', { id: 'rel-changes-list' });
 
-  const step4 = h('div', { style: { marginBottom: '28px', padding: '20px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-subtle)' } },
+  const step4 = h('div', { class: 'card', style: { marginBottom: '28px', padding: '20px' } },
     h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' } },
       h('div', { style: { fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--accent-primary)' } }, '④ Relationship Changes (Optional)'),
       h('button', { class: 'btn btn--sm btn--ghost', onclick: () => addRelChange(relContainer, state, pieces) }, '+ Add Change'),

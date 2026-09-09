@@ -166,7 +166,7 @@ function controlSection(timeline, step) {
     .map((f) => ({ ...f, pct: step.share[f.id] || 0 }))
     .sort((a, b) => b.pct - a.pct);
 
-  return h('div', { style: { background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '12px', marginBottom: '10px' } },
+  return h('div', { class: 'card', style: { borderRadius: '10px', padding: '12px', marginBottom: '10px' } },
     h('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '8px' } },
       h('span', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }, title: 'Relative share of faction power, folded from scene power shifts — not literal map area.' }, 'Relative power share'),
       h('span', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, step.order === 0 ? 'At start' : `After: ${step.title}`),

@@ -65,6 +65,12 @@ html[data-theme='parchment'] {
 
   --accent-primary-soft: rgba(201,168,76,0.12);
   --accent-glow: #e8c96a;
+
+  --tag-character: #c9a84c;   --tag-character-soft: rgba(201,168,76,0.18);
+  --tag-location:  #4fb8a7;   --tag-location-soft:  rgba(79,184,167,0.18);
+  --tag-faction:   #b84a4a;   --tag-faction-soft:   rgba(184,74,74,0.18);
+  --tag-mystery:   #9b6dd7;   --tag-mystery-soft:   rgba(155,109,215,0.18);
+  --tag-tech:      #c9873c;   --tag-tech-soft:      rgba(201,135,60,0.18);
 }
 
 html[data-theme='parchment'] body {
@@ -112,6 +118,12 @@ html[data-theme='midnight'] {
 
   --accent-primary-soft: rgba(99,102,241,0.14);
   --accent-glow: #818cf8;
+
+  --tag-character: #818cf8;   --tag-character-soft: rgba(129,140,248,0.18);
+  --tag-location:  #34d399;   --tag-location-soft:  rgba(52,211,153,0.18);
+  --tag-faction:   #f87171;   --tag-faction-soft:   rgba(248,113,113,0.18);
+  --tag-mystery:   #a855f7;   --tag-mystery-soft:   rgba(168,85,247,0.18);
+  --tag-tech:      #fbbf24;   --tag-tech-soft:      rgba(251,191,36,0.18);
 }
 
 /* ── Daylight — light theme ──────────────────────────────────────────────── */
@@ -155,6 +167,12 @@ html[data-theme='daylight'] {
 
   --accent-primary-soft: rgba(37,99,235,0.10);
   --accent-glow: #60a5fa;
+
+  --tag-character: #2563eb;   --tag-character-soft: rgba(37,99,235,0.12);
+  --tag-location:  #0d9488;   --tag-location-soft:  rgba(13,148,136,0.12);
+  --tag-faction:   #dc2626;   --tag-faction-soft:   rgba(220,38,38,0.12);
+  --tag-mystery:   #7c3aed;   --tag-mystery-soft:   rgba(124,58,237,0.12);
+  --tag-tech:      #d97706;   --tag-tech-soft:      rgba(217,119,6,0.12);
 }
 
 /* The default (Warm Literary) body wash is tuned for a warm CREAM canvas. On
@@ -205,6 +223,12 @@ html[data-theme='terminal'] {
 
   --accent-primary-soft: rgba(34,197,94,0.14);
   --accent-glow: #4ade80;
+
+  --tag-character: #22c55e;   --tag-character-soft: rgba(34,197,94,0.16);
+  --tag-location:  #14b8a6;   --tag-location-soft:  rgba(20,184,166,0.16);
+  --tag-faction:   #ef4444;   --tag-faction-soft:   rgba(239,68,68,0.16);
+  --tag-mystery:   #a3e635;   --tag-mystery-soft:   rgba(163,230,53,0.16);
+  --tag-tech:      #eab308;   --tag-tech-soft:      rgba(234,179,8,0.16);
 
   --font-sans: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   --font-heading: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;

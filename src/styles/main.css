@@ -67,6 +67,16 @@
   --accent-primary-soft: rgba(74,99,80,0.12);
   --accent-glow: #6f8a74;
 
+  /* Brainstorm tag legend — a fixed SEMANTIC vocabulary (@character #location
+   * !faction ~mystery *tech). Dedicated tokens so the legend chips, the sidebar
+   * reference, and the in-text highlight stay in sync AND retune per theme.
+   * `-soft` is the translucent chip background. Tuned for the warm cream canvas. */
+  --tag-character: #4a6350;   --tag-character-soft: rgba(74,99,80,0.14);
+  --tag-location:  #3f8a7d;   --tag-location-soft:  rgba(63,138,125,0.14);
+  --tag-faction:   #b04a3f;   --tag-faction-soft:   rgba(176,74,63,0.14);
+  --tag-mystery:   #7c5a92;   --tag-mystery-soft:   rgba(124,90,146,0.14);
+  --tag-tech:      #c08a3e;   --tag-tech-soft:      rgba(192,138,62,0.14);
+
   /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;

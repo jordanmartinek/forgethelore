@@ -70,7 +70,7 @@ export function renderCharacterInterview(container) {
 
   // Transcript.
   const log = transcripts.get(activeCharId) || [];
-  const feed = h('div', { id: 'interview-feed', style: { flex: '1', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '12px', marginBottom: '12px', minHeight: '200px', background: 'var(--surface-1)' } });
+  const feed = h('div', { id: 'interview-feed', class: 'card', style: { flex: '1', overflowY: 'auto', padding: '12px', marginBottom: '12px', minHeight: '200px' } });
   if (log.length === 0) {
     feed.appendChild(h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' } }, `Say hello to ${active.name}, or try: "What do you want?", "What are you afraid of?", "What are you hiding?"`));
   }

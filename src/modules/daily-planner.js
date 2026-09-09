@@ -233,7 +233,7 @@ export function renderDailyPlanner(container) {
 
     // Completed
     doneTasks.length > 0
-      ? h('div', { style: { marginTop: '24px', padding: '16px', background: 'var(--surface-1)', borderRadius: '12px', border: '1px solid var(--border-subtle)' } },
+      ? h('div', { class: 'card', style: { marginTop: '24px' } },
           h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--success)', marginBottom: '8px' } }, `✅ COMPLETED TODAY (${doneTasks.length})`),
           ...doneTasks.map(task =>
             h('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '4px 0', textDecoration: 'line-through' } }, `${task.icon} ${task.text}`)

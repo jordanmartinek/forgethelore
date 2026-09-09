@@ -170,7 +170,7 @@ function renderTreeSVG(pcs, l, layout, container) {
     svg.appendChild(g);
   });
 
-  return h('div', { style: { overflowX: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '8px', marginBottom: '16px' } }, svg);
+  return h('div', { class: 'card', style: { overflowX: 'auto', padding: '8px', marginBottom: '16px' } }, svg);
 }
 
 function renderLinkList(pcs, l, container) {

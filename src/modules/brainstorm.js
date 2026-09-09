@@ -125,11 +125,11 @@ function renderEditor() {
 
     // Tag legend
     h('div', { style: { padding: '6px 16px', background: 'var(--surface-1)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', gap: '8px', flexWrap: 'wrap', flexShrink: '0' } },
-      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: '#6366f1' } }, '@character'),
-      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: '#22c55e' } }, '#location'),
-      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(239,68,68,0.15)', color: '#ef4444' } }, '!faction'),
-      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(168,85,247,0.15)', color: '#a855f7' } }, '~mystery'),
-      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b' } }, '*tech'),
+      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: getTagBgColor('character'), color: getTagColor('character') } }, '@character'),
+      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: getTagBgColor('location'), color: getTagColor('location') } }, '#location'),
+      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: getTagBgColor('faction'), color: getTagColor('faction') } }, '!faction'),
+      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: getTagBgColor('mystery'), color: getTagColor('mystery') } }, '~mystery'),
+      h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: getTagBgColor('technology'), color: getTagColor('technology') } }, '*tech'),
     ),
 
     // Textarea
@@ -170,7 +170,7 @@ function openPushModal(session) {
       h('div', { style: { padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', marginBottom: '8px', border: '1px solid var(--border-subtle)' } },
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } },
           h('input', { type: 'checkbox', checked: true, onchange: (e) => { itemStates[idx].approved = e.target.checked; } }),
-          h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: getTagColor(item.type) + '20', color: getTagColor(item.type), fontWeight: '600' } }, item.type),
+          h('span', { style: { fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: getTagBgColor(item.type), color: getTagColor(item.type), fontWeight: '600' } }, item.type),
           h('span', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' } }, item.name),
         ),
         h('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.6', maxHeight: '60px', overflow: 'hidden' } }, item.text.slice(0, 200) + (item.text.length > 200 ? '...' : '')),
@@ -333,9 +333,21 @@ function countTags(content) {
   return parseTags(content).length;
 }
 
+// The five tag types map to a fixed SEMANTIC palette defined as CSS tokens
+// (--tag-* / --tag-*-soft in main.css + themes.css), so the legend chips, the
+// sidebar reference, the push-modal chips, and the in-text highlight all stay
+// in sync and retune per theme. `getTagColor` returns the solid token (safe as
+// a CSS color/background), `getTagBgColor` the translucent chip background.
+const TAG_TOKEN = { character: 'character', location: 'location', faction: 'faction', mystery: 'mystery', technology: 'tech' };
+
 function getTagColor(type) {
-  const colors = { character: '#6366f1', location: '#22c55e', faction: '#ef4444', mystery: '#a855f7', technology: '#f59e0b' };
-  return colors[type] || '#64748b';
+  const key = TAG_TOKEN[type];
+  return key ? `var(--tag-${key})` : 'var(--text-tertiary)';
+}
+
+function getTagBgColor(type) {
+  const key = TAG_TOKEN[type];
+  return key ? `var(--tag-${key}-soft)` : 'var(--border-subtle)';
 }
 
 function getFieldOptions(type) {
@@ -643,9 +655,9 @@ function updateBrainstormSidebar() {
 
   sidebar.appendChild(h('div', { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }));
   sidebar.appendChild(h('div', { style: { padding: '4px 12px', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' } }, 'Tag Reference'));
-  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: '#6366f1' } }, '@'), h('span', { class: 'sidebar-item__label' }, 'Character')));
-  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: '#22c55e' } }, '#'), h('span', { class: 'sidebar-item__label' }, 'Location')));
-  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: '#ef4444' } }, '!'), h('span', { class: 'sidebar-item__label' }, 'Faction')));
-  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: '#a855f7' } }, '~'), h('span', { class: 'sidebar-item__label' }, 'Mystery')));
-  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: '#f59e0b' } }, '*'), h('span', { class: 'sidebar-item__label' }, 'Technology')));
+  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: getTagColor('character') } }, '@'), h('span', { class: 'sidebar-item__label' }, 'Character')));
+  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: getTagColor('location') } }, '#'), h('span', { class: 'sidebar-item__label' }, 'Location')));
+  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: getTagColor('faction') } }, '!'), h('span', { class: 'sidebar-item__label' }, 'Faction')));
+  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: getTagColor('mystery') } }, '~'), h('span', { class: 'sidebar-item__label' }, 'Mystery')));
+  sidebar.appendChild(h('div', { class: 'sidebar-item', style: { fontSize: '11px' } }, h('span', { style: { color: getTagColor('technology') } }, '*'), h('span', { class: 'sidebar-item__label' }, 'Technology')));
 }
