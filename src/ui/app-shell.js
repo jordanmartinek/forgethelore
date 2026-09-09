@@ -6,10 +6,13 @@
 
 import { h, render } from '../core/renderer.js';
 import { appStore } from '../core/store.js';
-import { db } from '../core/database.js';
 import { getNavGroups, getModuleLabel, renderModuleById } from '../core/registry.js';
 import { APP_NAME, APP_VERSION } from '../core/version.js';
 import { timeAgo, formatNumber, countWords } from '../core/format.js';
+import * as repo from '../core/repo.js';
+import { Collections } from '../core/repo.js';
+import { loadData, persistState } from '../core/persist.js';
+import { generateId } from '../core/objects.js';
 import { openAISettings } from './ai-settings-panel.js';
 import { TEMPLATES, applyTemplate, applyGeneratedWorld } from '../core/templates.js';
 import { renderCommandPalette } from './command-palette.js';
@@ -498,100 +501,128 @@ function createStatusBar() {
 
 // ─── Dashboard (Home Screen) ─────────────────────────────────────────────────
 
-async function renderDashboard(container) {
+/**
+ * Gather real, story-centric dashboard data from the live localStorage layer
+ * (repo/persist) rather than the mostly-unused IndexedDB `objects` store, so the
+ * home screen reflects what the writer is actually working on.
+ */
+function gatherStoryData() {
+  // Manuscript prose: the step-keyed scene map { [stepNum]: [{title,content}] }.
+  const manuscript = loadData(Collections.MANUSCRIPT, {}) || {};
+  const scenes = [];
+  let manuscriptWords = 0;
+  if (manuscript && typeof manuscript === 'object') {
+    for (const list of Object.values(manuscript)) {
+      (Array.isArray(list) ? list : []).forEach((card) => {
+        const words = countWords(card && card.content ? card.content : '');
+        manuscriptWords += words;
+        scenes.push({ id: card.id, title: card.title || 'Untitled scene', words, content: card.content || '' });
+      });
+    }
+  }
+
+  // Writing sprints (newest first already) contribute prose + "continue" hints.
+  const sprints = loadData(Collections.SPRINTS, []) || [];
+  const sprintWords = sprints.reduce((sum, s) => sum + (s.wordsWritten || countWords(s.content || '')), 0);
+  const lastSprint = sprints.find((s) => (s.content || '').trim().length) || null;
+
+  const characters = repo.list(Collections.CHARACTERS);
+  const locations = repo.list(Collections.LOCATIONS);
+
+  // Recent work: characters/locations + brainstorm sessions + sprints, by time.
+  const brainstorm = loadData(Collections.BRAINSTORM, []) || [];
+  const recent = [];
+  characters.forEach((c) => recent.push({ type: 'character', name: c.name, ts: c.updatedAt || 0, module: 'characters' }));
+  locations.forEach((l) => recent.push({ type: 'location', name: l.name, ts: l.updatedAt || 0, module: 'locations' }));
+  brainstorm.forEach((b) => recent.push({ type: 'note', name: b.title || 'Note', ts: b.createdAt || 0, module: 'brainstorm' }));
+  sprints.slice(0, 3).forEach((s) => recent.push({ type: 'sprint', name: `${s.wordsWritten || countWords(s.content || '')} words`, ts: s.endedAt || s.startedAt || 0, module: 'writing-sprint' }));
+  const recentItems = recent.filter((r) => r.ts).sort((a, b) => b.ts - a.ts).slice(0, 6);
+
+  return {
+    wordCount: manuscriptWords + sprintWords,
+    sceneCount: scenes.length,
+    characterCount: characters.length,
+    locationCount: locations.length,
+    lastScene: scenes.length ? scenes[scenes.length - 1] : null,
+    lastSprint,
+    recentItems,
+  };
+}
+
+/** Time-of-day greeting for the studio feel. */
+function greeting() {
+  const hr = new Date().getHours();
+  if (hr < 5) return 'Good evening';
+  if (hr < 12) return 'Good morning';
+  if (hr < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function renderDashboard(container) {
   const state = appStore.getState();
   const activeProject = state.projects.find(p => p.id === state.activeProjectId);
   const projectName = activeProject ? activeProject.name : 'LoreForge';
-  const projectIcon = activeProject ? activeProject.icon : '🏰';
+  const data = gatherStoryData();
 
-  // Get data for stats
-  let objectCount = 0;
-  let wordCount = 0;
-  let recentItems = [];
-  try {
-    const objects = await db.getAll('objects');
-    objectCount = objects.length;
-    // Calculate word count from text fields
-    objects.forEach(obj => {
-      if (obj.content) wordCount += countWords(obj.content);
-      if (obj.description) wordCount += countWords(obj.description);
-      if (obj.notes) wordCount += countWords(obj.notes);
-      if (obj.text) wordCount += countWords(obj.text);
-      if (obj.body) wordCount += countWords(obj.body);
-    });
-    // Get recent items sorted by updatedAt
-    recentItems = objects
-      .filter(obj => obj.updatedAt)
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, 8);
-  } catch (e) {
-    // DB might be empty
-  }
+  const go = (id) => appStore.setState({ activeModule: id });
 
-  const dashboard = h('div', { class: 'dashboard' },
-    // Header
-    h('div', { class: 'dashboard__header' },
-      h('div', { class: 'dashboard__greeting' },
-        h('h1', { class: 'dashboard__title' }, `${projectIcon} ${projectName}`),
-        h('p', { class: 'dashboard__subtitle' }, activeProject?.description || 'Your creative planning workspace'),
+  // What to continue: the last-written scene if any, else the manuscript.
+  const continueLabel = data.lastScene && data.lastScene.title
+    ? data.lastScene.title
+    : (data.lastSprint ? 'Your last writing sprint' : 'Start your manuscript');
+  const continueSub = data.lastScene
+    ? `${formatNumber(data.lastScene.words)} words`
+    : (data.lastSprint ? `${formatNumber(data.lastSprint.wordsWritten || countWords(data.lastSprint.content || ''))} words` : 'Chapter 1');
+  const continueTarget = data.lastSprint && !data.lastScene ? 'writing-sprint' : 'manuscript';
+
+  const dashboard = h('div', { class: 'studio' },
+    // ── Greeting + Continue Writing hero ──────────────────────────────────
+    h('div', { class: 'studio__hero' },
+      h('p', { class: 'studio__greeting' }, `${greeting()}.`),
+      h('h1', { class: 'studio__project' }, projectName),
+      activeProject?.description
+        ? h('p', { class: 'studio__tagline' }, activeProject.description)
+        : null,
+      h('div', { class: 'studio__continue card card--editorial' },
+        h('div', { class: 'studio__continue-info' },
+          h('div', { class: 'studio__continue-eyebrow' }, 'Continue writing'),
+          h('div', { class: 'studio__continue-title' }, continueLabel),
+          h('div', { class: 'studio__continue-sub' }, continueSub),
+        ),
+        h('button', { class: 'btn btn--primary studio__continue-btn', onclick: () => go(continueTarget) }, 'Continue →'),
       ),
     ),
 
-    // Stats Row
-    h('div', { class: 'dashboard__stats' },
-      createStatCard('📝', 'Word Count', formatNumber(wordCount), 'Across all entries'),
-      createStatCard('📦', 'Total Objects', String(objectCount), 'Characters, locations, etc.'),
-      createStatCard('🗂️', 'Projects', String(state.projects.length), 'Active universes'),
-      createStatCard('💾', 'Status', state.saveStatus === 'saved' ? 'Saved' : state.saveStatus === 'saving' ? 'Saving...' : 'Offline', 'Data persistence'),
+    // ── Story progress ────────────────────────────────────────────────────
+    h('div', { class: 'studio__stats' },
+      studioStat(formatNumber(data.wordCount), 'Words'),
+      studioStat(String(data.sceneCount), data.sceneCount === 1 ? 'Scene' : 'Scenes'),
+      studioStat(String(data.characterCount), data.characterCount === 1 ? 'Character' : 'Characters'),
+      studioStat(String(data.locationCount), data.locationCount === 1 ? 'Place' : 'Places'),
     ),
 
-    // Quick Actions
-    h('div', { class: 'dashboard__section' },
-      h('h2', { class: 'dashboard__section-title' }, 'Quick Actions'),
-      h('div', { class: 'dashboard__actions' },
-        createQuickAction('📖', 'Open Manuscript', () => appStore.setState({ activeModule: 'manuscript' })),
-        createQuickAction('⚡', 'Quick Log', () => appStore.setState({ activeModule: 'quick-log' })),
-        createQuickAction('💭', 'Brainstorm', () => appStore.setState({ activeModule: 'brainstorm' })),
-        createQuickAction('♟️', 'Strategic Board', () => appStore.setState({ activeModule: 'conflict-board' })),
-        createQuickAction('👤', 'Characters', () => appStore.setState({ activeModule: 'characters' })),
-        createQuickAction('🕸️', 'Knowledge Graph', () => appStore.setState({ activeModule: 'knowledge-graph' })),
-        createQuickAction('📊', 'Analytics', () => appStore.setState({ activeModule: 'analytics' })),
-        createQuickAction('⏳', 'Timeline', () => appStore.setState({ activeModule: 'timeline' })),
-      ),
+    // ── Quick capture ─────────────────────────────────────────────────────
+    h('div', { class: 'studio__section' },
+      h('h2', { class: 'studio__section-title' }, 'Quick capture'),
+      renderQuickCapture(),
     ),
 
-    // Recent Items
-    h('div', { class: 'dashboard__section' },
-      h('h2', { class: 'dashboard__section-title' }, 'Recent Items'),
-      recentItems.length > 0
-        ? h('div', { class: 'dashboard__recent' },
-            ...recentItems.map(item => createRecentItem(item))
-          )
-        : h('div', { class: 'dashboard__empty' },
-            h('p', {}, 'No items yet. Start by creating objects in any module!'),
-          ),
+    // ── Recent work ───────────────────────────────────────────────────────
+    h('div', { class: 'studio__section' },
+      h('h2', { class: 'studio__section-title' }, 'Recent work'),
+      data.recentItems.length
+        ? h('div', { class: 'studio__recent' }, ...data.recentItems.map(createRecentItem))
+        : h('p', { class: 'studio__empty' }, 'Your recent characters, places and notes will appear here as you build your story.'),
     ),
 
-    // Navigation Guide
-    h('div', { class: 'dashboard__section' },
-      h('h2', { class: 'dashboard__section-title' }, 'Modules Overview'),
-      h('div', { class: 'dashboard__modules-grid' },
-        ...navGroups.map(group =>
-          h('div', { class: 'dashboard__module-group' },
-            h('h3', { class: 'dashboard__module-group-title' }, group.label),
-            h('ul', { class: 'dashboard__module-list' },
-              ...group.items.map(item =>
-                h('li', {},
-                  h('a', {
-                    href: '#',
-                    class: 'dashboard__module-link',
-                    onclick: (e) => { e.preventDefault(); appStore.setState({ activeModule: item.id }); }
-                  }, item.label)
-                )
-              )
-            )
-          )
-        )
+    // ── Jump back in (a few primary destinations, not every module) ────────
+    h('div', { class: 'studio__section' },
+      h('h2', { class: 'studio__section-title' }, 'Jump back in'),
+      h('div', { class: 'studio__jump' },
+        jumpCard('📖', 'Manuscript', 'Write your story', () => go('manuscript')),
+        jumpCard('👤', 'Characters', 'Your story\u2019s people', () => go('characters')),
+        jumpCard('🌌', 'World', 'Explore your world', () => go('world-builder')),
+        jumpCard('⏳', 'Timeline', 'Events & continuity', () => go('timeline')),
       ),
     ),
   );
@@ -599,38 +630,75 @@ async function renderDashboard(container) {
   container.appendChild(dashboard);
 }
 
-function createStatCard(icon, label, value, description) {
-  return h('div', { class: 'dashboard__stat-card' },
-    h('div', { class: 'dashboard__stat-icon' }, icon),
-    h('div', { class: 'dashboard__stat-info' },
-      h('div', { class: 'dashboard__stat-value' }, value),
-      h('div', { class: 'dashboard__stat-label' }, label),
-      h('div', { class: 'dashboard__stat-desc' }, description),
-    )
+function studioStat(value, label) {
+  return h('div', { class: 'studio__stat' },
+    h('div', { class: 'studio__stat-value' }, value),
+    h('div', { class: 'studio__stat-label' }, label),
   );
 }
 
-function createQuickAction(icon, label, onclick) {
-  return h('button', { class: 'dashboard__action-btn', onclick },
-    h('span', { class: 'dashboard__action-icon' }, icon),
-    h('span', { class: 'dashboard__action-label' }, label),
+/**
+ * Frictionless quick capture: a note the writer can jot without deciding where
+ * it belongs. Saving creates a brainstorm session (same shape/store the
+ * Brainstorm module uses) so it can later become a character, place, event, etc.
+ */
+function renderQuickCapture() {
+  const textarea = h('textarea', {
+    class: 'input studio__capture-input',
+    rows: '2',
+    placeholder: 'What\u2019s on your mind? Capture an idea…',
+  });
+
+  const save = () => {
+    const text = (textarea.value || '').trim();
+    if (!text) return;
+    const sessions = loadData(Collections.BRAINSTORM, []) || [];
+    const firstLine = text.split('\n')[0].slice(0, 50);
+    sessions.unshift({ id: generateId(), title: firstLine || `Note — ${new Date().toLocaleDateString()}`, content: text, createdAt: Date.now() });
+    persistState(Collections.BRAINSTORM, sessions);
+    textarea.value = '';
+    // Reflect the new note immediately by re-rendering the dashboard.
+    renderActiveModule();
+  };
+
+  return h('div', { class: 'studio__capture card' },
+    textarea,
+    h('div', { class: 'studio__capture-actions' },
+      h('span', { class: 'studio__capture-hint' }, 'Saved to Brainstorm — turn it into anything later.'),
+      h('button', { class: 'btn btn--primary btn--sm', onclick: save }, 'Capture'),
+    ),
+  );
+}
+
+function jumpCard(icon, title, sub, onclick) {
+  return h('button', { class: 'studio__jump-card card card--interactive', onclick },
+    h('span', { class: 'studio__jump-icon' }, icon),
+    h('span', { class: 'studio__jump-title' }, title),
+    h('span', { class: 'studio__jump-sub' }, sub),
   );
 }
 
 function createRecentItem(item) {
   const typeIcons = {
     character: '👤', location: '📍', faction: '⚔️', scene: '🎬',
-    note: '📝', event: '📅', species: '🧬', religion: '🕯️',
+    note: '📝', sprint: '⏱️', event: '📅', species: '🧬', religion: '🕯️',
     organization: '🏢', military: '⚔️', technology: '⚙️',
   };
   const icon = typeIcons[item.type] || '📋';
-  const timeStr = item.updatedAt ? timeAgo(item.updatedAt) : '';
+  const timeStr = item.ts ? timeAgo(item.ts) : (item.updatedAt ? timeAgo(item.updatedAt) : '');
+  const target = item.module;
 
-  return h('div', { class: 'dashboard__recent-item' },
-    h('span', { class: 'dashboard__recent-icon' }, icon),
-    h('div', { class: 'dashboard__recent-info' },
-      h('span', { class: 'dashboard__recent-name' }, item.name || item.title || 'Untitled'),
-      h('span', { class: 'dashboard__recent-meta' }, `${item.type || 'object'} · ${timeStr}`),
+  return h('div', {
+    class: 'studio__recent-item',
+    role: target ? 'button' : undefined,
+    tabindex: target ? '0' : undefined,
+    onclick: target ? () => appStore.setState({ activeModule: target }) : undefined,
+    onkeydown: target ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); appStore.setState({ activeModule: target }); } } : undefined,
+  },
+    h('span', { class: 'studio__recent-icon' }, icon),
+    h('div', { class: 'studio__recent-info' },
+      h('span', { class: 'studio__recent-name' }, item.name || item.title || 'Untitled'),
+      h('span', { class: 'studio__recent-meta' }, `${item.type || 'item'}${timeStr ? ` · ${timeStr}` : ''}`),
     ),
   );
 }

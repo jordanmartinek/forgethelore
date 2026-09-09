@@ -1643,3 +1643,229 @@ textarea.input {
   color: var(--text-primary);
   margin-bottom: var(--space-xs);
 }
+
+
+/* ─── Studio (story-centric home / dashboard) ──────────────────────────────────
+ * A writer's studio, not an analytics dashboard: generous whitespace, a serif
+ * voice for the story's name, one clear "continue writing" action, quiet stats,
+ * frictionless capture, and recent work. Uses the shared .card primitive.
+ */
+.studio {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--space-3xl) var(--space-xl) var(--space-2xl);
+}
+
+.studio__hero {
+  margin-bottom: var(--space-2xl);
+}
+
+.studio__greeting {
+  font-size: 14px;
+  color: var(--text-tertiary);
+  margin: 0 0 var(--space-xs);
+}
+
+.studio__project {
+  font-family: var(--font-heading);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.studio__tagline {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin: var(--space-sm) 0 0;
+  line-height: 1.6;
+  max-width: 60ch;
+}
+
+.studio__continue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  margin-top: var(--space-xl);
+  padding: var(--space-xl);
+}
+
+.studio__continue-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+
+.studio__continue-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.studio__continue-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.studio__continue-btn {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+/* Quiet stats — a calm row, not stat "widgets". */
+.studio__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xl);
+  padding: var(--space-lg) 0 var(--space-2xl);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-2xl);
+}
+
+.studio__stat-value {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.studio__stat-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 6px;
+}
+
+.studio__section {
+  margin-bottom: var(--space-2xl);
+}
+
+.studio__section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-tertiary);
+  margin: 0 0 var(--space-md);
+}
+
+.studio__empty {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  font-style: italic;
+}
+
+/* Quick capture */
+.studio__capture {
+  padding: var(--space-md);
+}
+
+.studio__capture-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  resize: none;
+  box-shadow: none;
+  padding: var(--space-sm);
+}
+
+.studio__capture-input:focus {
+  box-shadow: none;
+  border: none;
+}
+
+.studio__capture-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.studio__capture-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Recent work — plain rows, not cards-in-cards. */
+.studio__recent {
+  display: flex;
+  flex-direction: column;
+}
+
+.studio__recent-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px var(--space-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.studio__recent-item:hover,
+.studio__recent-item:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+
+.studio__recent-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.studio__recent-name {
+  display: block;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.studio__recent-meta {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+/* Jump back in */
+.studio__jump {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-md);
+}
+
+.studio__jump-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: var(--space-lg);
+  font-family: var(--font-ui);
+}
+
+.studio__jump-icon { font-size: 22px; margin-bottom: var(--space-xs); }
+.studio__jump-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.studio__jump-sub { font-size: 12px; color: var(--text-muted); }
+
+/* Responsive: stack the continue hero on narrow screens. */
+@media (max-width: 640px) {
+  .studio { padding: var(--space-xl) var(--space-lg); }
+  .studio__project { font-size: 28px; }
+  .studio__continue { flex-direction: column; align-items: stretch; }
+  .studio__continue-btn { width: 100%; }
+  .studio__stats { gap: var(--space-xl); }
+}
