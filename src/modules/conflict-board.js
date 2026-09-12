@@ -12,6 +12,7 @@ import { loadData, saveData, getActiveProjectId } from '../core/persist.js';
 import { showModal, formField as createFormField, confirmDialog } from '../ui/modal.js';
 import { events } from '../core/events.js';
 import { getInsights, isAIEnabled } from '../core/ai.js';
+import { arrangeByFaction, factionStrength, powerShares } from '../core/board-layout.js';
 
 // ─── Board Data (loaded from localStorage or defaults) ───────────────────────
 
@@ -88,6 +89,9 @@ let dragState = null;
 let boardSize = 'md';
 let activeView = 'macro'; // 'macro' or 'micro'
 let activeSceneId = null;
+// When set to a faction id, the board focuses that faction: its pieces are
+// highlighted and the others dimmed. null = show all. Multi-faction UX (§ board).
+let factionFilter = null;
 
 // ─── Scene Data (Micro Board) ────────────────────────────────────────────────
 
@@ -448,6 +452,23 @@ async function resetBoardPositions() {
   triggerSave();
 }
 
+// ─── Arrange By Faction ──────────────────────────────────────────────────────
+// Multi-faction layout: partition the board into one region per faction (via the
+// pure board-layout helper) and lay each faction's pieces inside its territory,
+// so 3–6 factions read as distinct powers rather than two opposing sides.
+
+async function arrangeBoardByFaction() {
+  if (!factions.length) return;
+  const ok = await confirmDialog({ title: 'Arrange by faction?', message: 'Pieces will be grouped into one region of the board per faction.', confirmLabel: 'Arrange' });
+  if (!ok) return;
+
+  const positions = arrangeByFaction(pieces, factions);
+  pieces.forEach((p) => { if (positions[p.id]) p.position = positions[p.id]; });
+
+  rerenderBoard();
+  triggerSave();
+}
+
 // ─── New Board Modal ─────────────────────────────────────────────────────────
 
 function openNewBoardModal() {
@@ -544,7 +565,8 @@ function renderToolbar() {
     h('div', { class: 'conflict-board__toolbar-left' },
       ...(activeView === 'macro' ? [
         h('button', { class: 'btn btn--sm btn--ghost', onclick: toggleHeatmap, title: 'Toggle Heatmap' }, '🔥'),
-        h('button', { class: 'btn btn--sm btn--ghost', onclick: resetBoardPositions, title: 'Reset Board Positions' }, '🔄 Reset'),
+        h('button', { class: 'btn btn--sm btn--ghost', onclick: arrangeBoardByFaction, title: 'Arrange pieces into one region per faction' }, '⬛ By Faction'),
+        h('button', { class: 'btn btn--sm btn--ghost', onclick: resetBoardPositions, title: 'Arrange pieces by story role (protagonists vs antagonists)' }, '🔄 By Role'),
         h('button', { class: 'btn btn--sm btn--primary', onclick: openAddPieceModal }, '+ Piece'),
       ] : [
         h('button', { class: 'btn btn--sm btn--primary', onclick: openAddSceneModal }, '+ Add Scene'),
@@ -605,31 +627,85 @@ function renderFactionsPanel() {
 }
 
 
+// ─── Render: Multi-faction goal rail ─────────────────────────────────────────
+// Replaces the old two-faction top/bottom goal cards. Shows every faction's
+// objective + progress as a compact chip; clicking a chip focuses that faction.
+
+function renderGoalRail() {
+  return h('div', { class: 'board-goal-rail' },
+    ...factions.map((f) => {
+      const focused = factionFilter === f.id;
+      return h('button', {
+        class: `board-goal-chip ${focused ? 'board-goal-chip--focused' : ''} ${factionFilter && !focused ? 'board-goal-chip--dim' : ''}`,
+        style: { borderColor: f.color },
+        title: `${f.name} — click to focus`,
+        onclick: () => toggleFactionFilter(f.id),
+      },
+        h('div', { class: 'board-goal-chip__head' },
+          h('span', { class: 'board-goal-chip__faction', style: { color: f.color } }, `${f.icon} ${f.name}`),
+          h('span', { class: 'board-goal-chip__pct' }, `${f.goalProgress || 0}%`),
+        ),
+        f.goal ? h('div', { class: 'board-goal-chip__text' }, `🎯 ${f.goal}`) : null,
+        h('div', { class: 'progress board-goal-chip__progress' },
+          h('div', { class: 'progress__bar', style: { width: `${f.goalProgress || 0}%`, background: f.color } }),
+        ),
+      );
+    }),
+  );
+}
+
+// ─── Render: Faction legend / filter ─────────────────────────────────────────
+// A compact chip row under the board: click a faction to focus it (highlight its
+// pieces, dim the rest), with a live aggregate-strength readout per faction.
+
+function renderFactionLegend() {
+  if (!factions.length) return h('div', {});
+  const shares = powerShares(factions, pieces);
+  const shareById = new Map(shares.map((s) => [s.id, s]));
+
+  return h('div', { class: 'board-legend' },
+    h('button', {
+      class: `board-legend__chip ${!factionFilter ? 'board-legend__chip--active' : ''}`,
+      onclick: () => setFactionFilter(null),
+    }, 'All'),
+    ...factions.map((f) => {
+      const st = factionStrength(f.id, pieces);
+      const share = shareById.get(f.id);
+      const pct = share ? Math.round(share.share * 100) : 0;
+      const focused = factionFilter === f.id;
+      return h('button', {
+        class: `board-legend__chip ${focused ? 'board-legend__chip--active' : ''}`,
+        style: { '--chip-color': f.color },
+        title: `${f.name}: ${st.pieces} pieces · strength ${st.total} · ${pct}% of board power`,
+        onclick: () => toggleFactionFilter(f.id),
+      },
+        h('span', { class: 'board-legend__dot', style: { background: f.color } }),
+        h('span', { class: 'board-legend__name' }, `${f.icon} ${f.name}`),
+        h('span', { class: 'board-legend__strength' }, `${pct}%`),
+      );
+    }),
+  );
+}
+
+/** Focus a faction (toggle off if already focused). */
+function toggleFactionFilter(id) {
+  setFactionFilter(factionFilter === id ? null : id);
+}
+
+function setFactionFilter(id) {
+  factionFilter = id;
+  rerenderBoard();
+}
+
 // ─── Render: Board Canvas ────────────────────────────────────────────────────
 
 function renderBoardCanvas() {
   const canvas = h('div', { class: 'conflict-board__canvas' });
 
-  // Goal cards (top and bottom for first two factions)
-  if (factions.length >= 2) {
-    canvas.appendChild(h('div', { class: 'goal-card goal-card--top', style: { borderColor: factions[1].color } },
-      h('div', { class: 'goal-card__faction', style: { color: factions[1].color } }, `${factions[1].icon} ${factions[1].name}`),
-      h('div', { class: 'goal-card__text' }, factions[1].goal),
-      h('div', { class: 'goal-card__progress' },
-        h('div', { class: 'progress' },
-          h('div', { class: 'progress__bar', style: { width: `${factions[1].goalProgress}%`, background: factions[1].color } })
-        )
-      )
-    ));
-    canvas.appendChild(h('div', { class: 'goal-card goal-card--bottom', style: { borderColor: factions[0].color } },
-      h('div', { class: 'goal-card__faction', style: { color: factions[0].color } }, `${factions[0].icon} ${factions[0].name}`),
-      h('div', { class: 'goal-card__text' }, factions[0].goal),
-      h('div', { class: 'goal-card__progress' },
-        h('div', { class: 'progress' },
-          h('div', { class: 'progress__bar', style: { width: `${factions[0].goalProgress}%`, background: factions[0].color } })
-        )
-      )
-    ));
+  // Multi-faction goal rail: every faction's objective + progress, not just two.
+  // Clicking a goal chip focuses that faction (same as the legend/filter).
+  if (factions.length) {
+    canvas.appendChild(renderGoalRail());
   }
 
   // Chessboard
@@ -656,6 +732,9 @@ function renderBoardCanvas() {
   board.appendChild(createConflictLinesSVG());
   canvas.appendChild(board);
 
+  // Faction legend / filter under the board.
+  canvas.appendChild(renderFactionLegend());
+
   return canvas;
 }
 
@@ -664,11 +743,13 @@ function createPieceElement(piece, faction) {
   const pctLeft = (piece.position.col + 0.5) / 8 * 100;
   const pctTop = (piece.position.row + 0.5) / 8 * 100;
   const momentumIcon = piece.momentum === 'rising' ? '▲' : piece.momentum === 'falling' ? '▼' : '■';
+  // When a faction is focused, dim pieces that don't belong to it.
+  const dimmed = factionFilter && piece.faction !== factionFilter;
 
   return h('div', {
-    class: `chess-piece ${selectedPiece === piece.id ? 'chess-piece--selected' : ''}`,
+    class: `chess-piece ${selectedPiece === piece.id ? 'chess-piece--selected' : ''} ${dimmed ? 'chess-piece--dimmed' : ''}`,
     style: { left: `calc(${pctLeft}% - 24px)`, top: `calc(${pctTop}% - 24px)`, background: faction.color, borderColor: selectedPiece === piece.id ? 'var(--accent-primary)' : faction.color },
-    dataset: { pieceId: piece.id },
+    dataset: { pieceId: piece.id, faction: piece.faction },
     draggable: 'true',
     onclick: (e) => { e.stopPropagation(); selectPiece(piece.id); },
     ondragstart: (e) => handleDragStart(e, piece),
