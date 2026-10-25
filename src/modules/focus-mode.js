@@ -18,6 +18,7 @@ import { list, Collections } from '../core/repo.js';
 import { sessionStats, contextRail } from '../core/focus-model.js';
 import { mountBannerInto } from '../ui/banner.js';
 import { attachTextAIActions } from '../ui/text-ai-actions.js';
+import { attachWritingCompanion } from '../ui/writing-companion-panel.js';
 
 const TRUBY_TITLES = {
   1: 'Self-Revelation, Need & Desire', 2: 'Ghost & Story World', 3: 'Weakness & Need',
@@ -125,6 +126,9 @@ function openOverlay(card, root) {
     const oldMirror = existing.querySelector('.reminder-banner--mirror');
     if (oldMirror && typeof oldMirror._cleanup === 'function') oldMirror._cleanup();
     existing.remove();
+    // The writing companion dock lives on <body> (not inside the overlay), so
+    // remove any stray dock from a previous card before opening the new one.
+    document.querySelectorAll('.wc-dock').forEach((el) => el.remove());
   }
 
   const startedAt = Date.now();
@@ -159,6 +163,9 @@ function openOverlay(card, root) {
   editor.value = startText;
   // Contextual selection AI (highlight a passage → ✨ Improve/Rewrite/…).
   const detachAI = attachTextAIActions(editor);
+  // Real-time writing companion (double-click a word → synonyms; pause →
+  // craft suggestions). Offline-first, so it works with or without an AI key.
+  const detachCompanion = attachWritingCompanion(editor);
 
   const updateHud = () => {
     const s = sessionStats(startText, currentText, sessionGoal, startedAt);
@@ -183,6 +190,7 @@ function openOverlay(card, root) {
   const close = () => {
     if (saveTimer) clearTimeout(saveTimer);
     if (detachAI) detachAI();
+    if (detachCompanion) detachCompanion();
     saveCard(card.stepNum, { id: card.id, title: card.title, content: editor.value, color: card.color });
     document.removeEventListener('keydown', onKey);
     // Tear down the banner mirror's event subscriptions.
