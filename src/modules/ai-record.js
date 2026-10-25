@@ -17,12 +17,15 @@ import { h } from '../core/renderer.js';
 import { generateId } from '../core/objects.js';
 import { loadData, persistState } from '../core/persist.js';
 import { list, Collections } from '../core/repo.js';
+import { events } from '../core/events.js';
 import { showModal, formField, confirmDialog } from '../ui/modal.js';
 import { expandableText } from '../ui/expandable-text.js';
 import { toastSuccess, toastError, toastWarning } from '../ui/toast.js';
 import { appStore } from '../core/store.js';
 import {
   AI_RECORD_KEY,
+  AI_RECORD_FOCUS_KEY,
+  AI_RECORDS_CHANGED,
   AI_SOURCES,
   sourceMeta,
   makeRecord,
@@ -45,11 +48,24 @@ let filter = { search: '', source: '', tag: '' };
 
 function load() {
   records = normalizeRecords(loadData(AI_RECORD_KEY, []));
+  // Honor a focus hint set by the always-on review checklist (click a record
+  // there → open it here). Consume it so it only applies once.
+  try {
+    const focusId = localStorage.getItem(AI_RECORD_FOCUS_KEY);
+    if (focusId) {
+      localStorage.removeItem(AI_RECORD_FOCUS_KEY);
+      if (records.find((r) => r.id === focusId)) activeId = focusId;
+    }
+  } catch (_) { /* ignore */ }
   if (activeId && !records.find((r) => r.id === activeId)) activeId = null;
 }
 
 function save() {
-  return persistState(AI_RECORD_KEY, records);
+  const ok = persistState(AI_RECORD_KEY, records);
+  // Notify the always-on review checklist (and any other listener) so it can
+  // refresh without being tightly coupled to this module.
+  events.emit(AI_RECORDS_CHANGED, { count: records.length });
+  return ok;
 }
 
 // ─── Main render ───────────────────────────────────────────────────────────
@@ -138,10 +154,11 @@ function renderListItems(visible) {
       ),
       h('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, `${meta.label}${r.model ? ` · ${r.model}` : ''} · ${formatDate(r.updatedAt)}`),
       r.content ? h('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, r.content.slice(0, 70)) : null,
-      (r.tags.length || linkCount(r) || (r.summary && r.summary.trim())) ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px', alignItems: 'center' } },
+      (r.tags.length || linkCount(r) || (r.summary && r.summary.trim()) || r.reviewed) ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px', alignItems: 'center' } },
         ...r.tags.slice(0, 3).map((t) => h('span', { style: { fontSize: '9px', padding: '1px 5px', borderRadius: 'var(--radius-full)', background: 'var(--surface-2)', color: 'var(--text-secondary)' } }, `#${t}`)),
         linkCount(r) ? h('span', { style: { fontSize: '9px', color: 'var(--text-muted)' }, title: `${linkCount(r)} linked entit${linkCount(r) === 1 ? 'y' : 'ies'}` }, `🔗${linkCount(r)}`) : null,
         (r.summary && r.summary.trim()) ? h('span', { style: { fontSize: '9px', color: 'var(--text-muted)' }, title: 'Has a summary' }, '✨') : null,
+        r.reviewed ? h('span', { style: { fontSize: '9px', color: 'var(--success)' }, title: 'Reviewed' }, '✓') : null,
       ) : null,
     );
   }));
@@ -175,6 +192,11 @@ function renderReader() {
           `${meta.icon} ${meta.label}${record.model ? ` · ${record.model}` : ''} · ${recordWordCount(record)} words · ${formatDate(record.createdAt)}`),
       ),
       h('div', { style: { display: 'flex', gap: '6px', flexShrink: '0' } },
+        h('button', {
+          class: `btn btn--sm ${record.reviewed ? 'btn--ghost' : 'btn--primary'}`,
+          title: record.reviewed ? 'Reviewed — click to move back to the review list' : 'Mark as reviewed (checks it off the review list)',
+          onclick: () => toggleReviewed(record),
+        }, record.reviewed ? '✓ Reviewed' : 'Mark reviewed'),
         h('button', { class: 'btn btn--ghost btn--sm', title: record.pinned ? 'Unpin' : 'Pin to top', onclick: () => togglePin(record) }, record.pinned ? '📌' : '📍'),
         h('button', { class: 'btn btn--ghost btn--sm', title: 'Copy full record', onclick: () => copyRecord(record) }, '📋'),
         h('button', { class: 'btn btn--ghost btn--sm', title: 'Send to Brainstorm to work it into your story', onclick: () => sendToBrainstorm(record) }, '💭'),
@@ -380,6 +402,14 @@ function togglePin(record) {
   record.pinned = !record.pinned;
   record.updatedAt = Date.now();
   save();
+  rerender();
+}
+
+function toggleReviewed(record) {
+  record.reviewed = !record.reviewed;
+  record.updatedAt = Date.now();
+  save(); // emits AI_RECORDS_CHANGED → the always-on checklist refreshes
+  toastSuccess(record.reviewed ? 'Checked off — removed from the review list.' : 'Moved back to the review list.');
   rerender();
 }
 

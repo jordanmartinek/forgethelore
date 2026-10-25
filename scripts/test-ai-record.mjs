@@ -154,5 +154,29 @@ assert(sumEmpty.usedAI === false && sumEmpty.summary === '', 'summarizeRecord wi
 const sp = JSON.parse(R.buildSummaryPrompt(R.makeRecord({ title: 'T', prompt: 'P', content: 'C' })));
 assert(sp.title === 'T' && sp.prompt === 'P' && sp.session === 'C', 'buildSummaryPrompt carries title/prompt/session');
 
+// ── Review workflow: reviewed flag + pending queries ─────────────────────────
+assert(R.makeRecord({}).reviewed === false, 'makeRecord defaults reviewed to false');
+assert(R.makeRecord({ reviewed: true }).reviewed === true, 'makeRecord keeps reviewed=true');
+assert(R.makeRecord({ reviewed: 1 }).reviewed === true, 'makeRecord coerces reviewed to boolean');
+assert(typeof R.AI_RECORDS_CHANGED === 'string' && R.AI_RECORDS_CHANGED.length > 0, 'AI_RECORDS_CHANGED event name is exported');
+
+const reviewCorpus = R.normalizeRecords([
+  { id: 'r1', title: 'Old reviewed', content: 'x', reviewed: true, updatedAt: 100 },
+  { id: 'r2', title: 'Needs review A', content: 'x', updatedAt: 300 },
+  { id: 'r3', title: 'Needs review B', content: 'x', updatedAt: 200, pinned: true },
+  { id: 'r4', title: 'Needs review C', content: 'x', updatedAt: 250 },
+]);
+assert(R.pendingReviewCount(reviewCorpus) === 3, 'pendingReviewCount excludes reviewed records');
+const pending = R.pendingReviewRecords(reviewCorpus);
+assert(pending.length === 3 && !pending.some((r) => r.reviewed), 'pendingReviewRecords returns only unreviewed');
+assert(pending[0].id === 'r3', 'pendingReviewRecords floats pinned to the top');
+assert(pending[1].id === 'r2' && pending[2].id === 'r4', 'pendingReviewRecords then sorts by updatedAt desc');
+assert(R.pendingReviewRecords([]).length === 0 && R.pendingReviewCount(null) === 0, 'pending helpers tolerate empty/non-arrays');
+
+// checking one off removes it from the pending list
+reviewCorpus.find((r) => r.id === 'r2').reviewed = true;
+assert(R.pendingReviewCount(reviewCorpus) === 2, 'marking a record reviewed drops the pending count');
+assert(!R.pendingReviewRecords(reviewCorpus).some((r) => r.id === 'r2'), 'a reviewed record leaves the pending list');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} ai-record tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
