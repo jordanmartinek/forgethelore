@@ -52,6 +52,7 @@ import { renderPovAnalytics } from '../modules/pov-analytics.js';
 import { renderCharacterHub } from '../modules/character-hub.js';
 import { renderWorldHub } from '../modules/world-hub.js';
 import { renderInsightsHub } from '../modules/insights-hub.js';
+import { renderAIRecord } from '../modules/ai-record.js';
 
 /**
  * @typedef {Object} ModuleDef
@@ -118,6 +119,7 @@ export const MODULES = [
 
   // ── CREATE — generative & planning workspaces ───────────────────────────
   { id: 'brainstorm',      label: 'Brainstorm',      icon: '💭', section: 'create', tier: 'primary',  group: 'write',   render: renderBrainstorm },
+  { id: 'ai-record',       label: 'AI Record',       icon: '🤖', section: 'create', tier: 'primary',  group: 'write',   render: renderAIRecord },
   { id: 'writing-sprint',  label: 'Writing Sprint',  icon: '⏱️', section: 'create', tier: 'primary',  group: 'write',   render: renderWritingSprint },
   { id: 'character-interview', label: 'Interview Character', icon: '💬', section: 'create', tier: 'primary', group: 'write', render: renderCharacterInterview },
   { id: 'conflict-board',  label: 'Strategic Board', icon: '♟️', section: 'create', tier: 'advanced', group: 'plan',    render: renderConflictBoard },
