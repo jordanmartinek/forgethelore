@@ -566,10 +566,79 @@
 
 /* Sidebar Footer */
 .nav-sidebar__footer {
-  margin-top: auto;
   padding: var(--space-md);
   border-top: 1px solid var(--border-subtle);
 }
+
+/* ─── AI Records review checklist (always-on, pinned in the sidebar) ───────── */
+/* margin-top:auto pushes this panel (and the footer below it) to the bottom of
+ * the sidebar, so the nav groups stay at the top and this stays visible. */
+.ai-review {
+  margin-top: auto;
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  flex-shrink: 0;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+.ai-review__header {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  margin-bottom: 6px;
+}
+.ai-review__title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-muted); display: flex; align-items: center; gap: 2px;
+}
+.ai-review__count {
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary); color: #fff;
+  font-size: 10px; font-weight: 700;
+}
+.ai-review__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ai-review__item { display: flex; align-items: center; gap: 7px; padding: 3px 2px; }
+.ai-review__check { flex-shrink: 0; cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent-primary); }
+.ai-review__name {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 5px;
+  background: none; border: none; padding: 2px 0;
+  font-family: var(--font-ui); font-size: 12px; color: var(--text-secondary);
+  text-align: left; cursor: pointer;
+}
+.ai-review__name:hover { color: var(--text-primary); }
+.ai-review__src { flex-shrink: 0; font-size: 10px; }
+.ai-review__name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-review__empty {
+  font-size: 11px; color: var(--text-muted); line-height: 1.5; padding: 2px 0;
+}
+.ai-review__empty--cta {
+  display: block; width: 100%; text-align: left;
+  background: none; border: 1px dashed var(--border-subtle); border-radius: var(--radius-md);
+  padding: 8px; cursor: pointer; font-family: var(--font-ui);
+}
+.ai-review__empty--cta:hover { border-color: var(--border-default); color: var(--text-secondary); }
+.ai-review__more {
+  margin-top: 6px; width: 100%;
+  background: none; border: none; padding: 4px 0;
+  font-size: 11px; color: var(--accent-primary); cursor: pointer; text-align: left;
+}
+.ai-review__more:hover { text-decoration: underline; }
+
+/* Collapsed sidebar: hide the labels/list, keep just the robot + count badge so
+ * the reminder is still present (and clickable) in the slim rail. */
+.app-layout--sidebar-collapsed .ai-review {
+  padding: var(--space-sm) 0;
+  text-align: center;
+}
+.app-layout--sidebar-collapsed .ai-review__title-label,
+.app-layout--sidebar-collapsed .ai-review__list,
+.app-layout--sidebar-collapsed .ai-review__empty,
+.app-layout--sidebar-collapsed .ai-review__more {
+  display: none;
+}
+.app-layout--sidebar-collapsed .ai-review__header { justify-content: center; }
 
 .nav-sidebar__collapse-btn {
   width: 100%;

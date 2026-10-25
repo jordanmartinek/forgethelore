@@ -20,6 +20,7 @@ import { THEMES, getTheme, setTheme } from '../core/theme.js';
 import { createBanner, showBanner } from './banner.js';
 import { isBannerEnabled } from '../core/banner.js';
 import { toggleAIPanel } from './ai-panel.js';
+import { createAIRecordReview } from './ai-record-review.js';
 
 // Reflect the banner's initial visibility on the layout grid so a hidden banner
 // collapses its row. banner.js keeps this in sync on later toggles.
@@ -362,6 +363,9 @@ function createNavSidebar() {
     ),
     // Navigation groups
     ...navGroups.map(group => createNavGroup(group)),
+    // Always-on checklist: AI records still awaiting review. Pinned above the
+    // collapse footer so it stays visible in every module.
+    createAIRecordReview(),
     // Collapse toggle at bottom
     h('div', { class: 'nav-sidebar__footer' },
       h('button', {

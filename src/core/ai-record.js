@@ -23,6 +23,22 @@ import { PROVIDERS } from './ai.js';
 export const AI_RECORD_KEY = 'aiRecords';
 
 /**
+ * Event emitted on the shared bus whenever the AI-records collection changes
+ * (add/edit/delete/import/review-toggle). The always-on review checklist
+ * (ui/ai-record-review.js) listens for this to refresh without tight coupling
+ * to the module.
+ */
+export const AI_RECORDS_CHANGED = 'ai-records:changed';
+
+/**
+ * localStorage key for a one-shot "open this record" hint. The review checklist
+ * writes a record id here before navigating; the module consumes it on load to
+ * focus that record, then clears it. NOT namespaced per project — it's a
+ * transient UI hint, consumed immediately.
+ */
+export const AI_RECORD_FOCUS_KEY = 'loreforge_ai_record_focus';
+
+/**
  * Known AI sources, each with a label + emoji for the UI. 'other' is the
  * catch-all so nothing is ever un-filable.
  * @type {{ id:string, label:string, icon:string }[]}
@@ -55,6 +71,8 @@ export function sourceMeta(id) {
  * @property {string} content  the AI's response / the session transcript
  * @property {string[]} tags   free-form tags for grouping (e.g. "magic", "villains")
  * @property {boolean} pinned  surfaced to the top when true
+ * @property {boolean} reviewed  true once the writer has investigated/integrated
+ *                              this record (checked it off the review list)
  * @property {string} summary  an optional short summary (AI- or on-device-generated)
  * @property {string[]} linkedCharacterIds  ids of characters this record references
  * @property {string[]} linkedLocationIds   ids of places this record references
@@ -102,6 +120,7 @@ export function makeRecord(partial = {}) {
     content: String(partial.content || ''),
     tags: parseTags(partial.tags),
     pinned: Boolean(partial.pinned),
+    reviewed: Boolean(partial.reviewed),
     summary: String(partial.summary || ''),
     linkedCharacterIds: toIdList(partial.linkedCharacterIds),
     linkedLocationIds: toIdList(partial.linkedLocationIds),
@@ -156,6 +175,26 @@ export function queryRecords(records, q = {}) {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     return (b.updatedAt || 0) - (a.updatedAt || 0);
   });
+}
+
+/**
+ * The records still awaiting review (not yet checked off), newest first. Drives
+ * the always-on "AI records to review" checklist. Pinned records float to the
+ * top so a deliberately-flagged record is reviewed first.
+ * @param {AIRecord[]} records
+ * @returns {AIRecord[]}
+ */
+export function pendingReviewRecords(records) {
+  const list = Array.isArray(records) ? records.filter((r) => r && !r.reviewed) : [];
+  return list.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+}
+
+/** Count of records awaiting review. */
+export function pendingReviewCount(records) {
+  return Array.isArray(records) ? records.filter((r) => r && !r.reviewed).length : 0;
 }
 
 /**
