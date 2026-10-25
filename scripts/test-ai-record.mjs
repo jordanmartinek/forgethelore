@@ -105,5 +105,54 @@ assert(R.recordToText(null) === '', 'recordToText handles null');
 assert(R.AI_RECORD_KEY === 'aiRecords', 'AI_RECORD_KEY is the stable collection key');
 assert(Array.isArray(R.AI_SOURCES) && R.AI_SOURCES.some((s) => s.id === 'gemini') && R.AI_SOURCES.some((s) => s.id === 'other'), 'AI_SOURCES includes gemini + other');
 
+// ── Entity links: toIdList / makeRecord / recordsForEntity / linkCount ───────
+assert(JSON.stringify(R.toIdList(['a', 'b', 'a', '', '  c '])) === JSON.stringify(['a', 'b', 'c']), 'toIdList trims, de-dupes, drops empties');
+assert(JSON.stringify(R.toIdList([{ id: 'x' }, { id: 'y' }, { nope: 1 }])) === JSON.stringify(['x', 'y']), 'toIdList accepts objects with id');
+assert(R.toIdList(null).length === 0, 'toIdList tolerates non-arrays');
+
+const linked = R.makeRecord({ title: 'L', content: 'c', linkedCharacterIds: ['c1', 'c1', 'c2'], linkedLocationIds: ['l1'] });
+assert(JSON.stringify(linked.linkedCharacterIds) === JSON.stringify(['c1', 'c2']), 'makeRecord cleans linkedCharacterIds');
+assert(JSON.stringify(linked.linkedLocationIds) === JSON.stringify(['l1']), 'makeRecord keeps linkedLocationIds');
+assert(R.makeRecord({}).linkedCharacterIds.length === 0, 'makeRecord defaults links to empty arrays');
+assert(R.linkCount(linked) === 3, 'linkCount sums characters + places');
+assert(R.linkCount({}) === 0 && R.linkCount(null) === 0, 'linkCount tolerates missing fields');
+
+const linkCorpus = [
+  R.makeRecord({ id: 'a', content: 'x', linkedCharacterIds: ['c1'] }),
+  R.makeRecord({ id: 'b', content: 'y', linkedCharacterIds: ['c1', 'c2'], linkedLocationIds: ['l9'] }),
+  R.makeRecord({ id: 'c', content: 'z' }),
+];
+assert(R.recordsForEntity(linkCorpus, 'character', 'c1').length === 2, 'recordsForEntity finds character links');
+assert(R.recordsForEntity(linkCorpus, 'location', 'l9').length === 1, 'recordsForEntity finds place links');
+assert(R.recordsForEntity(linkCorpus, 'character', 'nope').length === 0, 'recordsForEntity returns [] for no matches');
+assert(R.recordsForEntity(null, 'character', 'c1').length === 0, 'recordsForEntity tolerates non-arrays');
+
+// ── Summary: parse / deterministic / makeRecord field ────────────────────────
+assert(R.makeRecord({ summary: '  hi  ' }).summary === 'hi' || R.makeRecord({ summary: 'hi' }).summary === 'hi', 'makeRecord carries a summary');
+assert(R.parseSummary('{"summary":"A tense scene.","takeaways":["beat one","beat two"]}').includes('A tense scene.'), 'parseSummary reads summary');
+assert(/- beat one/.test(R.parseSummary('{"summary":"S","takeaways":["beat one"]}')), 'parseSummary renders takeaways as bullets');
+assert(R.parseSummary('Sure!\n```json\n{"summary":"Fenced.","takeaways":[]}\n```').includes('Fenced.'), 'parseSummary extracts JSON from fenced reply');
+assert(R.parseSummary('Just plain prose.').includes('Just plain prose.'), 'parseSummary falls back to prose');
+assert(R.parseSummary('') === '' && R.parseSummary(null) === '', 'parseSummary empty/null -> ""');
+assert(R.parseSummary('{}') === '', 'parseSummary empty object -> ""');
+
+const detSum = R.deterministicSummary({ content: 'The city floats on rings of light. It hides a secret.\n- Ley lines power it\n- The council lies\n- A rebel knows the truth' });
+assert(detSum.includes('The city floats'), 'deterministicSummary leads with the opening sentences');
+assert(/- Ley lines power it/.test(detSum), 'deterministicSummary reuses existing bullet lines as takeaways');
+assert(R.deterministicSummary({ content: '' }) === '', 'deterministicSummary empty content -> ""');
+const detNoBullets = R.deterministicSummary({ content: 'First sentence. Second sentence. Third idea here. Fourth idea.' });
+assert(detNoBullets.length > 0 && /First sentence/.test(detNoBullets), 'deterministicSummary works without bullets');
+
+// summarizeRecord offline (no key) resolves via deterministic summary
+assert(R.isAIEnabled() === false, 'no AI key configured in test');
+const sumRes = await R.summarizeRecord(R.makeRecord({ content: 'A big idea. Another idea. A third one.' }));
+assert(sumRes.usedAI === false && sumRes.summary.length > 0, 'summarizeRecord offline returns a usable summary, marked not-AI');
+const sumEmpty = await R.summarizeRecord(R.makeRecord({ content: '' }));
+assert(sumEmpty.usedAI === false && sumEmpty.summary === '', 'summarizeRecord with no content -> empty');
+
+// buildSummaryPrompt shape
+const sp = JSON.parse(R.buildSummaryPrompt(R.makeRecord({ title: 'T', prompt: 'P', content: 'C' })));
+assert(sp.title === 'T' && sp.prompt === 'P' && sp.session === 'C', 'buildSummaryPrompt carries title/prompt/session');
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} ai-record tests: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
