@@ -136,11 +136,14 @@
 .conflict-board__canvas {
   grid-row: 2;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   background: var(--bg-primary);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
 }
 
 .chessboard {
@@ -497,3 +500,92 @@
 .piece-bishop { font-size: 18px; }
 .piece-knight { font-size: 18px; }
 .piece-pawn { font-size: 16px; }
+
+
+/* ─── Multi-faction goal rail ──────────────────────────────────────────────────
+ * Replaces the two edge goal cards: a wrapping row of faction goal chips so
+ * every force is visible, not just two. Sits above the board in the canvas. */
+.board-goal-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+  width: 100%;
+  max-width: 900px;
+  flex-shrink: 0;
+}
+
+.board-goal-chip {
+  flex: 1 1 160px;
+  max-width: 220px;
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+  font-family: var(--font-ui);
+}
+.board-goal-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.board-goal-chip--focused { box-shadow: var(--shadow-md); background: var(--surface-2); }
+.board-goal-chip--dim { opacity: 0.5; }
+
+.board-goal-chip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.board-goal-chip__faction { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-goal-chip__pct { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.board-goal-chip__text {
+  font-size: 11px; color: var(--text-secondary); line-height: 1.4;
+  margin-bottom: 6px;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.board-goal-chip__progress { height: 4px; }
+
+/* ─── Faction legend / filter ─────────────────────────────────────────────────
+ * Under the board: click a faction to focus it. Shows each faction's share of
+ * total board power. */
+.board-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  width: 100%;
+  max-width: 900px;
+  flex-shrink: 0;
+}
+
+.board-legend__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.board-legend__chip:hover { background: var(--bg-hover); color: var(--text-primary); }
+.board-legend__chip--active {
+  background: var(--accent-primary-soft);
+  border-color: var(--border-accent);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.board-legend__dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.board-legend__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.board-legend__strength { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Dimmed pieces when a faction is focused. */
+.chess-piece--dimmed { opacity: 0.28; filter: saturate(0.6); }
+.chess-piece--dimmed:hover { opacity: 0.7; }

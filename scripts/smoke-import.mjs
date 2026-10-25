@@ -129,6 +129,7 @@ const modules = [
   '../src/ui/ai-panel.js',
   '../src/ui/text-ai-actions.js',
   '../src/modules/insights-hub.js',
+  '../src/core/board-layout.js',
   '../src/core/registry.js',
   '../src/ui/command-palette.js',
   '../src/ui/app-shell.js',
