@@ -135,7 +135,7 @@ function renderResourceDetailContent(res) {
     h('div', { style: { marginBottom: '16px' } },
       h('div', { style: { fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginBottom: '10px' } }, 'RESOURCE HOLDERS'),
       ...res.holders.map((holder, idx) =>
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' } },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)' } },
           h('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: holder.color, flexShrink: '0' } }),
           h('div', { style: { flex: '1', fontSize: '13px', color: 'var(--text-primary)' } }, holder.character),
           h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },

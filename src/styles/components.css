@@ -1101,7 +1101,7 @@
 }
 
 .panel__content {
-  padding: var(--space-lg);
+  padding: var(--space-xl);
 }
 
 /* ─── Collapsible Sections ─────────────────────────────────────────────────── */

@@ -253,11 +253,11 @@ export function renderDailyPlanner(container) {
 }
 
 function renderTaskSection(title, subtitle, tasks, color) {
-  return h('div', { style: { marginBottom: '20px', padding: '16px', background: 'var(--surface-1)', borderRadius: '12px', border: `1px solid ${color}25` } },
+  return h('div', { class: 'card', style: { marginBottom: '20px', border: `1px solid ${color}25` } },
     h('div', { style: { fontSize: '12px', fontWeight: '700', color, marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, title),
     h('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' } }, subtitle),
     ...tasks.map(task =>
-      h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' } },
+      h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)' } },
         h('button', {
           style: { width: '20px', height: '20px', borderRadius: '4px', border: '2px solid var(--border-strong)', background: 'transparent', cursor: 'pointer', flexShrink: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' },
           onclick: () => markComplete(task.id),

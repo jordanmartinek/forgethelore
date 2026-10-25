@@ -151,7 +151,7 @@ function fillScrubPanels(panels, world, factionById) {
         const a = pieceName.get(rs.rel.sourceId) || rs.rel.sourceId;
         const b = pieceName.get(rs.rel.targetId) || rs.rel.targetId;
         const top = Object.entries(rs.dims || {}).sort((x, y) => (y[1] || 0) - (x[1] || 0)).slice(0, 3);
-        return h('div', { style: { padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' } },
+        return h('div', { style: { padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' } },
           h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '3px' } }, `${a} ↔ ${b}`),
           h('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } },
             ...top.map(([dim, val]) => {
